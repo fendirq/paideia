@@ -21,8 +21,8 @@ Paideia is a full-stack web application that provides Drew School students and t
 | Database | PostgreSQL + Prisma ORM + pgvector extension |
 | Auth | NextAuth.js — Google OAuth, @drewschool.org only |
 | File Storage | Vercel Blob |
-| LLM | Kimi K2.5 via Together.ai (OpenAI-compatible API) |
-| Fallback LLM | Llama 3.1 70B or similar via Together.ai (silent failover) |
+| LLM | Kimi K2.5 via Together.ai (OpenAI-compatible API) — requires `TOGETHER_API_KEY` env var |
+| Fallback LLM | Llama 3.1 70B or similar via Together.ai (silent failover, same API key) |
 | Embeddings | bge-large-en-v1.5 or text-embedding-3-small |
 | Hosting | Vercel |
 | Repo | GitHub — `paideia` |
@@ -48,26 +48,48 @@ Paideia is a full-stack web application that provides Drew School students and t
 
 Distinctive display font for headings (Clash Display, Satoshi, General Sans, or Cabinet Grotesk) paired with a clean body font. No generic Inter/Roboto.
 
+### Consistency
+
+All pages share the same Tailwind theme config — colors, fonts, spacing, and border radii are defined once in `tailwind.config.ts` and used everywhere. No per-page overrides. The result should feel like one cohesive product (similar to how Claude maintains visual consistency across chat, settings, and marketing pages).
+
 ### Design Principles
 
 - Desktop-first (optimized for laptops, stacked/tabbed fallback for mobile)
 - Dark mode by default with light mode toggle
 - No emojis in the UI
-- Parallax scrolling on marketing pages
-- Framer Motion for all page transitions and scroll-triggered animations
+- Parallax scrolling on **landing page only** (hero section + scroll-triggered feature sections). All app pages (chat, dashboards, library) use standard scrolling.
+- Framer Motion for page transitions and scroll-triggered animations (landing page)
 - Skeleton loading states, not spinners
 
 ---
 
 ## 4. Authentication & Roles
 
-- Google OAuth via NextAuth.js
+### Login Page (First Page)
+
+The login page is the **first thing users see** when visiting Paideia. No landing page or marketing content before login.
+
+- **Google OAuth**: "Sign in with your Drew email" button via NextAuth.js
 - Restricted to `@drewschool.org` email addresses
 - Non-Drew emails see: "Paideia is exclusively for Drew School students and faculty."
 - First login: role selection screen — "I'm a Student" / "I'm a Teacher"
 - Role stored in User record, immutable after selection
-- JWT session management
+
+### Guest Passcode Access
+
+Below the Google sign-in button, a secondary option:
+- Small text link: "Enter with passcode"
+- Expanding input field for a 6-digit passcode
+- Hardcoded passcode: `082600`
+- Guest access grants a temporary session (not stored in the database, no User record created)
+- Guests can browse the library and view resources but cannot upload, start tutoring sessions, or leave ratings
+- Session expires on browser close
+
+### Session Management
+
+- JWT session management for authenticated users
 - Middleware protects all `/app/*` routes
+- Guest sessions use a lightweight cookie (no DB persistence)
 
 ---
 
@@ -245,15 +267,17 @@ Core instructions:
 
 ---
 
-## 10. Landing Page
+## 10. Landing / Home Page (Post-Login)
 
-- **Hero**: Full-width looping video background (`hero-bg.mp4`), muted, autoplay, dark overlay. Bold headline, subtitle, "Sign in with your Drew email" CTA.
+After login, authenticated users land on this page. It serves as the app's home and introduction.
+
+- **Hero**: Full-width looping video background (`hero-bg.mp4`), muted, autoplay, dark overlay. Bold headline, subtitle, quick-action buttons ("Start Tutoring", "Browse Library").
 - **How It Works**: 3-step scroll-triggered animation (Upload > AI Diagnoses > Socratic Session)
 - **Subject Library Preview**: Subject grid with resource counts, scroll-triggered entrance
 - **Features Showcase**: Panels — Socratic learning, curriculum-specific, growing knowledge base, file support
 - **For Students / For Teachers**: Split section with value props for each audience
 - **Footer**: Links, Drew branding, "Built by Mic — Drew Class of [year]"
-- Parallax layering and Framer Motion throughout
+- Parallax layering and Framer Motion throughout this page (landing page is the only page with parallax)
 
 ---
 
