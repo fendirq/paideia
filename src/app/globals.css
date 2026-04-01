@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-base: #1a1915;
+  --color-bg-surface: #2d2b28;
+  --color-bg-elevated: #3d3a37;
+  --color-accent: #4a9d5b;
+  --color-accent-light: #6bc47d;
+  --color-text-primary: #e8e0d8;
+  --color-text-secondary: #a39e98;
+  --color-text-muted: #706b65;
+
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-body: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
+  }
+
+  ::selection {
+    background-color: oklch(from var(--color-accent) l c h / 0.3);
+    color: var(--color-text-primary);
+  }
+}
+
+@utility btn-primary {
+  background-color: var(--color-accent);
+  color: var(--color-bg-base);
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s;
+  &:hover {
+    background-color: var(--color-accent-light);
+  }
+}
+
+@utility btn-secondary {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-bg-elevated);
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.15s;
+  &:hover {
+    background-color: var(--color-bg-surface);
+  }
+}
+
+@utility card {
+  background-color: var(--color-bg-surface);
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-bg-elevated);
+}
