@@ -211,8 +211,8 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
                   e.preventDefault();
                   setDeleteTarget(inq.id);
                 }}
-                className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all p-1.5 rounded-lg hover:bg-bg-elevated"
-                title="Delete inquiry"
+                className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 focus:opacity-100 text-text-muted hover:text-red-400 transition-all p-1.5 rounded-lg hover:bg-bg-elevated"
+                aria-label="Delete inquiry"
               >
                 <svg
                   className="w-4 h-4"

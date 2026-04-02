@@ -32,12 +32,8 @@ export async function GET(
     },
   });
 
-  if (!inquiry) {
+  if (!inquiry || inquiry.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (inquiry.userId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   return NextResponse.json(inquiry);
@@ -63,20 +59,25 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Delete in order: messages → sessions → chunks → files → inquiry
+  // Atomic delete: messages → sessions → chunks → files → inquiry
   const sessions = await db.tutoringSession.findMany({
     where: { inquiryId: id },
     select: { id: true },
   });
-  if (sessions.length > 0) {
-    await db.message.deleteMany({
-      where: { sessionId: { in: sessions.map((s) => s.id) } },
-    });
-    await db.tutoringSession.deleteMany({ where: { inquiryId: id } });
-  }
-  await db.textChunk.deleteMany({ where: { inquiryId: id } });
-  await db.file.deleteMany({ where: { inquiryId: id } });
-  await db.inquiry.delete({ where: { id } });
+
+  await db.$transaction([
+    ...(sessions.length > 0
+      ? [
+          db.message.deleteMany({
+            where: { sessionId: { in: sessions.map((s) => s.id) } },
+          }),
+          db.tutoringSession.deleteMany({ where: { inquiryId: id } }),
+        ]
+      : []),
+    db.textChunk.deleteMany({ where: { inquiryId: id } }),
+    db.file.deleteMany({ where: { inquiryId: id } }),
+    db.inquiry.delete({ where: { id } }),
+  ]);
 
   return NextResponse.json({ success: true });
 }
