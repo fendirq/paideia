@@ -32,13 +32,52 @@ export async function GET(
     },
   });
 
-  if (!inquiry) {
+  if (!inquiry || inquiry.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (inquiry.userId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return NextResponse.json(inquiry);
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(inquiry);
+  const { id } = await params;
+
+  const inquiry = await db.inquiry.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
+
+  if (!inquiry || inquiry.userId !== session.user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Atomic delete: messages → sessions → chunks → files → inquiry
+  const sessions = await db.tutoringSession.findMany({
+    where: { inquiryId: id },
+    select: { id: true },
+  });
+
+  await db.$transaction([
+    ...(sessions.length > 0
+      ? [
+          db.message.deleteMany({
+            where: { sessionId: { in: sessions.map((s) => s.id) } },
+          }),
+          db.tutoringSession.deleteMany({ where: { inquiryId: id } }),
+        ]
+      : []),
+    db.textChunk.deleteMany({ where: { inquiryId: id } }),
+    db.file.deleteMany({ where: { inquiryId: id } }),
+    db.inquiry.delete({ where: { id } }),
+  ]);
+
+  return NextResponse.json({ success: true });
 }
