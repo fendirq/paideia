@@ -97,7 +97,7 @@ export function LoginForm() {
             disabled={loading || !passcode}
             className="btn-secondary w-full disabled:opacity-50"
           >
-            {loading ? "Verifying..." : "Enter as Guest"}
+            {loading ? "Verifying..." : "Enter as Admin"}
           </button>
         </form>
       )}

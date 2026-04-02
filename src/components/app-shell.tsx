@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 
 const navItems = [
@@ -43,25 +44,109 @@ function NavIcon({ icon }: { icon: string }) {
   }
 }
 
+interface RecentSession {
+  id: string;
+  unitName: string;
+  teacherName: string;
+  status: string;
+}
+
 interface AppShellProps {
   children: React.ReactNode;
   userName?: string;
   userRole?: string | null;
+  recentSessions?: RecentSession[];
 }
 
-export function AppShell({ children, userName, userRole }: AppShellProps) {
+export function AppShell({
+  children,
+  userName,
+  userRole,
+  recentSessions = [],
+}: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [sessions, setSessions] = useState(recentSessions);
+  useEffect(() => { setSessions(recentSessions); }, [recentSessions]);
+  const currentSessionId = pathname.startsWith("/app/sessions/")
+    ? pathname.split("/app/sessions/")[1]?.split("/")[0]
+    : null;
+
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(false);
+    try {
+      const res = await fetch(`/api/sessions/${deleteTarget}`, { method: "DELETE" });
+      if (res.ok) {
+        setSessions((prev) => prev.filter((s) => s.id !== deleteTarget));
+        if (currentSessionId === deleteTarget) {
+          router.push("/app");
+        }
+        setDeleteTarget(null);
+      } else {
+        setDeleteError(true);
+      }
+    } catch {
+      setDeleteError(true);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex">
-      <aside className="w-64 bg-bg-surface border-r border-bg-elevated flex flex-col">
+    <div className="h-screen flex">
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setDeleteTarget(null)}
+          />
+          <div className="relative bg-bg-surface border border-bg-elevated rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-display font-semibold text-text-primary mb-2">
+              Delete session?
+            </h3>
+            <p className="text-sm text-text-secondary mb-6">
+              This will permanently delete this tutoring session and all its
+              messages. This action cannot be undone.
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-400 mb-3">
+                Failed to delete. Please try again.
+              </p>
+            )}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setDeleteTarget(null); setDeleteError(false); }}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary border border-bg-elevated rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm bg-accent hover:bg-accent-light text-bg-base rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <aside className="w-64 bg-bg-surface border-r border-bg-elevated flex flex-col shrink-0">
         <div className="p-6">
           <h2 className="text-xl font-display font-bold text-text-primary">
             Paideia
           </h2>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className="px-3 space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -81,6 +166,59 @@ export function AppShell({ children, userName, userRole }: AppShellProps) {
           })}
         </nav>
 
+        {/* Recent sessions */}
+        {sessions.length > 0 && (
+          <div className="mt-6 flex-1 overflow-y-auto px-3">
+            <p className="px-3 text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+              Recents
+            </p>
+            <div className="space-y-0.5">
+              {sessions.map((s) => {
+                const isActive = currentSessionId === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    className={`group relative rounded-lg transition-colors ${
+                      isActive
+                        ? "bg-bg-elevated"
+                        : "hover:bg-bg-elevated/50"
+                    }`}
+                  >
+                    <Link
+                      href={`/app/sessions/${s.id}`}
+                      className="block px-3 py-2 pr-8"
+                    >
+                      <p
+                        className={`text-sm font-medium truncate ${
+                          isActive ? "text-text-primary" : "text-text-secondary"
+                        }`}
+                      >
+                        {s.unitName}
+                      </p>
+                      <p className="text-xs text-text-muted truncate">
+                        {s.teacherName}
+                      </p>
+                    </Link>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteTarget(s.id);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-text-muted hover:text-text-primary transition-all p-1"
+                      title="Delete session"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="p-4 border-t border-bg-elevated">
           <div className="flex items-center justify-between">
             <div>
@@ -88,8 +226,8 @@ export function AppShell({ children, userName, userRole }: AppShellProps) {
                 {userName ?? "Guest"}
               </p>
               <p className="text-xs text-text-muted">
-                {userRole === "GUEST"
-                  ? "Guest"
+                {userRole === "ADMIN"
+                  ? "Admin"
                   : userRole === "TEACHER"
                     ? "Teacher"
                     : userRole === "STUDENT"
@@ -110,7 +248,7 @@ export function AppShell({ children, userName, userRole }: AppShellProps) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
     </div>
   );
 }

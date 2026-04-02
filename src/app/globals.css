@@ -64,3 +64,110 @@
   border-radius: 0.75rem;
   border: 1px solid var(--color-bg-elevated);
 }
+
+/* Chat prose — spacious, readable AI responses */
+.chat-prose {
+  color: var(--color-text-primary);
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.chat-prose p {
+  margin-bottom: 0.75rem;
+}
+
+.chat-prose p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-prose h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.75rem;
+  margin-bottom: 1rem;
+  color: var(--color-text-primary);
+}
+
+.chat-prose h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-primary);
+}
+
+.chat-prose h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.6rem;
+  color: var(--color-text-primary);
+}
+
+.chat-prose strong {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.chat-prose ul,
+.chat-prose ol {
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.chat-prose li {
+  margin-bottom: 0.5rem;
+  color: var(--color-text-primary);
+}
+
+.chat-prose code {
+  color: var(--color-accent-light);
+  background-color: var(--color-bg-base);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.chat-prose pre {
+  background-color: var(--color-bg-base);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.chat-prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.chat-prose blockquote {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--color-text-secondary);
+}
+
+.chat-prose hr {
+  border-color: var(--color-bg-elevated);
+  margin: 1.5rem 0;
+}
+
+.chat-prose a {
+  color: var(--color-accent-light);
+  text-decoration: underline;
+}
+
+.chat-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.chat-prose th,
+.chat-prose td {
+  border: 1px solid var(--color-bg-elevated);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
