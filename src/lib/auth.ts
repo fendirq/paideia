@@ -24,11 +24,25 @@ export const authOptions: NextAuthOptions = {
           typeof credentials?.passcode === "string" &&
           validatePasscode(credentials.passcode)
         ) {
+          // Ensure admin user exists in DB for full access
+          const adminEmail = "admin@paideia.local";
+          let adminUser = await db.user.findUnique({
+            where: { email: adminEmail },
+          });
+          if (!adminUser) {
+            adminUser = await db.user.create({
+              data: {
+                email: adminEmail,
+                name: "Admin",
+                role: "ADMIN",
+              },
+            });
+          }
           return {
-            id: "guest",
-            name: "Guest",
-            email: "guest@paideia.local",
-            role: "GUEST",
+            id: adminUser.id,
+            name: "Admin",
+            email: adminEmail,
+            role: "ADMIN",
           };
         }
         return null;
@@ -51,7 +65,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role ?? null;
       }
       // For Google users, refresh role from DB (set during onboarding)
-      if (token.userId && token.userId !== "guest" && !token.role) {
+      if (token.userId && !token.role) {
         const dbUser = await db.user.findUnique({
           where: { id: token.userId },
           select: { role: true },

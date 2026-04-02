@@ -1,6 +1,6 @@
-const GUEST_PASSCODE = "082600";
-
 export function validatePasscode(input: string): boolean {
   if (!input || typeof input !== "string") return false;
-  return input === GUEST_PASSCODE;
+  const expected = process.env.ADMIN_PASSCODE;
+  if (!expected) return false;
+  return input === expected;
 }
