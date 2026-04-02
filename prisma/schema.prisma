@@ -1,0 +1,141 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// ─── Enums ───
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum Subject {
+  MATHEMATICS
+  ENGLISH
+  HISTORY
+  SCIENCE
+  MANDARIN
+  HUMANITIES
+  OTHER
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+}
+
+// ─── NextAuth Models ───
+
+model User {
+  id               String            @id @default(cuid())
+  name             String?
+  email            String            @unique
+  emailVerified    DateTime?
+  image            String?
+  role             Role?
+  accounts         Account[]
+  inquiries        Inquiry[]
+  tutoringSessions TutoringSession[]
+  createdAt        DateTime          @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// ─── App Models ───
+
+model Inquiry {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+  subject     Subject
+  teacherName String
+  unitName    String
+  description String
+  files       File[]
+  chunks      TextChunk[]
+  sessions    TutoringSession[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model File {
+  id            String      @id @default(cuid())
+  inquiryId     String
+  inquiry       Inquiry     @relation(fields: [inquiryId], references: [id])
+  fileName      String
+  fileUrl       String
+  fileType      String
+  extractedText String?
+  chunks        TextChunk[]
+  createdAt     DateTime    @default(now())
+}
+
+model TextChunk {
+  id         String                      @id @default(cuid())
+  fileId     String
+  file       File                        @relation(fields: [fileId], references: [id])
+  inquiryId  String
+  inquiry    Inquiry                     @relation(fields: [inquiryId], references: [id])
+  content    String
+  embedding  Unsupported("vector(1024)")
+  chunkIndex Int
+  createdAt  DateTime                    @default(now())
+}
+
+model TutoringSession {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  inquiryId     String
+  inquiry       Inquiry       @relation(fields: [inquiryId], references: [id])
+  messages      Message[]
+  rating        Int?
+  ratingComment String?
+  status        SessionStatus @default(ACTIVE)
+  startedAt     DateTime      @default(now())
+  endedAt       DateTime?
+}
+
+model Message {
+  id               String          @id @default(cuid())
+  sessionId        String
+  session          TutoringSession @relation(fields: [sessionId], references: [id])
+  role             String
+  content          String
+  suggestedActions String[]
+  createdAt        DateTime        @default(now())
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String
+  targetId   String
+  reason     String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+}

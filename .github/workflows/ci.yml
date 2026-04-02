@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [dev]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - run: npx next build
+        env:
+          DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+          NEXTAUTH_SECRET: "ci-secret"
+          GOOGLE_CLIENT_ID: "ci"
+          GOOGLE_CLIENT_SECRET: "ci"
+          TOGETHER_API_KEY: "ci"
+          BLOB_READ_WRITE_TOKEN: "ci"
