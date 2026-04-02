@@ -29,6 +29,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# superpowers plugin cache
+.superpowers/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

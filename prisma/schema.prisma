@@ -14,6 +14,7 @@ datasource db {
 enum Role {
   STUDENT
   TEACHER
+  ADMIN
 }
 
 enum Subject {
@@ -100,7 +101,7 @@ model TextChunk {
   inquiryId  String
   inquiry    Inquiry                     @relation(fields: [inquiryId], references: [id])
   content    String
-  embedding  Unsupported("vector(1536)")
+  embedding  Unsupported("vector(1024)")
   chunkIndex Int
   createdAt  DateTime                    @default(now())
 }
