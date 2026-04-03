@@ -231,7 +231,7 @@ export function ChatContainer({
               <p className="text-2xl font-display font-semibold mb-2">
                 Hello, I&apos;m Paideia.
               </p>
-              <p className="text-base text-text-secondary font-[Times_New_Roman,_Times,_serif] leading-relaxed">
+              <p className="text-base text-text-secondary font-serif leading-relaxed">
                 Your Socratic tutor for{" "}
                 <span className="text-text-primary font-semibold">
                   {inquiry.unitName}
@@ -262,7 +262,7 @@ export function ChatContainer({
       </div>
 
       {/* Action panel + Input area */}
-      <div className="border-t border-bg-elevated">
+      <div className="border-t border-white/[0.04]">
         <div className="max-w-3xl mx-auto px-6 py-4">
           {showWelcome && !isStreaming && (
             <ActionPanel
@@ -296,7 +296,7 @@ export function ChatContainer({
               maxLength={2000}
               rows={1}
               disabled={isStreaming}
-              className="flex-1 bg-bg-base border border-bg-elevated rounded-2xl px-5 py-3.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-[Times_New_Roman,_Times,_serif]"
+              className="flex-1 bg-bg-base border border-white/[0.06] rounded-2xl px-5 py-3.5 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-serif"
             />
             <button
               type="submit"

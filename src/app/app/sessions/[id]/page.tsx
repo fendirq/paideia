@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { ChatContainer } from "@/components/chat-container";
+import Link from "next/link";
 
 export default async function SessionPage({
   params,
@@ -40,26 +41,16 @@ export default async function SessionPage({
     tutoringSession.inquiry.subject.slice(1).toLowerCase();
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-bg-surface">
-      <div className="border-b border-bg-elevated px-6 py-4 flex items-center gap-4">
-        <a
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-bg-inner">
+      <div className="border-b border-white/[0.04] px-6 py-3 flex items-center gap-4">
+        <Link
           href="/app"
           className="text-text-muted hover:text-text-primary transition-colors"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
-            />
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
           </svg>
-        </a>
+        </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-display font-semibold truncate">
             {tutoringSession.inquiry.unitName}
