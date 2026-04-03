@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { StatCard } from "@/components/stat-card";
+import { ActivityChart } from "@/components/activity-chart";
 import { DonutChart } from "@/components/donut-chart";
 import { ExamCountdown } from "@/components/exam-countdown";
 import { StudyQueue } from "@/components/study-queue";
@@ -23,6 +24,7 @@ export default async function AnalyticsPage() {
     inquiries,
     exams,
     studyItems,
+    weekSessions,
   ] = await Promise.all([
     db.tutoringSession.count({
       where: { userId, startedAt: { gte: weekAgo } },
@@ -54,12 +56,16 @@ export default async function AnalyticsPage() {
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
+    db.tutoringSession.findMany({
+      where: { userId, startedAt: { gte: weekAgo } },
+      select: { startedAt: true },
+    }),
   ]);
 
   // Compute stats
   const sessionsTrend = sessionsThisWeek - sessionsLastWeek;
 
-  // Compute streak: count consecutive days with sessions
+  // Compute streak
   const recentDates = await db.tutoringSession.findMany({
     where: { userId },
     select: { startedAt: true },
@@ -82,16 +88,36 @@ export default async function AnalyticsPage() {
     }
   }
 
-  // Donut data: sessions per subject
+  // Message count
+  const messageCount = await db.message.count({
+    where: { session: { userId } },
+  });
+
+  // Donut data
   const subjectCounts = new Map<string, number>();
   for (const s of totalSessions) {
     const subj = s.inquiry.subject;
     subjectCounts.set(subj, (subjectCounts.get(subj) ?? 0) + 1);
   }
-  const donutSegments = Array.from(subjectCounts.entries()).map(([subject, count]) => ({
-    subject,
-    label: subject.charAt(0) + subject.slice(1).toLowerCase(),
-    count,
+  const donutSegments = Array.from(subjectCounts.entries()).map(
+    ([subject, count]) => ({
+      subject,
+      label: subject.charAt(0) + subject.slice(1).toLowerCase(),
+      count,
+    })
+  );
+
+  // Weekly activity data (Mon-Sun)
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const activityMap = new Map<number, number>();
+  for (const s of weekSessions) {
+    const day = s.startedAt.getDay();
+    const adjusted = day === 0 ? 6 : day - 1; // Mon=0, Sun=6
+    activityMap.set(adjusted, (activityMap.get(adjusted) ?? 0) + 1);
+  }
+  const activityData = dayNames.map((day, i) => ({
+    day,
+    count: activityMap.get(i) ?? 0,
   }));
 
   // Exam countdown
@@ -118,35 +144,42 @@ export default async function AnalyticsPage() {
     completed: item.status === "PRACTICED",
   }));
 
+  const uniqueSubjects = new Set(totalSessions.map((s) => s.inquiry.subject));
+
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-bg-inner">
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-display font-bold mb-1">Analytics</h1>
-        <p className="text-text-secondary text-sm mb-8">
-          Track your study habits and upcoming goals.
-        </p>
+    <div className="max-w-4xl mx-auto px-6 py-8">
+      <h1 className="font-serif text-[34px] text-text-primary mb-2">
+        Analytics
+      </h1>
+      <p className="text-[15px] text-text-secondary mb-8">
+        Track your study habits and upcoming goals.
+      </p>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          <StatCard
-            value={sessionsThisWeek}
-            label="Sessions this week"
-            trend={sessionsTrend > 0 ? sessionsTrend : undefined}
-          />
-          <StatCard value={streak} label="Day streak" />
-          <StatCard value={inquiries} label="Classes active" />
-          <StatCard value={totalSessions.length} label="Total sessions" />
-        </div>
-
-        {/* Two-column: Donut + Exams */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <DonutChart segments={donutSegments} total={totalSessions.length} />
-          <ExamCountdown exams={examItems} />
-        </div>
-
-        {/* Full-width: Study queue */}
-        <StudyQueue items={queueItems} />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard
+          value={sessionsThisWeek}
+          label="Sessions"
+          trend={sessionsTrend > 0 ? sessionsTrend : undefined}
+        />
+        <StatCard value={streak} label="Day streak" />
+        <StatCard value={messageCount} label="Messages" />
+        <StatCard value={uniqueSubjects.size} label="Subjects" />
       </div>
+
+      {/* Activity + Donut side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <ActivityChart data={activityData} />
+        <DonutChart segments={donutSegments} total={totalSessions.length} />
+      </div>
+
+      {/* Exams */}
+      <div className="mb-6">
+        <ExamCountdown exams={examItems} />
+      </div>
+
+      {/* Study queue */}
+      <StudyQueue items={queueItems} />
     </div>
   );
 }

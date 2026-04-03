@@ -15,10 +15,21 @@ interface StudyQueueProps {
   items: StudyQueueItem[];
 }
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+const STATUS_STYLES: Record<
+  string,
+  { bg: string; text: string; label: string }
+> = {
   NEW: { bg: "bg-[#5b9bd5]/[0.12]", text: "text-[#5b9bd5]", label: "New" },
-  REVIEW: { bg: "bg-[#e8a838]/[0.12]", text: "text-[#e8a838]", label: "Review" },
-  PRACTICED: { bg: "bg-accent/[0.12]", text: "text-accent-light", label: "Practiced" },
+  REVIEW: {
+    bg: "bg-[#e8a838]/[0.12]",
+    text: "text-[#e8a838]",
+    label: "Review",
+  },
+  PRACTICED: {
+    bg: "bg-accent/[0.12]",
+    text: "text-accent-light",
+    label: "Practiced",
+  },
 };
 
 export function StudyQueue({ items: initialItems }: StudyQueueProps) {
@@ -33,13 +44,13 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
   };
 
   return (
-    <div className="bg-bg-surface/50 border border-white/[0.04] rounded-xl p-6">
-      <h3 className="font-display font-semibold text-[15px] mb-5">
+    <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-6">
+      <h3 className="font-display text-[13px] font-semibold mb-5">
         To Study
       </h3>
 
       {items.length === 0 ? (
-        <p className="text-sm text-text-muted py-4">
+        <p className="text-[13px] text-text-muted py-4">
           No study items yet. Upload coursework to generate your study plan.
         </p>
       ) : (
@@ -49,28 +60,36 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
             return (
               <div
                 key={item.id}
-                className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-bg-elevated/30 transition-colors"
+                className="flex items-center gap-3 py-2.5 px-2 rounded-[8px] hover:bg-bg-surface/30 transition-colors"
               >
-                {/* Checkbox */}
                 <button
                   onClick={() => toggleComplete(item.id)}
-                  className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
+                  className={`w-[20px] h-[20px] rounded-[6px] border-2 shrink-0 flex items-center justify-center transition-colors ${
                     item.completed
                       ? "bg-accent border-accent"
                       : "border-text-muted/40 hover:border-accent/60"
                   }`}
                 >
                   {item.completed && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    <svg
+                      className="w-3 h-3 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="m4.5 12.75 6 6 9-13.5"
+                      />
                     </svg>
                   )}
                 </button>
 
-                {/* Content */}
                 <div className="flex-1 min-w-0">
                   <p
-                    className={`text-sm font-medium ${
+                    className={`text-[13px] font-display font-medium ${
                       item.completed
                         ? "line-through text-text-muted"
                         : "text-text-primary"
@@ -78,15 +97,14 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
                   >
                     {item.topic}
                   </p>
-                  <p className="text-xs text-text-muted">
+                  <p className="text-[11px] text-text-muted">
                     {item.className}
-                    {item.chapter ? ` · ${item.chapter}` : ""}
+                    {item.chapter ? ` \u00B7 ${item.chapter}` : ""}
                   </p>
                 </div>
 
-                {/* Status badge */}
                 <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${style.bg} ${style.text}`}
+                  className={`text-[10px] px-2.5 py-1 rounded-[6px] font-display font-medium ${style.bg} ${style.text}`}
                 >
                   {style.label}
                 </span>
