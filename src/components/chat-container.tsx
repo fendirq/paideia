@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage } from "./chat-message";
 import { ActionPanel } from "./action-panel";
 import { filterResponseBySubject } from "@/lib/content-filter";
+import { stripThinkingTags } from "@/lib/strip-thinking";
 
 interface Message {
   id?: string;
@@ -164,11 +165,8 @@ export function ChatContainer({
             if (delta) {
               fullText += delta;
 
-              // Strip <think>...</think> tags and any unclosed <think> block
-              let visible = fullText
-                .replace(/<think>[\s\S]*?<\/think>/g, "")
-                .replace(/<think>[\s\S]*$/g, "")
-                .trim();
+              // Strip <think>...</think> tags and fix R1 sentence fragments
+              let visible = stripThinkingTags(fullText);
 
               // Don't show anything while model is still thinking
               if (!visible) continue;
@@ -198,11 +196,8 @@ export function ChatContainer({
         }
       }
 
-      // Strip thinking tags (closed and unclosed) and parse actions
-      let cleaned = fullText
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .replace(/<think>[\s\S]*$/g, "")
-        .trim();
+      // Strip thinking tags and fix R1 sentence fragments
+      let cleaned = stripThinkingTags(fullText);
 
       const separator = "---ACTIONS---";
       const idx = cleaned.lastIndexOf(separator);

@@ -39,13 +39,7 @@ export async function streamChatCompletion(
   return response.body!;
 }
 
-// Strip DeepSeek R1 <think>...</think> reasoning tags from output (closed and unclosed)
-function stripThinkingTags(text: string): string {
-  return text
-    .replace(/<think>[\s\S]*?<\/think>/g, "")
-    .replace(/<think>[\s\S]*$/g, "")
-    .trim();
-}
+import { stripThinkingTags } from "./strip-thinking";
 
 export function parseActionsFromResponse(fullText: string): {
   message: string;
