@@ -20,6 +20,8 @@ interface FileCabinetProps {
   subject: string;
   description: string;
   chunkCount: number;
+  teacherNotes?: string | null;
+  isTeacher?: boolean;
 }
 
 export function FileCabinet({
@@ -30,6 +32,8 @@ export function FileCabinet({
   subject,
   description,
   chunkCount,
+  teacherNotes,
+  isTeacher,
 }: FileCabinetProps) {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(
     files[0]?.id ?? null
@@ -54,12 +58,32 @@ export function FileCabinet({
           </Link>
           <h1 className="text-2xl font-display font-bold">{unitName}</h1>
           <p className="text-text-muted text-sm">
-            {subject} &middot; {teacherName}
+            {subject.charAt(0) + subject.slice(1).toLowerCase()} &middot; {teacherName}
           </p>
           {description && (
             <p className="text-text-secondary text-sm mt-2 max-w-2xl">
               {description}
             </p>
+          )}
+          {isTeacher && (
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-text-muted mb-1.5">
+                Teacher Notes (visible to you only)
+              </label>
+              <textarea
+                defaultValue={teacherNotes ?? ""}
+                onBlur={(e) => {
+                  fetch(`/api/inquiries/${inquiryId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teacherNotes: e.target.value }),
+                  });
+                }}
+                rows={3}
+                placeholder="Add notes about this student's progress..."
+                className="w-full max-w-lg bg-bg-surface border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none"
+              />
+            </div>
           )}
         </div>
 

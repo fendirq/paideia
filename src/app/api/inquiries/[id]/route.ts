@@ -39,6 +39,34 @@ export async function GET(
   return NextResponse.json(inquiry);
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const body = await req.json();
+
+  const inquiry = await db.inquiry.findUnique({ where: { id } });
+  if (!inquiry || inquiry.userId !== session.user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const updated = await db.inquiry.update({
+    where: { id },
+    data: {
+      teacherNotes:
+        typeof body.teacherNotes === "string" ? body.teacherNotes : undefined,
+    },
+  });
+
+  return NextResponse.json(updated);
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

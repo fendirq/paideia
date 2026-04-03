@@ -45,9 +45,11 @@ export default async function InquiryPage({
       inquiryId={inquiry.id}
       unitName={inquiry.unitName}
       teacherName={inquiry.teacherName}
-      subject={subjectLabel}
+      subject={inquiry.subject}
       description={inquiry.description}
       chunkCount={inquiry._count.chunks}
+      teacherNotes={inquiry.teacherNotes}
+      isTeacher={session.user.role === "TEACHER"}
     />
   );
 }
