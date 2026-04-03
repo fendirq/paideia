@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage } from "./chat-message";
 import { ActionPanel } from "./action-panel";
-import { SocraticBanner } from "./socratic-banner";
+import { filterResponseBySubject } from "@/lib/content-filter";
 
 interface Message {
   id?: string;
@@ -178,7 +178,10 @@ export function ChatContainer({
                 thinkingCleared = true;
               }
 
-              const displayText = visible.split("---ACTIONS---")[0].trim();
+              const displayText = filterResponseBySubject(
+                visible.split("---ACTIONS---")[0].trim(),
+                inquiry.subject
+              );
               setMessages((prev) => {
                 const updated = [...prev];
                 updated[updated.length - 1] = {
@@ -203,7 +206,7 @@ export function ChatContainer({
 
       const separator = "---ACTIONS---";
       const idx = cleaned.lastIndexOf(separator);
-      let finalMessage = cleaned;
+      let finalMessage = filterResponseBySubject(cleaned, inquiry.subject);
       let actions: string[] = [];
 
       if (idx !== -1) {
@@ -269,10 +272,6 @@ export function ChatContainer({
       {/* Messages area */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-8 space-y-2">
-          <div className="pt-2 pb-4">
-            <SocraticBanner subject={inquiry.subject} helpType={helpType} />
-          </div>
-
           {showWelcome && (
             <div className="py-12">
               <p className="text-2xl font-display font-semibold mb-2">

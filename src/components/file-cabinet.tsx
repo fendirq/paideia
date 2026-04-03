@@ -67,17 +67,30 @@ export function FileCabinet({
           )}
           {isTeacher && (
             <div className="mt-4">
-              <label className="block text-xs font-medium text-text-muted mb-1.5">
-                Teacher Notes (visible to you only)
-              </label>
+              <div className="flex items-center gap-2 mb-1.5">
+                <label className="block text-xs font-medium text-text-muted">
+                  Teacher Notes (visible to you only)
+                </label>
+                <span id="notes-status" className="text-xs text-text-muted" />
+              </div>
               <textarea
                 defaultValue={teacherNotes ?? ""}
+                maxLength={5000}
                 onBlur={(e) => {
+                  const status = document.getElementById("notes-status");
                   fetch(`/api/inquiries/${inquiryId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ teacherNotes: e.target.value }),
-                  });
+                  })
+                    .then((res) => {
+                      if (status) status.textContent = res.ok ? "Saved" : "Error saving";
+                      setTimeout(() => { if (status) status.textContent = ""; }, 2000);
+                    })
+                    .catch(() => {
+                      if (status) status.textContent = "Error saving";
+                      setTimeout(() => { if (status) status.textContent = ""; }, 2000);
+                    });
                 }}
                 rows={3}
                 placeholder="Add notes about this student's progress..."

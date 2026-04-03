@@ -51,17 +51,23 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
+  if (session.user.role !== "TEACHER") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const inquiry = await db.inquiry.findUnique({ where: { id } });
-  if (!inquiry || inquiry.userId !== session.user.id) {
+  if (!inquiry) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const notes =
+    typeof body.teacherNotes === "string"
+      ? body.teacherNotes.slice(0, 5000)
+      : undefined;
+
   const updated = await db.inquiry.update({
     where: { id },
-    data: {
-      teacherNotes:
-        typeof body.teacherNotes === "string" ? body.teacherNotes : undefined,
-    },
+    data: { teacherNotes: notes },
   });
 
   return NextResponse.json(updated);
