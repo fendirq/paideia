@@ -45,8 +45,6 @@ export function renderMath(text: string): string {
     return match;
   });
 
-  text = text.replace(/\$\$/g, "");
-
   for (let i = 0; i < rendered.length; i++) {
     text = text.replace(placeholder(i), rendered[i]);
   }

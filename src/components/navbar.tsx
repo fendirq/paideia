@@ -9,6 +9,7 @@ const navItems = [
   { href: "/app", label: "Home" },
   { href: "/app/sessions", label: "Sessions" },
   { href: "/app/analytics", label: "Analytics" },
+  { href: "/app/search", label: "Search" },
 ];
 
 interface NavbarProps {
@@ -20,6 +21,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
   const pathname = usePathname();
   const isHomepage = pathname === "/app";
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,6 +33,11 @@ export function Navbar({ userName, userImage }: NavbarProps) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const initial = userName?.charAt(0)?.toUpperCase() ?? "?";
 
@@ -50,8 +57,8 @@ export function Navbar({ userName, userImage }: NavbarProps) {
         PAIDEIA
       </Link>
 
-      {/* Right: Start Chat + Nav Capsule */}
-      <div className="flex items-center gap-3">
+      {/* Right: Desktop nav */}
+      <div className="hidden md:flex items-center gap-3">
         {/* Start Chat button */}
         <Link
           href="/app/upload"
@@ -62,7 +69,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
 
         {/* Nav capsule */}
         <div className="flex items-center gap-1 bg-bg-base/40 backdrop-blur-xl rounded-full border border-white/[0.06] p-1">
-          {navItems.map((item) => {
+          {navItems.slice(0, 3).map((item) => {
             const isActive =
               item.href === "/app"
                 ? pathname === "/app"
@@ -121,6 +128,65 @@ export function Navbar({ userName, userImage }: NavbarProps) {
           </div>
         </div>
       </div>
+
+      {/* Right: Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="md:hidden text-text-secondary hover:text-text-primary transition-colors"
+      >
+        {mobileOpen ? (
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        )}
+      </button>
+
+      {/* Mobile dropdown */}
+      {mobileOpen && (
+        <div className="absolute top-full left-0 right-0 md:hidden bg-bg-surface border-b border-white/[0.06] shadow-xl">
+          <div className="px-6 py-4 space-y-1">
+            {navItems.map((item) => {
+              const isActive =
+                item.href === "/app"
+                  ? pathname === "/app"
+                  : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-white/[0.08] text-text-primary"
+                      : "text-text-muted hover:text-text-secondary hover:bg-white/[0.04]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+            <Link
+              href="/app/upload"
+              className="block px-4 py-2.5 rounded-lg text-sm font-medium text-accent hover:bg-accent/10 transition-colors"
+            >
+              Start Chat
+            </Link>
+            <hr className="border-white/[0.04]" />
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="text-sm text-text-secondary">{userName ?? "User"}</span>
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="text-sm text-text-muted hover:text-text-primary transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

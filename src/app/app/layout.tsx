@@ -12,9 +12,7 @@ export default async function AppLayout({
 
   if (!session) redirect("/login");
 
-  const isAdmin = session.user.role === "ADMIN";
-
-  if (!isAdmin && !session.user.role) {
+  if (!session.user.role) {
     redirect("/onboarding");
   }
 

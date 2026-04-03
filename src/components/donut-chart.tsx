@@ -57,7 +57,7 @@ export function DonutChart({ segments, total }: DonutChartProps) {
                   strokeWidth={strokeWidth}
                   strokeDasharray={dashArray}
                   strokeDashoffset={dashOffset}
-                  strokeLinecap="round"
+                  strokeLinecap="butt"
                 />
               );
             })}

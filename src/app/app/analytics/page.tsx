@@ -74,10 +74,10 @@ export default async function AnalyticsPage() {
   const today = new Date();
   for (let i = 0; i < 365; i++) {
     const d = new Date(today);
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     if (uniqueDays.has(d.toISOString().split("T")[0])) {
       streak++;
-    } else if (i > 0) {
+    } else {
       break;
     }
   }
