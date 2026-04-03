@@ -1,53 +1,32 @@
-"use client";
+interface VideoHeroProps {
+  userName?: string | null;
+}
 
-import { useEffect, useState } from "react";
-
-export function VideoHero() {
-  const [opacity, setOpacity] = useState(1);
-
-  useEffect(() => {
-    function handleScroll() {
-      const scrollY = window.scrollY;
-      const fadeEnd = window.innerHeight * 0.6;
-      setOpacity(Math.max(0, 1 - scrollY / fadeEnd));
-    }
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+export function VideoHero({ userName }: VideoHeroProps) {
+  const displayName = userName?.split(" ")[0] ?? "there";
 
   return (
-    <>
-      {/* Fixed video background */}
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="fixed inset-0 w-full h-full object-cover z-0"
-      >
-        <source src="/hero-bg.mp4" type="video/mp4" />
-      </video>
-
-      {/* Hero overlay */}
-      <div className="relative z-10 h-screen flex flex-col items-center justify-center">
-        <h1
-          className="font-display font-bold text-6xl md:text-8xl text-white tracking-[0.15em] drop-shadow-lg transition-opacity duration-300"
-          style={{ opacity }}
-        >
-          PAIDEIA
-        </h1>
-
-        {/* Scroll indicator */}
-        <div
-          className="absolute bottom-12 flex flex-col items-center gap-2 text-white/50 transition-opacity duration-300"
-          style={{ opacity }}
-        >
-          <span className="text-xs font-body tracking-widest uppercase">Scroll</span>
-          <svg className="w-5 h-5 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
+    <div
+      className="relative overflow-hidden"
+      style={{
+        height: "340px",
+        background: [
+          "radial-gradient(ellipse at 30% 80%, rgba(74,157,91,0.12) 0%, transparent 50%)",
+          "radial-gradient(ellipse at 70% 20%, rgba(91,155,213,0.05) 0%, transparent 50%)",
+          "linear-gradient(180deg, #1a1915 0%, #22211e 100%)",
+        ].join(", "),
+      }}
+    >
+      <div className="absolute inset-0 flex items-end">
+        <div className="max-w-4xl mx-auto px-6 pb-12 w-full">
+          <h1 className="font-serif text-[42px] leading-[1.15] text-text-primary mb-3">
+            Welcome back, {displayName}.
+          </h1>
+          <p className="text-[15px] text-text-secondary leading-relaxed max-w-md">
+            Pick up where you left off, or start a new study session.
+          </p>
         </div>
       </div>
-    </>
+    </div>
   );
 }

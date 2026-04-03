@@ -18,8 +18,8 @@ export default async function HomePage() {
   });
 
   return (
-    <div className="-mt-14">
-      <VideoHero />
+    <div>
+      <VideoHero userName={session.user.name} />
       <ClassGrid classes={classes} />
     </div>
   );
