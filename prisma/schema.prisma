@@ -32,6 +32,12 @@ enum SessionStatus {
   COMPLETED
 }
 
+enum StudyStatus {
+  NEW
+  REVIEW
+  PRACTICED
+}
+
 // ─── NextAuth Models ───
 
 model User {
@@ -78,6 +84,8 @@ model Inquiry {
   files       File[]
   chunks      TextChunk[]
   sessions    TutoringSession[]
+  exams       Exam[]
+  studyItems  StudyItem[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -116,6 +124,7 @@ model TutoringSession {
   rating        Int?
   ratingComment String?
   status        SessionStatus @default(ACTIVE)
+  duration      Int?
   startedAt     DateTime      @default(now())
   endedAt       DateTime?
 }
@@ -138,4 +147,28 @@ model Report {
   reason     String
   status     String   @default("pending")
   createdAt  DateTime @default(now())
+}
+
+model Exam {
+  id         String      @id @default(cuid())
+  inquiryId  String
+  inquiry    Inquiry     @relation(fields: [inquiryId], references: [id])
+  name       String
+  date       DateTime
+  topics     String[]
+  studyItems StudyItem[]
+  createdAt  DateTime    @default(now())
+}
+
+model StudyItem {
+  id        String      @id @default(cuid())
+  inquiryId String
+  inquiry   Inquiry     @relation(fields: [inquiryId], references: [id])
+  examId    String?
+  exam      Exam?       @relation(fields: [examId], references: [id])
+  topic     String
+  chapter   String?
+  status    StudyStatus @default(NEW)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
