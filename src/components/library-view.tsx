@@ -3,35 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SUBJECT_COLORS, SUBJECT_LABELS } from "@/lib/subject-constants";
 
-const SUBJECT_COLORS: Record<string, string> = {
-  MATHEMATICS: "#5b9bd5",
-  ENGLISH: "#c57bdb",
-  HISTORY: "#e8a838",
-  SCIENCE: "#4a9d5b",
-  MANDARIN: "#e87838",
-  HUMANITIES: "#d4a574",
-  OTHER: "#a39e98",
-};
-
-const SUBJECT_LABELS: Record<string, string> = {
-  MATHEMATICS: "Math",
-  ENGLISH: "English",
-  HISTORY: "History",
-  SCIENCE: "Science",
-  MANDARIN: "Mandarin",
-  HUMANITIES: "Humanities",
-  OTHER: "Other",
-};
-
-const SUBJECT_EMOJI: Record<string, string> = {
-  MATHEMATICS: "\u03C0",
-  ENGLISH: "\u270D",
-  HISTORY: "\uD83C\uDFDB",
-  SCIENCE: "\uD83E\uDDEA",
-  MANDARIN: "\u5B57",
-  HUMANITIES: "\uD83D\uDCDA",
-  OTHER: "\uD83D\uDCC4",
+const SUBJECT_INITIALS: Record<string, string> = {
+  MATHEMATICS: "M",
+  ENGLISH: "E",
+  HISTORY: "H",
+  SCIENCE: "S",
+  MANDARIN: "C",
+  HUMANITIES: "Hu",
+  OTHER: "O",
 };
 
 interface InquiryItem {
@@ -211,7 +192,7 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
           {filtered.map((inq) => {
             const color = SUBJECT_COLORS[inq.subject] ?? SUBJECT_COLORS.OTHER;
             const label = SUBJECT_LABELS[inq.subject] ?? "Other";
-            const emoji = SUBJECT_EMOJI[inq.subject] ?? SUBJECT_EMOJI.OTHER;
+            const initial = SUBJECT_INITIALS[inq.subject] ?? SUBJECT_INITIALS.OTHER;
             return (
               <div key={inq.id} className="group relative">
                 <Link
@@ -227,7 +208,12 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
                     style={{ backgroundColor: color }}
                   />
                   <div className="p-5">
-                    <span className="text-[22px] mb-3 block">{emoji}</span>
+                    <span
+                      className="w-9 h-9 rounded-[10px] flex items-center justify-center font-display font-bold text-[14px] mb-3"
+                      style={{ backgroundColor: `${color}18`, color }}
+                    >
+                      {initial}
+                    </span>
                     <h3 className="font-display font-semibold text-[15px] text-text-primary mb-1 truncate">
                       {inq.unitName}
                     </h3>

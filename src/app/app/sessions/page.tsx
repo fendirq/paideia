@@ -26,7 +26,6 @@ export default async function SessionsPage() {
     unitName: s.inquiry.unitName,
     teacherName: s.inquiry.teacherName,
     messageCount: s._count.messages,
-    status: s.status,
     startedAt: s.startedAt.toISOString(),
   }));
 

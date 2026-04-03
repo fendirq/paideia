@@ -8,7 +8,7 @@ export default async function LibraryPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const inquiries = await db.inquiry.findMany({
+  const rawInquiries = await db.inquiry.findMany({
     where: { userId: session.user.id },
     include: {
       files: { select: { fileName: true } },
@@ -16,6 +16,17 @@ export default async function LibraryPage() {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  const inquiries = rawInquiries.map((inq) => ({
+    id: inq.id,
+    subject: inq.subject,
+    unitName: inq.unitName,
+    teacherName: inq.teacherName,
+    description: inq.description,
+    createdAt: inq.createdAt.toISOString(),
+    files: inq.files,
+    _count: inq._count,
+  }));
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
@@ -25,7 +36,7 @@ export default async function LibraryPage() {
       <p className="text-[15px] text-text-secondary mb-8">
         Your uploaded coursework and study materials.
       </p>
-      <LibraryView inquiries={JSON.parse(JSON.stringify(inquiries))} />
+      <LibraryView inquiries={inquiries} />
     </div>
   );
 }

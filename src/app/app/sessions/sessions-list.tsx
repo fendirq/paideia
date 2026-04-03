@@ -3,26 +3,7 @@
 import { useState } from "react";
 import { SessionCard } from "@/components/session-card";
 import Link from "next/link";
-
-const SUBJECT_COLORS: Record<string, string> = {
-  MATHEMATICS: "#5b9bd5",
-  ENGLISH: "#c57bdb",
-  HISTORY: "#e8a838",
-  SCIENCE: "#4a9d5b",
-  MANDARIN: "#e87838",
-  HUMANITIES: "#d4a574",
-  OTHER: "#a39e98",
-};
-
-const SUBJECT_LABELS: Record<string, string> = {
-  MATHEMATICS: "Math",
-  ENGLISH: "English",
-  HISTORY: "History",
-  SCIENCE: "Science",
-  MANDARIN: "Mandarin",
-  HUMANITIES: "Humanities",
-  OTHER: "Other",
-};
+import { SUBJECT_COLORS, SUBJECT_LABELS } from "@/lib/subject-constants";
 
 interface SessionItem {
   id: string;
@@ -31,7 +12,6 @@ interface SessionItem {
   unitName: string;
   teacherName: string;
   messageCount: number;
-  status: string;
   startedAt: string;
 }
 
@@ -162,7 +142,6 @@ export function SessionsList({ sessions }: SessionsListProps) {
                     unitName={s.unitName}
                     subject={s.subject}
                     messageCount={s.messageCount}
-                    status={s.status}
                     startedAt={s.startedAt}
                   />
                 ))}

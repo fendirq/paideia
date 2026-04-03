@@ -8,7 +8,7 @@ export default async function UploadPage() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect("/app");
+    redirect("/login");
   }
 
   const existingClasses = await db.inquiry.findMany({

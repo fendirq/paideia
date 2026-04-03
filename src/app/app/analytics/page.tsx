@@ -24,7 +24,6 @@ export default async function AnalyticsPage() {
     inquiries,
     exams,
     studyItems,
-    weekSessions,
   ] = await Promise.all([
     db.tutoringSession.count({
       where: { userId, startedAt: { gte: weekAgo } },
@@ -34,7 +33,7 @@ export default async function AnalyticsPage() {
     }),
     db.tutoringSession.findMany({
       where: { userId },
-      select: { inquiry: { select: { subject: true, unitName: true } } },
+      select: { startedAt: true, inquiry: { select: { subject: true, unitName: true } } },
     }),
     db.inquiry.count({ where: { userId } }),
     db.exam.findMany({
@@ -56,25 +55,14 @@ export default async function AnalyticsPage() {
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    db.tutoringSession.findMany({
-      where: { userId, startedAt: { gte: weekAgo } },
-      select: { startedAt: true },
-    }),
   ]);
 
   // Compute stats
   const sessionsTrend = sessionsThisWeek - sessionsLastWeek;
 
-  // Compute streak
-  const recentDates = await db.tutoringSession.findMany({
-    where: { userId },
-    select: { startedAt: true },
-    orderBy: { startedAt: "desc" },
-    take: 100,
-  });
-
+  // Compute streak from totalSessions (already has startedAt)
   const uniqueDays = new Set(
-    recentDates.map((s) => s.startedAt.toISOString().split("T")[0])
+    totalSessions.map((s) => s.startedAt.toISOString().split("T")[0])
   );
   let streak = 0;
   const today = new Date();
@@ -107,10 +95,10 @@ export default async function AnalyticsPage() {
     })
   );
 
-  // Weekly activity data (Mon-Sun)
+  // Weekly activity data (Mon-Sun) — derived from totalSessions
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const activityMap = new Map<number, number>();
-  for (const s of weekSessions) {
+  for (const s of totalSessions.filter((s) => s.startedAt >= weekAgo)) {
     const day = s.startedAt.getDay();
     const adjusted = day === 0 ? 6 : day - 1; // Mon=0, Sun=6
     activityMap.set(adjusted, (activityMap.get(adjusted) ?? 0) + 1);

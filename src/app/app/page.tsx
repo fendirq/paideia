@@ -9,13 +9,22 @@ export default async function HomePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const classes = await db.inquiry.findMany({
+  const rawClasses = await db.inquiry.findMany({
     where: { userId: session.user.id },
     include: {
       _count: { select: { sessions: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
+
+  const classes = rawClasses.map((c) => ({
+    id: c.id,
+    subject: c.subject,
+    unitName: c.unitName,
+    teacherName: c.teacherName,
+    updatedAt: c.updatedAt.toISOString(),
+    _count: c._count,
+  }));
 
   return (
     <div>

@@ -1,14 +1,6 @@
 "use client";
 
-const SUBJECT_COLORS: Record<string, string> = {
-  MATHEMATICS: "#5b9bd5",
-  ENGLISH: "#c57bdb",
-  HISTORY: "#e8a838",
-  SCIENCE: "#4a9d5b",
-  MANDARIN: "#e87838",
-  HUMANITIES: "#d4a574",
-  OTHER: "#a39e98",
-};
+import { SUBJECT_COLORS } from "@/lib/subject-constants";
 
 interface DonutSegment {
   subject: string;
@@ -27,7 +19,12 @@ export function DonutChart({ segments, total }: DonutChartProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  let cumulativePercent = 0;
+  // Pre-compute cumulative offsets to avoid mutation during render
+  const offsets = segments.reduce<number[]>((acc, seg, i) => {
+    const prev = i === 0 ? 0 : acc[i - 1] + (total > 0 ? segments[i - 1].count / total : 0);
+    acc.push(prev);
+    return acc;
+  }, []);
 
   return (
     <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-6">
@@ -42,11 +39,10 @@ export function DonutChart({ segments, total }: DonutChartProps) {
           style={{ width: size, height: size }}
         >
           <svg width={size} height={size} className="-rotate-90">
-            {segments.map((seg) => {
+            {segments.map((seg, i) => {
               const percent = total > 0 ? seg.count / total : 0;
               const dashArray = `${circumference * percent} ${circumference * (1 - percent)}`;
-              const dashOffset = -circumference * cumulativePercent;
-              cumulativePercent += percent;
+              const dashOffset = -circumference * offsets[i];
               const color =
                 SUBJECT_COLORS[seg.subject] ?? SUBJECT_COLORS.OTHER;
 

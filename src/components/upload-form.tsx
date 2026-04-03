@@ -3,16 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { SubjectChips } from "@/components/subject-chips";
-
-const SUBJECT_COLORS: Record<string, string> = {
-  MATHEMATICS: "#5b9bd5",
-  ENGLISH: "#c57bdb",
-  HISTORY: "#e8a838",
-  SCIENCE: "#4a9d5b",
-  MANDARIN: "#e87838",
-  HUMANITIES: "#d4a574",
-  OTHER: "#a39e98",
-};
+import { SUBJECT_COLORS } from "@/lib/subject-constants";
 
 const ALLOWED_EXTENSIONS = [
   ".pdf",
@@ -28,6 +19,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const MAX_TOTAL_SIZE = 100 * 1024 * 1024;
 
 interface UploadedFile {
+  key: string;
   file: File;
   url?: string;
   status: "pending" | "uploading" | "done" | "error";
@@ -122,7 +114,7 @@ export function UploadForm({ userRole, existingClasses }: UploadFormProps) {
           setError(err);
           return;
         }
-        valid.push({ file, status: "pending" });
+        valid.push({ key: crypto.randomUUID(), file, status: "pending" });
       }
       setFiles((prev) => [...prev, ...valid]);
     },
@@ -454,7 +446,7 @@ export function UploadForm({ userRole, existingClasses }: UploadFormProps) {
                 <div className="mt-3 space-y-2">
                   {files.map((f, i) => (
                     <div
-                      key={i}
+                      key={f.key}
                       className="flex items-center justify-between bg-bg-surface/50 rounded-[10px] px-3 py-2 border border-white/[0.04]"
                     >
                       <div className="flex items-center gap-2 min-w-0">
