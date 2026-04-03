@@ -1,5 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
+import { katexSanitizeSchema } from "@/lib/rehype-sanitize-config";
 import { renderMath } from "@/lib/math";
 
 interface Step {
@@ -31,7 +33,7 @@ export function StepChain({ steps }: StepChainProps) {
 
           {/* Explanation */}
           <div className="font-serif text-[15px] leading-relaxed text-text-secondary mb-2">
-            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+            <ReactMarkdown rehypePlugins={[rehypeRaw, [rehypeSanitize, katexSanitizeSchema]]}>
               {renderMath(step.explanation)}
             </ReactMarkdown>
           </div>
@@ -39,7 +41,7 @@ export function StepChain({ steps }: StepChainProps) {
           {/* Math block */}
           {step.math && (
             <div className="bg-bg-surface/50 border border-white/[0.04] rounded-lg px-3.5 py-2.5 text-base leading-relaxed">
-              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+              <ReactMarkdown rehypePlugins={[rehypeRaw, [rehypeSanitize, katexSanitizeSchema]]}>
                 {renderMath(step.math)}
               </ReactMarkdown>
             </div>

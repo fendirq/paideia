@@ -1,5 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
+import { katexSanitizeSchema } from "@/lib/rehype-sanitize-config";
 import { renderMath } from "@/lib/math";
 
 interface ProblemBoxProps {
@@ -14,7 +16,7 @@ export function ProblemBox({ label = "PROBLEM", content }: ProblemBoxProps) {
         {label}
       </p>
       <div className="text-[17px] leading-relaxed text-text-primary">
-        <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+        <ReactMarkdown rehypePlugins={[rehypeRaw, [rehypeSanitize, katexSanitizeSchema]]}>
           {renderMath(content)}
         </ReactMarkdown>
       </div>

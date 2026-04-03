@@ -230,11 +230,11 @@ export function ChatContainer({
 
       const separator = "---ACTIONS---";
       const idx = cleaned.lastIndexOf(separator);
-      let finalMessage = filterResponseBySubject(cleaned, inquiry.subject);
       let actions: string[] = [];
+      let rawMessage = idx !== -1 ? cleaned.slice(0, idx).trim() : cleaned.trim();
+      let finalMessage = filterResponseBySubject(rawMessage, inquiry.subject);
 
       if (idx !== -1) {
-        finalMessage = cleaned.slice(0, idx).trim();
         const actionsText = cleaned.slice(idx + separator.length).trim();
         actions = actionsText
           .split("\n")
@@ -277,7 +277,7 @@ export function ChatContainer({
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isStreaming) return;
-    streamResponse(text);
+    await streamResponse(text);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

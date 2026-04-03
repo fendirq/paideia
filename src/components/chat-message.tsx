@@ -3,6 +3,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
+import { katexSanitizeSchema } from "@/lib/rehype-sanitize-config";
 import { renderMath, cleanUserMath } from "@/lib/math";
 import "katex/dist/katex.min.css";
 
@@ -58,7 +60,7 @@ export function ChatMessage({
       <div className="chat-prose">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]}
+          rehypePlugins={[rehypeRaw, [rehypeSanitize, katexSanitizeSchema]]}
         >
           {renderMath(content)}
         </ReactMarkdown>

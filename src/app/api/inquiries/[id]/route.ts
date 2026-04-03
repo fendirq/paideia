@@ -51,12 +51,12 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
-  if (session.user.role !== "TEACHER") {
+  if (session.user.role !== "TEACHER" && session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
-  if (!inquiry) {
+  if (!inquiry || inquiry.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

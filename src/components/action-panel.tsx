@@ -67,7 +67,7 @@ export function ActionPanel({ actions, onSelect, onDismiss, label }: ActionPanel
           <button
             key={i}
             onClick={() => onSelect(action)}
-            className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 font-[Times_New_Roman,_Times,_serif] text-text-secondary hover:bg-bg-elevated/50"
+            className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2.5 font-serif text-text-secondary hover:bg-bg-elevated/50"
           >
             <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono shrink-0 bg-bg-elevated text-text-muted">
               {i + 1}
@@ -106,7 +106,7 @@ export function ActionPanel({ actions, onSelect, onDismiss, label }: ActionPanel
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
                 placeholder="Type your question..."
-                className="flex-1 bg-bg-elevated rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent font-[Times_New_Roman,_Times,_serif]"
+                className="flex-1 bg-bg-elevated rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent font-serif"
                 autoFocus
               />
               <button

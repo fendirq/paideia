@@ -6,26 +6,40 @@ import { useRouter } from "next/navigation";
 export function RoleSelector() {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   async function selectRole(role: "STUDENT" | "TEACHER") {
     setLoading(role);
+    setError(false);
 
-    const res = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
+    try {
+      const res = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
 
-    if (res.ok) {
-      router.push("/app");
-      router.refresh();
-    } else {
+      if (res.ok) {
+        router.push("/app");
+        router.refresh();
+      } else {
+        setError(true);
+        setLoading(null);
+      }
+    } catch {
+      setError(true);
       setLoading(null);
     }
   }
 
   return (
-    <div className="grid grid-cols-2 gap-5 w-full max-w-md">
+    <div className="flex flex-col items-center gap-4 w-full max-w-md">
+      {error && (
+        <p className="text-red-400 text-[13px]">
+          Something went wrong. Please try again.
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-5 w-full">
       <button
         onClick={() => selectRole("STUDENT")}
         disabled={loading !== null}
@@ -73,6 +87,7 @@ export function RoleSelector() {
           {loading === "TEACHER" ? "Setting up..." : "Teacher"}
         </span>
       </button>
+      </div>
     </div>
   );
 }

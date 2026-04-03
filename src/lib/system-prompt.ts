@@ -39,7 +39,8 @@ function classifySubject(subject: string): SubjectGroup {
       return "history";
     case "ENGLISH":
     case "HUMANITIES":
-      return "writing";
+    case "MANDARIN":
+    case "OTHER":
     default:
       return "writing";
   }
