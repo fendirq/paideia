@@ -35,12 +35,41 @@ const STATUS_STYLES: Record<
 export function StudyQueue({ items: initialItems }: StudyQueueProps) {
   const [items, setItems] = useState(initialItems);
 
-  const toggleComplete = (id: string) => {
+  const toggleComplete = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+
+    const newStatus = item.completed ? item.status : "PRACTICED";
+    const newCompleted = !item.completed;
+
+    // Optimistic update
     setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
+      prev.map((i) =>
+        i.id === id ? { ...i, completed: newCompleted } : i
       )
     );
+
+    try {
+      const res = await fetch(`/api/study-items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newCompleted ? "PRACTICED" : "REVIEW" }),
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === id ? { ...i, completed: item.completed } : i
+          )
+        );
+      }
+    } catch {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, completed: item.completed } : i
+        )
+      );
+    }
   };
 
   return (
