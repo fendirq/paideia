@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage } from "./chat-message";
 import { ActionPanel } from "./action-panel";
+import { SocraticBanner } from "./socratic-banner";
 
 interface Message {
   id?: string;
@@ -41,17 +42,57 @@ export function ChatContainer({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isStreamingRef = useRef(false);
 
-  const welcomeActions = inquiry.description
-    ? [
-        `Help me understand: ${inquiry.description}`,
-        `Load up a problem from my uploaded file`,
-        `Quiz me on ${inquiry.unitName}`,
-      ]
-    : [
-        `Load up a problem from my uploaded file`,
-        `Quiz me on ${inquiry.unitName}`,
-        `Start with the basics of ${inquiry.unitName}`,
-      ];
+  const getWelcomeActions = (): string[] => {
+    const subjectGroup =
+      inquiry.subject === "MATHEMATICS" || inquiry.subject === "SCIENCE"
+        ? "math-stem"
+        : inquiry.subject === "HISTORY"
+          ? "history"
+          : "writing";
+
+    if (subjectGroup === "math-stem") {
+      return inquiry.description
+        ? [
+            `Help me understand: ${inquiry.description}`,
+            `Load up a problem from my uploaded file`,
+            `Quiz me on ${inquiry.unitName}`,
+          ]
+        : [
+            `Load up a problem from my uploaded file`,
+            `Quiz me on ${inquiry.unitName}`,
+            `Start with the basics of ${inquiry.unitName}`,
+          ];
+    }
+
+    if (subjectGroup === "history") {
+      return inquiry.description
+        ? [
+            `Help me analyze: ${inquiry.description}`,
+            `Walk me through a source from my uploaded file`,
+            `Quiz me on the key events in ${inquiry.unitName}`,
+          ]
+        : [
+            `Walk me through a source from my uploaded file`,
+            `Help me understand the causes and effects in ${inquiry.unitName}`,
+            `Start with the timeline of ${inquiry.unitName}`,
+          ];
+    }
+
+    // writing (English, Humanities, etc.)
+    return inquiry.description
+      ? [
+          `Help me with: ${inquiry.description}`,
+          `Give me feedback on my uploaded writing`,
+          `Help me develop a thesis for ${inquiry.unitName}`,
+        ]
+      : [
+          `Give me feedback on my uploaded writing`,
+          `Help me develop a thesis for ${inquiry.unitName}`,
+          `Walk me through the structure of a strong essay`,
+        ];
+  };
+
+  const welcomeActions = getWelcomeActions();
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -228,6 +269,10 @@ export function ChatContainer({
       {/* Messages area */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-8 space-y-2">
+          <div className="pt-2 pb-4">
+            <SocraticBanner subject={inquiry.subject} helpType={helpType} />
+          </div>
+
           {showWelcome && (
             <div className="py-12">
               <p className="text-2xl font-display font-semibold mb-2">
@@ -238,8 +283,9 @@ export function ChatContainer({
                 <span className="text-text-primary font-semibold">
                   {inquiry.unitName}
                 </span>{" "}
-                in {inquiry.subject} with {inquiry.teacherName}. How would you
-                like to start?
+                in{" "}
+                {inquiry.subject.charAt(0) + inquiry.subject.slice(1).toLowerCase()}{" "}
+                with {inquiry.teacherName}. How would you like to start?
               </p>
             </div>
           )}
