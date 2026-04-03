@@ -80,8 +80,9 @@ model Inquiry {
   subject     Subject
   teacherName String
   unitName    String
-  description String
-  files       File[]
+  description  String
+  teacherNotes String?
+  files        File[]
   chunks      TextChunk[]
   sessions    TutoringSession[]
   exams       Exam[]
@@ -120,6 +121,7 @@ model TutoringSession {
   user          User          @relation(fields: [userId], references: [id])
   inquiryId     String
   inquiry       Inquiry       @relation(fields: [inquiryId], references: [id])
+  helpType      String?
   messages      Message[]
   rating        Int?
   ratingComment String?
