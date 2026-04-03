@@ -95,6 +95,35 @@ export function ChatContainer({
 
   const welcomeActions = getWelcomeActions();
 
+  const getDefaultActions = (): string[] => {
+    const subjectGroup =
+      inquiry.subject === "MATHEMATICS" || inquiry.subject === "SCIENCE"
+        ? "math-stem"
+        : inquiry.subject === "HISTORY"
+          ? "history"
+          : "writing";
+
+    if (subjectGroup === "math-stem") {
+      return [
+        "Walk me through the next step",
+        "Can you explain that a different way?",
+        "I'm stuck, help me",
+      ];
+    }
+    if (subjectGroup === "history") {
+      return [
+        "Tell me more about this",
+        "Can you explain that a different way?",
+        "I'm stuck, help me",
+      ];
+    }
+    return [
+      "Help me develop this further",
+      "Can you explain that a different way?",
+      "I'm stuck, help me",
+    ];
+  };
+
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -209,7 +238,7 @@ export function ChatContainer({
         const actionsText = cleaned.slice(idx + separator.length).trim();
         actions = actionsText
           .split("\n")
-          .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+          .map((l) => l.replace(/^\d+\.\s*/, "").replace(/^\[\d+\]\s*/, "").trim())
           .filter((l) => l.length > 0 && l !== "I still don't understand")
           .slice(0, 3);
       }
@@ -224,9 +253,10 @@ export function ChatContainer({
         return updated;
       });
 
-      if (actions.length > 0) {
-        setCurrentActions(actions);
+      if (actions.length === 0) {
+        actions = getDefaultActions();
       }
+      setCurrentActions(actions);
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => {
@@ -328,38 +358,41 @@ export function ChatContainer({
             />
           )}
 
-          <form onSubmit={handleSubmit} className="flex gap-3">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask a question..."
-              maxLength={2000}
-              rows={1}
-              disabled={isStreaming}
-              className="flex-1 bg-bg-base border border-white/[0.06] rounded-2xl px-5 py-3.5 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-serif"
-            />
-            <button
-              type="submit"
-              disabled={isStreaming || !input.trim()}
-              className="bg-accent hover:bg-accent-light text-bg-base rounded-2xl px-4 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+          {/* Show standalone input only when no action panel is visible */}
+          {!(!isStreaming && (showWelcome || currentActions.length > 0)) && (
+            <form onSubmit={handleSubmit} className="flex gap-3">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question..."
+                maxLength={2000}
+                rows={1}
+                disabled={isStreaming}
+                className="flex-1 bg-bg-base border border-white/[0.06] rounded-2xl px-5 py-3.5 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-serif"
+              />
+              <button
+                type="submit"
+                disabled={isStreaming || !input.trim()}
+                className="bg-accent hover:bg-accent-light text-bg-base rounded-2xl px-4 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
-                />
-              </svg>
-            </button>
-          </form>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
+                  />
+                </svg>
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

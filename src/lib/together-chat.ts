@@ -57,7 +57,7 @@ export function parseActionsFromResponse(fullText: string): {
   const actionsText = cleaned.slice(idx + separator.length).trim();
   const suggestedActions = actionsText
     .split("\n")
-    .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+    .map((line) => line.replace(/^\d+\.\s*/, "").replace(/^\[\d+\]\s*/, "").trim())
     .filter((line) => line.length > 0 && line !== "I still don't understand")
     .slice(0, 3);
 
