@@ -18,14 +18,14 @@ export default async function LibraryPage() {
   });
 
   return (
-    <div className="p-8 max-w-3xl">
-      <h1 className="text-3xl font-display font-bold mb-2">Library</h1>
-      <p className="text-text-secondary mb-6">
+    <div className="max-w-4xl mx-auto px-6 py-8">
+      <h1 className="font-serif text-[34px] text-text-primary mb-2">
+        Library
+      </h1>
+      <p className="text-[15px] text-text-secondary mb-8">
         Your uploaded coursework and study materials.
       </p>
-      <LibraryView
-        inquiries={JSON.parse(JSON.stringify(inquiries))}
-      />
+      <LibraryView inquiries={JSON.parse(JSON.stringify(inquiries))} />
     </div>
   );
 }
