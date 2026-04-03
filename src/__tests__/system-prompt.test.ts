@@ -62,4 +62,39 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("Paideia");
     expect(prompt).toContain("ONE STEP AT A TIME");
   });
+
+  it("includes cause-and-effect chain guidance for HISTORY", () => {
+    const prompt = buildSystemPrompt({ ...baseContext, subject: "HISTORY" });
+    expect(prompt).toContain("cause-and-effect");
+    expect(prompt).toContain("→");
+  });
+
+  it("includes source analysis guidance for HISTORY with helpType", () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      subject: "HISTORY",
+      helpType: "source-analysis",
+    });
+    expect(prompt).toContain("source-analysis");
+  });
+
+  it("includes writing structure guidance for ENGLISH", () => {
+    const prompt = buildSystemPrompt({ ...baseContext, subject: "ENGLISH" });
+    expect(prompt).toContain("thesis");
+    expect(prompt).toContain("evidence");
+  });
+
+  it("includes arrow notation guidance for math", () => {
+    const prompt = buildSystemPrompt({ ...baseContext, subject: "MATHEMATICS" });
+    expect(prompt).toContain("arrow notation");
+    expect(prompt).toContain("→");
+  });
+
+  it("all subjects share the golden rule", () => {
+    for (const subject of ["MATHEMATICS", "ENGLISH", "HISTORY", "SCIENCE", "HUMANITIES"]) {
+      const prompt = buildSystemPrompt({ ...baseContext, subject });
+      expect(prompt).toContain("GOLDEN RULE: ONE STEP AT A TIME");
+      expect(prompt).toContain("---ACTIONS---");
+    }
+  });
 });
