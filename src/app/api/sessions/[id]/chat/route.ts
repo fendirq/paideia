@@ -8,6 +8,7 @@ import {
   streamChatCompletion,
   parseActionsFromResponse,
 } from "@/lib/together-chat";
+import { filterResponseBySubject } from "@/lib/content-filter";
 
 export async function POST(
   req: NextRequest,
@@ -89,8 +90,12 @@ export async function POST(
   const saveAssistantMessage = async () => {
     if (assistantSaved || !fullResponse) return;
     assistantSaved = true;
+    const filtered = filterResponseBySubject(
+      fullResponse,
+      tutoringSession.inquiry.subject
+    );
     const { message: aiMessage, suggestedActions } =
-      parseActionsFromResponse(fullResponse);
+      parseActionsFromResponse(filtered);
     await db.message.create({
       data: {
         sessionId: id,
