@@ -22,12 +22,14 @@ interface ChatContainerProps {
   sessionId: string;
   initialMessages: Message[];
   inquiry: InquiryContext;
+  helpType?: string | null;
 }
 
 export function ChatContainer({
   sessionId,
   initialMessages,
   inquiry,
+  helpType,
 }: ChatContainerProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");

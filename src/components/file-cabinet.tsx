@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { HelpTypeSelect } from "./help-type-select";
 
 interface FileItem {
   id: string;
@@ -33,6 +34,7 @@ export function FileCabinet({
   const [selectedFileId, setSelectedFileId] = useState<string | null>(
     files[0]?.id ?? null
   );
+  const [showHelpSelect, setShowHelpSelect] = useState(false);
 
   const selectedFile = files.find((f) => f.id === selectedFileId);
 
@@ -116,12 +118,12 @@ export function FileCabinet({
               <h2 className="text-sm font-display font-semibold text-text-secondary">
                 {selectedFile?.fileName ?? "Select a file"}
               </h2>
-              <Link
-                href={`/app/sessions/new?inquiry=${inquiryId}`}
+              <button
+                onClick={() => setShowHelpSelect(true)}
                 className="bg-accent border-2 border-accent-light rounded-full px-5 py-2 text-sm font-medium text-white shadow-[0_0_20px_rgba(74,157,91,0.3)] hover:bg-accent-light transition-colors"
               >
                 Start Session
-              </Link>
+              </button>
             </div>
 
             {/* Content */}
@@ -143,6 +145,14 @@ export function FileCabinet({
           </div>
         </div>
       </div>
+
+      {showHelpSelect && (
+        <HelpTypeSelect
+          inquiryId={inquiryId}
+          subject={subject}
+          onClose={() => setShowHelpSelect(false)}
+        />
+      )}
     </div>
   );
 }
