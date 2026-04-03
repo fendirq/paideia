@@ -56,6 +56,7 @@ export async function POST(
     teacherName: tutoringSession.inquiry.teacherName,
     description: tutoringSession.inquiry.description,
     ragChunks,
+    helpType: tutoringSession.helpType,
   });
 
   // Build messages array from already-fetched history + new message

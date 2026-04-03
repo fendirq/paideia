@@ -65,11 +65,12 @@ export default async function SessionPage({
           sessionId={id}
           initialMessages={initialMessages}
           inquiry={{
-            subject: subjectLabel,
+            subject: tutoringSession.inquiry.subject,
             unitName: tutoringSession.inquiry.unitName,
             teacherName: tutoringSession.inquiry.teacherName,
             description: tutoringSession.inquiry.description,
           }}
+          helpType={tutoringSession.helpType}
         />
       </div>
     </div>

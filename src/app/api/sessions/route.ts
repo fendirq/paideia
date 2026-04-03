@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { inquiryId } = await req.json();
+  const { inquiryId, helpType } = await req.json();
   if (!inquiryId) {
     return NextResponse.json({ error: "inquiryId required" }, { status: 400 });
   }
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     data: {
       userId: session.user.id,
       inquiryId,
+      helpType: typeof helpType === "string" ? helpType : null,
     },
   });
 
