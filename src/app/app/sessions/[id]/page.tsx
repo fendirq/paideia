@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { ChatContainer } from "@/components/chat-container";
+import { SocraticBanner } from "@/components/socratic-banner";
 import Link from "next/link";
 
 export default async function SessionPage({
@@ -55,9 +56,15 @@ export default async function SessionPage({
           <h1 className="text-base font-display font-semibold truncate">
             {tutoringSession.inquiry.unitName}
           </h1>
-          <p className="text-sm text-text-muted">
-            {subjectLabel} &middot; {tutoringSession.inquiry.teacherName}
-          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-sm text-text-muted">
+              {subjectLabel} &middot; {tutoringSession.inquiry.teacherName}
+            </p>
+            <SocraticBanner
+              subject={tutoringSession.inquiry.subject}
+              helpType={tutoringSession.helpType}
+            />
+          </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
