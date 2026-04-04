@@ -20,6 +20,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const VALID_SUBJECTS = new Set(["MATHEMATICS", "ENGLISH", "HISTORY", "SCIENCE", "MANDARIN", "HUMANITIES", "OTHER"]);
+  if (!VALID_SUBJECTS.has(subject)) {
+    return NextResponse.json(
+      { error: "Invalid subject" },
+      { status: 400 }
+    );
+  }
+
+  if (typeof teacherName !== "string" || teacherName.length > 100 ||
+      typeof unitName !== "string" || unitName.length > 100 ||
+      typeof description !== "string" || description.length > 2000) {
+    return NextResponse.json(
+      { error: "Field length exceeded" },
+      { status: 400 }
+    );
+  }
+
   if (!files || !Array.isArray(files) || files.length === 0) {
     return NextResponse.json(
       { error: "At least one file is required" },

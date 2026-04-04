@@ -8,6 +8,7 @@ import {
   streamChatCompletion,
   parseActionsFromResponse,
 } from "@/lib/together-chat";
+import { filterResponseBySubject } from "@/lib/content-filter";
 
 export async function POST(
   req: NextRequest,
@@ -56,6 +57,7 @@ export async function POST(
     teacherName: tutoringSession.inquiry.teacherName,
     description: tutoringSession.inquiry.description,
     ragChunks,
+    helpType: tutoringSession.helpType,
   });
 
   // Build messages array from already-fetched history + new message
@@ -88,8 +90,12 @@ export async function POST(
   const saveAssistantMessage = async () => {
     if (assistantSaved || !fullResponse) return;
     assistantSaved = true;
+    const filtered = filterResponseBySubject(
+      fullResponse,
+      tutoringSession.inquiry.subject
+    );
     const { message: aiMessage, suggestedActions } =
-      parseActionsFromResponse(fullResponse);
+      parseActionsFromResponse(filtered);
     await db.message.create({
       data: {
         sessionId: id,
@@ -132,16 +138,6 @@ export async function POST(
       Connection: "keep-alive",
     },
   });
-
-  // Ensure assistant message is saved even if client disconnects mid-stream.
-  // Schedule a delayed save as a safety net — flush() handles the normal case.
-  setTimeout(async () => {
-    try {
-      await saveAssistantMessage();
-    } catch {
-      // already saved via flush, or nothing to save
-    }
-  }, 25_000);
 
   return response;
 }

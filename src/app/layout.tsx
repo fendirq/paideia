@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, DM_Sans } from "next/font/google";
+import { Space_Grotesk, Inter, Libre_Baskerville } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -9,9 +9,17 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
-const dmSans = DM_Sans({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-dm-sans",
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const libreBaskerville = Libre_Baskerville({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-libre-baskerville",
   display: "swap",
 });
 
@@ -29,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${dmSans.variable}`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${libreBaskerville.variable}`}
     >
       <body className="bg-bg-base font-body text-text-primary antialiased">
         <Providers>{children}</Providers>

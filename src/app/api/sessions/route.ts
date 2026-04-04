@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { VALID_HELP_TYPES } from "@/lib/help-types";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { inquiryId } = await req.json();
+  const { inquiryId, helpType } = await req.json();
   if (!inquiryId) {
     return NextResponse.json({ error: "inquiryId required" }, { status: 400 });
   }
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     data: {
       userId: session.user.id,
       inquiryId,
+      helpType: typeof helpType === "string" && VALID_HELP_TYPES.has(helpType) ? helpType : null,
     },
   });
 

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatMessage } from "./chat-message";
 import { ActionPanel } from "./action-panel";
+import { filterResponseBySubject } from "@/lib/content-filter";
+import { stripThinkingTags } from "@/lib/strip-thinking";
+import { parseActionsFromResponse } from "@/lib/parse-actions";
 
 interface Message {
   id?: string;
@@ -22,12 +25,14 @@ interface ChatContainerProps {
   sessionId: string;
   initialMessages: Message[];
   inquiry: InquiryContext;
+  helpType?: string | null;
 }
 
 export function ChatContainer({
   sessionId,
   initialMessages,
   inquiry,
+  helpType,
 }: ChatContainerProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
@@ -39,17 +44,79 @@ export function ChatContainer({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isStreamingRef = useRef(false);
 
-  const welcomeActions = inquiry.description
-    ? [
-        `Help me understand: ${inquiry.description}`,
-        `Load up a problem from my uploaded file`,
-        `Quiz me on ${inquiry.unitName}`,
-      ]
-    : [
-        `Load up a problem from my uploaded file`,
-        `Quiz me on ${inquiry.unitName}`,
-        `Start with the basics of ${inquiry.unitName}`,
+  const subjectGroup = useMemo(() =>
+    inquiry.subject === "MATHEMATICS" || inquiry.subject === "SCIENCE"
+      ? "math-stem"
+      : inquiry.subject === "HISTORY"
+        ? "history"
+        : "writing",
+    [inquiry.subject]
+  );
+
+  const welcomeActions = useMemo(() => {
+    if (subjectGroup === "math-stem") {
+      return inquiry.description
+        ? [
+            `Help me understand: ${inquiry.description}`,
+            `Load up a problem from my uploaded file`,
+            `Quiz me on ${inquiry.unitName}`,
+          ]
+        : [
+            `Load up a problem from my uploaded file`,
+            `Quiz me on ${inquiry.unitName}`,
+            `Start with the basics of ${inquiry.unitName}`,
+          ];
+    }
+
+    if (subjectGroup === "history") {
+      return inquiry.description
+        ? [
+            `Help me analyze: ${inquiry.description}`,
+            `Walk me through a source from my uploaded file`,
+            `Quiz me on the key events in ${inquiry.unitName}`,
+          ]
+        : [
+            `Walk me through a source from my uploaded file`,
+            `Help me understand the causes and effects in ${inquiry.unitName}`,
+            `Start with the timeline of ${inquiry.unitName}`,
+          ];
+    }
+
+    // writing (English, Humanities, etc.)
+    return inquiry.description
+      ? [
+          `Help me with: ${inquiry.description}`,
+          `Give me feedback on my uploaded writing`,
+          `Help me develop a thesis for ${inquiry.unitName}`,
+        ]
+      : [
+          `Give me feedback on my uploaded writing`,
+          `Help me develop a thesis for ${inquiry.unitName}`,
+          `Walk me through the structure of a strong essay`,
+        ];
+  }, [subjectGroup, inquiry.description, inquiry.unitName]);
+
+  const getDefaultActions = useCallback((): string[] => {
+    if (subjectGroup === "math-stem") {
+      return [
+        "Walk me through the next step",
+        "Can you explain that a different way?",
+        "I'm stuck, help me",
       ];
+    }
+    if (subjectGroup === "history") {
+      return [
+        "Tell me more about this",
+        "Can you explain that a different way?",
+        "I'm stuck, help me",
+      ];
+    }
+    return [
+      "Help me develop this further",
+      "Can you explain that a different way?",
+      "I'm stuck, help me",
+    ];
+  }, [subjectGroup]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -121,11 +188,8 @@ export function ChatContainer({
             if (delta) {
               fullText += delta;
 
-              // Strip <think>...</think> tags and any unclosed <think> block
-              let visible = fullText
-                .replace(/<think>[\s\S]*?<\/think>/g, "")
-                .replace(/<think>[\s\S]*$/g, "")
-                .trim();
+              // Strip <think>...</think> tags and fix R1 sentence fragments
+              let visible = stripThinkingTags(fullText);
 
               // Don't show anything while model is still thinking
               if (!visible) continue;
@@ -135,7 +199,10 @@ export function ChatContainer({
                 thinkingCleared = true;
               }
 
-              const displayText = visible.split("---ACTIONS---")[0].trim();
+              const displayText = filterResponseBySubject(
+                visible.split("---ACTIONS---")[0].trim(),
+                inquiry.subject
+              );
               setMessages((prev) => {
                 const updated = [...prev];
                 updated[updated.length - 1] = {
@@ -152,26 +219,9 @@ export function ChatContainer({
         }
       }
 
-      // Strip thinking tags (closed and unclosed) and parse actions
-      let cleaned = fullText
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .replace(/<think>[\s\S]*$/g, "")
-        .trim();
-
-      const separator = "---ACTIONS---";
-      const idx = cleaned.lastIndexOf(separator);
-      let finalMessage = cleaned;
-      let actions: string[] = [];
-
-      if (idx !== -1) {
-        finalMessage = cleaned.slice(0, idx).trim();
-        const actionsText = cleaned.slice(idx + separator.length).trim();
-        actions = actionsText
-          .split("\n")
-          .map((l) => l.replace(/^\d+\.\s*/, "").trim())
-          .filter((l) => l.length > 0 && l !== "I still don't understand")
-          .slice(0, 3);
-      }
+      // Parse actions using shared utility
+      const { message: parsedMessage, suggestedActions: actions } = parseActionsFromResponse(fullText);
+      const finalMessage = filterResponseBySubject(parsedMessage, inquiry.subject);
 
       setMessages((prev) => {
         const updated = [...prev];
@@ -183,9 +233,7 @@ export function ChatContainer({
         return updated;
       });
 
-      if (actions.length > 0) {
-        setCurrentActions(actions);
-      }
+      setCurrentActions(actions.length > 0 ? actions : getDefaultActions());
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => {
@@ -206,7 +254,7 @@ export function ChatContainer({
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isStreaming) return;
-    streamResponse(text);
+    await streamResponse(text);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -231,19 +279,20 @@ export function ChatContainer({
               <p className="text-2xl font-display font-semibold mb-2">
                 Hello, I&apos;m Paideia.
               </p>
-              <p className="text-base text-text-secondary font-[Times_New_Roman,_Times,_serif] leading-relaxed">
+              <p className="text-base text-text-secondary font-serif leading-relaxed">
                 Your Socratic tutor for{" "}
                 <span className="text-text-primary font-semibold">
                   {inquiry.unitName}
                 </span>{" "}
-                in {inquiry.subject} with {inquiry.teacherName}. How would you
-                like to start?
+                in{" "}
+                {inquiry.subject.charAt(0) + inquiry.subject.slice(1).toLowerCase()}{" "}
+                with {inquiry.teacherName}. How would you like to start?
               </p>
             </div>
           )}
           {messages.map((msg, i) => (
             <ChatMessage
-              key={i}
+              key={msg.id ?? `msg-${i}`}
               role={msg.role}
               content={msg.content}
               isStreaming={
@@ -262,7 +311,7 @@ export function ChatContainer({
       </div>
 
       {/* Action panel + Input area */}
-      <div className="border-t border-bg-elevated">
+      <div className="border-t border-white/[0.04]">
         <div className="max-w-3xl mx-auto px-6 py-4">
           {showWelcome && !isStreaming && (
             <ActionPanel
@@ -286,38 +335,41 @@ export function ChatContainer({
             />
           )}
 
-          <form onSubmit={handleSubmit} className="flex gap-3">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask a question..."
-              maxLength={2000}
-              rows={1}
-              disabled={isStreaming}
-              className="flex-1 bg-bg-base border border-bg-elevated rounded-2xl px-5 py-3.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-[Times_New_Roman,_Times,_serif]"
-            />
-            <button
-              type="submit"
-              disabled={isStreaming || !input.trim()}
-              className="bg-accent hover:bg-accent-light text-bg-base rounded-2xl px-4 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+          {/* Show standalone input only when no action panel is visible */}
+          {!(!isStreaming && (showWelcome || currentActions.length > 0)) && (
+            <form onSubmit={handleSubmit} className="flex gap-3">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question..."
+                maxLength={2000}
+                rows={1}
+                disabled={isStreaming}
+                className="flex-1 bg-bg-base border border-white/[0.06] rounded-2xl px-5 py-3.5 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-serif"
+              />
+              <button
+                type="submit"
+                disabled={isStreaming || !input.trim()}
+                className="bg-accent hover:bg-accent-light text-bg-base rounded-2xl px-4 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
-                />
-              </svg>
-            </button>
-          </form>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
+                  />
+                </svg>
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

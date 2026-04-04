@@ -13,10 +13,10 @@ describe("RoleSelector", () => {
   it("renders student and teacher options", () => {
     render(<RoleSelector />);
     expect(
-      screen.getByRole("button", { name: /i'm a student/i })
+      screen.getByRole("button", { name: /student/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /i'm a teacher/i })
+      screen.getByRole("button", { name: /teacher/i })
     ).toBeInTheDocument();
   });
 });

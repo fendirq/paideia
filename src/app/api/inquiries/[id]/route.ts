@@ -39,6 +39,40 @@ export async function GET(
   return NextResponse.json(inquiry);
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const body = await req.json();
+
+  if (session.user.role !== "TEACHER" && session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const inquiry = await db.inquiry.findUnique({ where: { id } });
+  if (!inquiry) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const notes =
+    typeof body.teacherNotes === "string"
+      ? body.teacherNotes.slice(0, 5000)
+      : undefined;
+
+  const updated = await db.inquiry.update({
+    where: { id },
+    data: { teacherNotes: notes },
+  });
+
+  return NextResponse.json(updated);
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -59,21 +93,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Atomic delete: messages → sessions → chunks → files → inquiry
-  const sessions = await db.tutoringSession.findMany({
-    where: { inquiryId: id },
-    select: { id: true },
-  });
-
+  // Atomic delete: messages → sessions → studyItems → exams → chunks → files → inquiry
   await db.$transaction([
-    ...(sessions.length > 0
-      ? [
-          db.message.deleteMany({
-            where: { sessionId: { in: sessions.map((s) => s.id) } },
-          }),
-          db.tutoringSession.deleteMany({ where: { inquiryId: id } }),
-        ]
-      : []),
+    db.message.deleteMany({ where: { session: { inquiryId: id } } }),
+    db.tutoringSession.deleteMany({ where: { inquiryId: id } }),
+    db.studyItem.deleteMany({ where: { inquiryId: id } }),
+    db.exam.deleteMany({ where: { inquiryId: id } }),
     db.textChunk.deleteMany({ where: { inquiryId: id } }),
     db.file.deleteMany({ where: { inquiryId: id } }),
     db.inquiry.delete({ where: { id } }),

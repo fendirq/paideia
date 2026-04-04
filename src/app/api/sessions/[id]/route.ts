@@ -48,8 +48,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await db.message.deleteMany({ where: { sessionId: id } });
-  await db.tutoringSession.delete({ where: { id } });
+  await db.$transaction([
+    db.message.deleteMany({ where: { sessionId: id } }),
+    db.tutoringSession.delete({ where: { id } }),
+  ]);
 
   return NextResponse.json({ ok: true });
 }

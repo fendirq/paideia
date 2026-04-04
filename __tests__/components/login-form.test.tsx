@@ -15,15 +15,15 @@ describe("LoginForm", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders passcode toggle link", () => {
+  it("renders passcode input", () => {
     render(<LoginForm />);
-    expect(screen.getByText(/enter with passcode/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/passcode/i)).toBeInTheDocument();
   });
 
-  it("shows passcode input when toggle is clicked", async () => {
-    const user = userEvent.setup();
+  it("renders submit button", () => {
     render(<LoginForm />);
-    await user.click(screen.getByText(/enter with passcode/i));
-    expect(screen.getByPlaceholderText(/passcode/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /enter/i })
+    ).toBeInTheDocument();
   });
 });
