@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SUBJECT_COLORS, SUBJECT_LABELS } from "@/lib/subject-constants";
@@ -81,45 +81,15 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
     <>
       {/* Delete modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setDeleteTarget(null)}
-          />
-          <div className="relative bg-bg-surface border border-white/[0.06] rounded-[20px] p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-[16px] font-display font-semibold text-text-primary mb-2">
-              Delete inquiry?
-            </h3>
-            <p className="text-[13px] text-text-secondary mb-6 leading-relaxed">
-              This will permanently delete this inquiry, all uploaded files, and
-              associated tutoring sessions. This cannot be undone.
-            </p>
-            {deleteError && (
-              <p className="text-[13px] text-red-400 mb-3">
-                Failed to delete. Please try again.
-              </p>
-            )}
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setDeleteTarget(null);
-                  setDeleteError(false);
-                }}
-                disabled={isDeleting}
-                className="px-4 py-2.5 text-[13px] text-text-secondary hover:text-text-primary border border-white/[0.06] rounded-[10px] transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="px-4 py-2.5 text-[13px] bg-red-500/80 hover:bg-red-500 text-white rounded-[10px] transition-colors disabled:opacity-50"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteModal
+          isDeleting={isDeleting}
+          deleteError={deleteError}
+          onCancel={() => {
+            setDeleteTarget(null);
+            setDeleteError(false);
+          }}
+          onConfirm={confirmDelete}
+        />
       )}
 
       {/* Search bar */}
@@ -257,5 +227,69 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
         </div>
       )}
     </>
+  );
+}
+
+function DeleteModal({
+  isDeleting,
+  deleteError,
+  onCancel,
+  onConfirm,
+}: {
+  isDeleting: boolean;
+  deleteError: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    confirmRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/50"
+        aria-hidden="true"
+        onClick={onCancel}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-dialog-title"
+        className="relative bg-bg-surface border border-white/[0.06] rounded-[20px] p-6 w-full max-w-sm shadow-xl"
+      >
+        <h3 id="delete-dialog-title" className="text-[16px] font-display font-semibold text-text-primary mb-2">
+          Delete inquiry?
+        </h3>
+        <p className="text-[13px] text-text-secondary mb-6 leading-relaxed">
+          This will permanently delete this inquiry, all uploaded files, and
+          associated tutoring sessions. This cannot be undone.
+        </p>
+        {deleteError && (
+          <p className="text-[13px] text-red-400 mb-3">
+            Failed to delete. Please try again.
+          </p>
+        )}
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="px-4 py-2.5 text-[13px] text-text-secondary hover:text-text-primary border border-white/[0.06] rounded-[10px] transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            ref={confirmRef}
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="px-4 py-2.5 text-[13px] bg-red-500/80 hover:bg-red-500 text-white rounded-[10px] transition-colors disabled:opacity-50"
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

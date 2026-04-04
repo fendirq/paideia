@@ -39,8 +39,8 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
     const item = items.find((i) => i.id === id);
     if (!item) return;
 
-    const newStatus = item.completed ? item.status : "PRACTICED";
     const newCompleted = !item.completed;
+    const revertStatus = item.status === "PRACTICED" ? "REVIEW" : item.status;
 
     // Optimistic update
     setItems((prev) =>
@@ -53,7 +53,7 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
       const res = await fetch(`/api/study-items/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newCompleted ? "PRACTICED" : "REVIEW" }),
+        body: JSON.stringify({ status: newCompleted ? "PRACTICED" : revertStatus }),
       });
       if (!res.ok) {
         // Revert on failure

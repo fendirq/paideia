@@ -139,15 +139,5 @@ export async function POST(
     },
   });
 
-  // Ensure assistant message is saved even if client disconnects mid-stream.
-  // Schedule a delayed save as a safety net — flush() handles the normal case.
-  setTimeout(async () => {
-    try {
-      await saveAssistantMessage();
-    } catch {
-      // already saved via flush, or nothing to save
-    }
-  }, 25_000);
-
   return response;
 }

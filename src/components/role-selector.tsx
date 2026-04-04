@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export function RoleSelector() {
-  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -20,8 +18,7 @@ export function RoleSelector() {
       });
 
       if (res.ok) {
-        router.push("/app");
-        router.refresh();
+        window.location.href = "/app";
       } else {
         setError(true);
         setLoading(null);

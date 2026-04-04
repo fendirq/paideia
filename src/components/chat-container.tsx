@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatMessage } from "./chat-message";
 import { ActionPanel } from "./action-panel";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { stripThinkingTags } from "@/lib/strip-thinking";
+import { parseActionsFromResponse } from "@/lib/parse-actions";
 
 interface Message {
   id?: string;
@@ -43,14 +44,16 @@ export function ChatContainer({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isStreamingRef = useRef(false);
 
-  const getWelcomeActions = (): string[] => {
-    const subjectGroup =
-      inquiry.subject === "MATHEMATICS" || inquiry.subject === "SCIENCE"
-        ? "math-stem"
-        : inquiry.subject === "HISTORY"
-          ? "history"
-          : "writing";
+  const subjectGroup = useMemo(() =>
+    inquiry.subject === "MATHEMATICS" || inquiry.subject === "SCIENCE"
+      ? "math-stem"
+      : inquiry.subject === "HISTORY"
+        ? "history"
+        : "writing",
+    [inquiry.subject]
+  );
 
+  const welcomeActions = useMemo(() => {
     if (subjectGroup === "math-stem") {
       return inquiry.description
         ? [
@@ -91,18 +94,9 @@ export function ChatContainer({
           `Help me develop a thesis for ${inquiry.unitName}`,
           `Walk me through the structure of a strong essay`,
         ];
-  };
+  }, [subjectGroup, inquiry.description, inquiry.unitName]);
 
-  const welcomeActions = getWelcomeActions();
-
-  const getDefaultActions = (): string[] => {
-    const subjectGroup =
-      inquiry.subject === "MATHEMATICS" || inquiry.subject === "SCIENCE"
-        ? "math-stem"
-        : inquiry.subject === "HISTORY"
-          ? "history"
-          : "writing";
-
+  const getDefaultActions = useCallback((): string[] => {
     if (subjectGroup === "math-stem") {
       return [
         "Walk me through the next step",
@@ -122,7 +116,7 @@ export function ChatContainer({
       "Can you explain that a different way?",
       "I'm stuck, help me",
     ];
-  };
+  }, [subjectGroup]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -225,23 +219,9 @@ export function ChatContainer({
         }
       }
 
-      // Strip thinking tags and fix R1 sentence fragments
-      let cleaned = stripThinkingTags(fullText);
-
-      const separator = "---ACTIONS---";
-      const idx = cleaned.lastIndexOf(separator);
-      let actions: string[] = [];
-      let rawMessage = idx !== -1 ? cleaned.slice(0, idx).trim() : cleaned.trim();
-      let finalMessage = filterResponseBySubject(rawMessage, inquiry.subject);
-
-      if (idx !== -1) {
-        const actionsText = cleaned.slice(idx + separator.length).trim();
-        actions = actionsText
-          .split("\n")
-          .map((l) => l.replace(/^\d+\.\s*/, "").replace(/^\[\d+\]\s*/, "").trim())
-          .filter((l) => l.length > 0 && l !== "I still don't understand")
-          .slice(0, 3);
-      }
+      // Parse actions using shared utility
+      const { message: parsedMessage, suggestedActions: actions } = parseActionsFromResponse(fullText);
+      const finalMessage = filterResponseBySubject(parsedMessage, inquiry.subject);
 
       setMessages((prev) => {
         const updated = [...prev];
@@ -253,10 +233,7 @@ export function ChatContainer({
         return updated;
       });
 
-      if (actions.length === 0) {
-        actions = getDefaultActions();
-      }
-      setCurrentActions(actions);
+      setCurrentActions(actions.length > 0 ? actions : getDefaultActions());
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => {
@@ -315,7 +292,7 @@ export function ChatContainer({
           )}
           {messages.map((msg, i) => (
             <ChatMessage
-              key={i}
+              key={msg.id ?? `msg-${i}`}
               role={msg.role}
               content={msg.content}
               isStreaming={

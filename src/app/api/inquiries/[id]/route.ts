@@ -56,7 +56,7 @@ export async function PATCH(
   }
 
   const inquiry = await db.inquiry.findUnique({ where: { id } });
-  if (!inquiry || inquiry.userId !== session.user.id) {
+  if (!inquiry) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -93,21 +93,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Atomic delete: messages → sessions → chunks → files → inquiry
-  const sessions = await db.tutoringSession.findMany({
-    where: { inquiryId: id },
-    select: { id: true },
-  });
-
+  // Atomic delete: messages → sessions → studyItems → exams → chunks → files → inquiry
   await db.$transaction([
-    ...(sessions.length > 0
-      ? [
-          db.message.deleteMany({
-            where: { sessionId: { in: sessions.map((s) => s.id) } },
-          }),
-          db.tutoringSession.deleteMany({ where: { inquiryId: id } }),
-        ]
-      : []),
+    db.message.deleteMany({ where: { session: { inquiryId: id } } }),
+    db.tutoringSession.deleteMany({ where: { inquiryId: id } }),
+    db.studyItem.deleteMany({ where: { inquiryId: id } }),
+    db.exam.deleteMany({ where: { inquiryId: id } }),
     db.textChunk.deleteMany({ where: { inquiryId: id } }),
     db.file.deleteMany({ where: { inquiryId: id } }),
     db.inquiry.delete({ where: { id } }),

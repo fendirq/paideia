@@ -86,12 +86,21 @@ function buildActionRules(group: SubjectGroup): string {
   }
 }
 
+/** Strip control characters and truncate to prevent prompt injection. */
+function sanitize(input: string, maxLength: number = 500): string {
+  return input.replace(/[\x00-\x1f\x7f]/g, "").slice(0, maxLength);
+}
+
 export function buildSystemPrompt(context: PromptContext): string {
   const group = classifySubject(context.subject);
 
+  const safeUnit = sanitize(context.unitName, 200);
+  const safeTeacher = sanitize(context.teacherName, 100);
+  const safeDescription = sanitize(context.description, 2000);
+
   const ragContext =
     context.ragChunks.length > 0
-      ? `\n\n## Uploaded Material Context\nThe student uploaded coursework about "${context.unitName}" in ${context.subject} (teacher: ${context.teacherName}). They described their struggle as: "${context.description}"\n\nRelevant excerpts from their uploaded materials:\n${context.ragChunks.map((c, i) => `[Excerpt ${i + 1}]: ${c.content}`).join("\n\n")}`
+      ? `\n\n## Uploaded Material Context\nThe student uploaded coursework about "${safeUnit}" in ${context.subject} (teacher: ${safeTeacher}). They described their struggle as: "${safeDescription}"\n\nRelevant excerpts from their uploaded materials:\n${context.ragChunks.map((c, i) => `[Excerpt ${i + 1}]: ${sanitize(c.content, 4000)}`).join("\n\n")}`
       : "";
 
   const helpTypeContext = context.helpType
@@ -123,9 +132,9 @@ ${subjectSections}
 
 ## Subject Context
 Subject: ${context.subject}
-Unit/Topic: ${context.unitName}
-Teacher: ${context.teacherName}
-Student's stated struggle: "${context.description}"${helpTypeContext}
+Unit/Topic: ${safeUnit}
+Teacher: ${safeTeacher}
+Student's stated struggle: "${safeDescription}"${helpTypeContext}
 ${ragContext}
 
 ## Response Format — ACTIONS (CRITICAL)

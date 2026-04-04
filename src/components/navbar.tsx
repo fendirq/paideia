@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
@@ -106,7 +107,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
               className="w-7 h-7 rounded-full bg-bg-elevated flex items-center justify-center text-xs font-medium text-text-secondary hover:text-text-primary transition-colors overflow-hidden"
             >
               {userImage ? (
-                <img src={userImage} alt="" className="w-full h-full object-cover" />
+                <Image src={userImage} alt="" width={28} height={28} className="w-full h-full object-cover" />
               ) : (
                 initial
               )}

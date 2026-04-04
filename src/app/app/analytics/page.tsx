@@ -60,14 +60,17 @@ export default async function AnalyticsPage() {
   // Compute stats
   const sessionsTrend = sessionsThisWeek - sessionsLastWeek;
 
-  // Compute streak from totalSessions (already has startedAt)
+  // Compute streak from totalSessions (all dates in UTC)
   const uniqueDays = new Set(
     totalSessions.map((s) => s.startedAt.toISOString().split("T")[0])
   );
   let streak = 0;
-  const today = new Date();
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(today);
+  const todayUTC = new Date().toISOString().split("T")[0];
+  const hasSessionToday = uniqueDays.has(todayUTC);
+  // If no session today, start counting from yesterday so partial days don't break streak
+  const startOffset = hasSessionToday ? 0 : 1;
+  for (let i = startOffset; i < 365; i++) {
+    const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
     if (uniqueDays.has(d.toISOString().split("T")[0])) {
       streak++;

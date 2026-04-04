@@ -81,7 +81,7 @@ export function UploadForm({ userRole, existingClasses }: UploadFormProps) {
   };
 
   const validateFile = useCallback(
-    (file: File): string | null => {
+    (file: File, currentFiles: UploadedFile[]): string | null => {
       const ext = "." + file.name.split(".").pop()?.toLowerCase();
       if (!ALLOWED_EXTENSIONS.includes(ext)) {
         return `${file.name}: unsupported file type`;
@@ -90,35 +90,40 @@ export function UploadForm({ userRole, existingClasses }: UploadFormProps) {
         return `${file.name}: exceeds 25MB limit`;
       }
       const totalSize =
-        files.reduce((sum, f) => sum + f.file.size, 0) + file.size;
+        currentFiles.reduce((sum, f) => sum + f.file.size, 0) + file.size;
       if (totalSize > MAX_TOTAL_SIZE) {
         return "Total file size exceeds 100MB limit";
       }
       return null;
     },
-    [files]
+    []
   );
 
   const addFiles = useCallback(
     (newFiles: FileList | File[]) => {
       const incoming = Array.from(newFiles);
-      if (files.length + incoming.length > MAX_FILES) {
-        setError(`Maximum ${MAX_FILES} files allowed`);
-        return;
-      }
-      setError("");
-      const valid: UploadedFile[] = [];
-      for (const file of incoming) {
-        const err = validateFile(file);
-        if (err) {
-          setError(err);
-          return;
+      setFiles((prev) => {
+        if (prev.length + incoming.length > MAX_FILES) {
+          setError(`Maximum ${MAX_FILES} files allowed`);
+          return prev;
         }
-        valid.push({ key: crypto.randomUUID(), file, status: "pending" });
-      }
-      setFiles((prev) => [...prev, ...valid]);
+        setError("");
+        const valid: UploadedFile[] = [];
+        let accumulated = prev;
+        for (const file of incoming) {
+          const err = validateFile(file, accumulated);
+          if (err) {
+            setError(err);
+            return prev;
+          }
+          const entry: UploadedFile = { key: crypto.randomUUID(), file, status: "pending" };
+          valid.push(entry);
+          accumulated = [...accumulated, entry];
+        }
+        return [...prev, ...valid];
+      });
     },
-    [files.length, validateFile]
+    [validateFile]
   );
 
   const removeFile = (index: number) => {

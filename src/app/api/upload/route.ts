@@ -41,13 +41,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const blob = await put(`uploads/${Date.now()}-${file.name}`, file, {
+  // Sanitize filename: strip path separators and dangerous characters
+  const rawName = file.name;
+  const extIdx = rawName.lastIndexOf(".");
+  const ext = extIdx > 0 ? rawName.slice(extIdx).toLowerCase().replace(/[^a-z0-9.]/g, "") : "";
+  const base = rawName.slice(0, extIdx > 0 ? extIdx : rawName.length)
+    .replace(/[^\w\s.-]/g, "")
+    .replace(/\s+/g, "_")
+    .slice(0, 100) || "file";
+  const safeName = base + ext;
+
+  const blob = await put(`uploads/${Date.now()}-${safeName}`, file, {
     access: "private",
   });
 
   return NextResponse.json({
     url: blob.url,
-    fileName: file.name,
+    fileName: safeName,
     fileType: file.type,
   });
 }

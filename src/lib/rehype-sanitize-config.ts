@@ -23,7 +23,6 @@ export const katexSanitizeSchema: typeof defaultSchema = {
       ...(defaultSchema.attributes?.span ?? []),
       "className",
       "class",
-      "style",
       "aria-hidden",
     ],
     svg: ["className", "class", "width", "height", "viewBox", "style", "aria-hidden", "focusable"],
@@ -34,6 +33,6 @@ export const katexSanitizeSchema: typeof defaultSchema = {
     use: ["href"],
     clipPath: ["id"],
     symbol: ["id", "viewBox"],
-    div: [...(defaultSchema.attributes?.div ?? []), "className", "class", "style"],
+    div: [...(defaultSchema.attributes?.div ?? []), "className", "class"],
   },
 };

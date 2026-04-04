@@ -46,7 +46,7 @@ export function renderMath(text: string): string {
   });
 
   for (let i = 0; i < rendered.length; i++) {
-    text = text.replace(placeholder(i), rendered[i]);
+    text = text.replaceAll(placeholder(i), rendered[i]);
   }
 
   return text;

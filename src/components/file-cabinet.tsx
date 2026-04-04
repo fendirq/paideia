@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { HelpTypeSelect } from "./help-type-select";
 
@@ -167,7 +167,30 @@ export function FileCabinet({
 }
 
 function NotesField({ inquiryId, defaultNotes }: { inquiryId: string; defaultNotes: string }) {
+  const [notes, setNotes] = useState(defaultNotes);
   const [noteStatus, setNoteStatus] = useState("");
+  const savingRef = useRef(false);
+
+  const saveNotes = (value: string) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    fetch(`/api/inquiries/${inquiryId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacherNotes: value }),
+    })
+      .then((res) => {
+        setNoteStatus(res.ok ? "Saved" : "Error saving");
+        setTimeout(() => setNoteStatus(""), 2000);
+      })
+      .catch(() => {
+        setNoteStatus("Error saving");
+        setTimeout(() => setNoteStatus(""), 2000);
+      })
+      .finally(() => {
+        savingRef.current = false;
+      });
+  };
 
   return (
     <>
@@ -178,23 +201,10 @@ function NotesField({ inquiryId, defaultNotes }: { inquiryId: string; defaultNot
         <span className="text-xs text-text-muted">{noteStatus}</span>
       </div>
       <textarea
-        defaultValue={defaultNotes}
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        onBlur={(e) => saveNotes(e.target.value)}
         maxLength={5000}
-        onBlur={(e) => {
-          fetch(`/api/inquiries/${inquiryId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ teacherNotes: e.target.value }),
-          })
-            .then((res) => {
-              setNoteStatus(res.ok ? "Saved" : "Error saving");
-              setTimeout(() => setNoteStatus(""), 2000);
-            })
-            .catch(() => {
-              setNoteStatus("Error saving");
-              setTimeout(() => setNoteStatus(""), 2000);
-            });
-        }}
         rows={3}
         placeholder="Add notes about this student's progress..."
         className="w-full max-w-lg bg-bg-surface border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none"
