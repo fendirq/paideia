@@ -50,6 +50,8 @@ model User {
   accounts         Account[]
   inquiries        Inquiry[]
   tutoringSessions TutoringSession[]
+  writingProfile   WritingProfile?
+  writingSamples   WritingSample[]
   createdAt        DateTime          @default(now())
 }
 
@@ -173,4 +175,27 @@ model StudyItem {
   status    StudyStatus @default(NEW)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+}
+
+// ─── Portal Models ───
+
+model WritingProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teacherProfile  Json
+  selfAssessment  Json
+  writingStyle    Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model WritingSample {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  content   String
+  wordCount Int
+  createdAt DateTime @default(now())
 }

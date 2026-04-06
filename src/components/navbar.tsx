@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
+import { TripleClickWrapper } from "./portal/TripleClickWrapper";
 
 const navItems = [
   { href: "/app", label: "Home" },
@@ -50,12 +51,14 @@ export function Navbar({ userName, userImage }: NavbarProps) {
       className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3 h-14 ${isSessionPage ? "bg-bg-inner" : "bg-transparent"}`}
     >
       {/* Left: Logo */}
-      <Link
-        href="/app"
-        className="font-display font-bold text-2xl tracking-[0.12em] text-text-primary"
-      >
-        PAIDEIA
-      </Link>
+      <TripleClickWrapper>
+        <Link
+          href="/app"
+          className="font-display font-bold text-2xl tracking-[0.12em] text-text-primary"
+        >
+          PAIDEIA
+        </Link>
+      </TripleClickWrapper>
 
       {/* Right: Desktop */}
       <div className="hidden md:flex items-center" ref={navRef}>

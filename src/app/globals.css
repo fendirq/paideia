@@ -220,3 +220,48 @@
   padding: 0.5rem 0.75rem;
   text-align: left;
 }
+
+/* Portal form fields */
+@utility input-field {
+  width: 100%;
+  background-color: var(--color-bg-base);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+  &:focus {
+    outline: none;
+    border-color: rgba(74, 157, 91, 0.5);
+  }
+}
+
+@utility select-field {
+  width: 100%;
+  background-color: var(--color-bg-base);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  &:focus {
+    outline: none;
+    border-color: rgba(74, 157, 91, 0.5);
+  }
+}
+
+/* Portal PIN shake animation */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
