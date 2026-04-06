@@ -10,10 +10,10 @@ const superscripts: Record<string, string> = {
 
 function cleanMathText(text: string): string {
   return text
-    .replace(/\^(\d+|n|i)/g, (_, exp) =>
+    .replace(/\^{([^}]+)}/g, (_, exp) =>
       [...exp].map((c: string) => superscripts[c] || c).join("")
     )
-    .replace(/\^{([^}]+)}/g, (_, exp) =>
+    .replace(/\^(\d+|n|i)/g, (_, exp) =>
       [...exp].map((c: string) => superscripts[c] || c).join("")
     )
     .replace(/sqrt\(([^)]*)\)/gi, "\u221A($1)")

@@ -5,7 +5,7 @@ import { ChatMessage } from "./chat-message";
 import { ActionPanel } from "./action-panel";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { stripThinkingTags } from "@/lib/strip-thinking";
-import { parseActionsFromResponse } from "@/lib/parse-actions";
+import { parseActionsFromResponse, splitActions } from "@/lib/parse-actions";
 
 interface Message {
   id?: string;
@@ -53,7 +53,44 @@ export function ChatContainer({
     [inquiry.subject]
   );
 
+  const welcomePhrase = useMemo(() => {
+    const phrases = [
+      "What do you have in mind?",
+      "Let\u2019s make this click.",
+      "Ready when you are.",
+      "Let\u2019s break it down together.",
+      "One step at a time \u2014 let\u2019s go.",
+      "Let\u2019s figure this out.",
+      "You\u2019ve got this \u2014 let\u2019s start.",
+    ];
+    return phrases[Math.floor(Math.random() * phrases.length)];
+  }, []);
+
   const welcomeActions = useMemo(() => {
+    // When helpType exists (from session setup form), tailor actions to the user's stated struggle
+    if (helpType) {
+      if (subjectGroup === "math-stem") {
+        return [
+          `Walk me through this step by step: ${helpType}`,
+          `Start with the fundamentals, then help me with this`,
+          `Give me a practice problem related to this`,
+        ];
+      }
+      if (subjectGroup === "history") {
+        return [
+          `Help me understand this: ${helpType}`,
+          `Give me the background context I need first`,
+          `Quiz me on this topic to find my gaps`,
+        ];
+      }
+      return [
+        `Help me work through this: ${helpType}`,
+        `Start with the basics, then build up to this`,
+        `Give me an example to learn from`,
+      ];
+    }
+
+    // Fallback: no helpType, use inquiry description or generic actions
     if (subjectGroup === "math-stem") {
       return inquiry.description
         ? [
@@ -94,7 +131,7 @@ export function ChatContainer({
           `Help me develop a thesis for ${inquiry.unitName}`,
           `Walk me through the structure of a strong essay`,
         ];
-  }, [subjectGroup, inquiry.description, inquiry.unitName]);
+  }, [subjectGroup, helpType, inquiry.description, inquiry.unitName]);
 
   const getDefaultActions = useCallback((): string[] => {
     if (subjectGroup === "math-stem") {
@@ -200,7 +237,7 @@ export function ChatContainer({
               }
 
               const displayText = filterResponseBySubject(
-                visible.split("---ACTIONS---")[0].trim(),
+                splitActions(visible).before.trim(),
                 inquiry.subject
               );
               setMessages((prev) => {
@@ -286,7 +323,8 @@ export function ChatContainer({
                 </span>{" "}
                 in{" "}
                 {inquiry.subject.charAt(0) + inquiry.subject.slice(1).toLowerCase()}{" "}
-                with {inquiry.teacherName}. How would you like to start?
+                with {inquiry.teacherName}.{" "}
+                {welcomePhrase}
               </p>
             </div>
           )}
@@ -316,7 +354,7 @@ export function ChatContainer({
           {showWelcome && !isStreaming && (
             <ActionPanel
               actions={welcomeActions}
-              label="How would you like to start?"
+              label={helpType ? "How should we approach this?" : "How would you like to start?"}
               onSelect={(action) => {
                 sendMessage(action);
               }}

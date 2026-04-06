@@ -2,34 +2,24 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { VideoHero } from "@/components/video-hero";
-import { ClassGrid } from "@/components/class-grid";
+import { HomeContent } from "@/components/home-content";
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const rawClasses = await db.inquiry.findMany({
+  const allInquiries = await db.inquiry.findMany({
     where: { userId: session.user.id },
-    include: {
-      _count: { select: { sessions: true } },
-    },
     orderBy: { updatedAt: "desc" },
   });
 
-  const classes = rawClasses.map((c) => ({
-    id: c.id,
-    subject: c.subject,
-    unitName: c.unitName,
-    teacherName: c.teacherName,
-    updatedAt: c.updatedAt.toISOString(),
-    _count: c._count,
-  }));
+  // Only show classes created via the "Add a Class" form
+  const classes = allInquiries
+    .filter((c) => c.teacherNotes === "add-class")
+    .map((c) => ({
+      id: c.id,
+      name: c.unitName,
+    }));
 
-  return (
-    <div>
-      <VideoHero userName={session.user.name} />
-      <ClassGrid classes={classes} />
-    </div>
-  );
+  return <HomeContent userName={session.user.name} existingClasses={classes} />;
 }

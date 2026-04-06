@@ -36,15 +36,16 @@ interface ExistingClass {
 interface UploadFormProps {
   userRole: string;
   existingClasses: ExistingClass[];
+  preselectedClassId?: string;
 }
 
-export function UploadForm({ userRole, existingClasses }: UploadFormProps) {
+export function UploadForm({ userRole, existingClasses, preselectedClassId }: UploadFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sidebar state
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
-  const [showNewForm, setShowNewForm] = useState(existingClasses.length === 0);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(preselectedClassId ?? null);
+  const [showNewForm, setShowNewForm] = useState(existingClasses.length === 0 && !preselectedClassId);
 
   // Form fields (for new class)
   const [subject, setSubject] = useState("");

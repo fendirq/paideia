@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { subject, teacherName, unitName, description, files } = body;
+  const { subject, teacherName, unitName, description, files, source } = body;
 
   if (!subject || !teacherName || !unitName || !description) {
     return NextResponse.json(
@@ -37,19 +37,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!files || !Array.isArray(files) || files.length === 0) {
+  if (files && !Array.isArray(files)) {
     return NextResponse.json(
-      { error: "At least one file is required" },
+      { error: "Files must be an array" },
       { status: 400 }
     );
   }
 
-  if (files.length > 5) {
+  if (files && files.length > 5) {
     return NextResponse.json(
       { error: "Maximum 5 files per inquiry" },
       { status: 400 }
     );
   }
+
+  const fileData = Array.isArray(files) && files.length > 0
+    ? files.map((f: { url: string; fileName: string; fileType: string }) => ({
+        fileName: f.fileName,
+        fileUrl: f.url,
+        fileType: f.fileType,
+      }))
+    : [];
 
   const inquiry = await db.inquiry.create({
     data: {
@@ -58,25 +66,19 @@ export async function POST(req: NextRequest) {
       teacherName,
       unitName,
       description,
-      files: {
-        create: files.map(
-          (f: { url: string; fileName: string; fileType: string }) => ({
-            fileName: f.fileName,
-            fileUrl: f.url,
-            fileType: f.fileType,
-          })
-        ),
-      },
+      ...(source === "add-class" && { teacherNotes: "add-class" }),
+      ...(fileData.length > 0 && { files: { create: fileData } }),
     },
     include: { files: true },
   });
 
-  // Trigger RAG pipeline — process synchronously for now
-  try {
-    await processInquiryFiles(inquiry.id);
-  } catch (error) {
-    console.error("RAG pipeline error:", error);
-    // Don't fail the inquiry creation — RAG can be retried
+  // Trigger RAG pipeline if files were uploaded
+  if (fileData.length > 0) {
+    try {
+      await processInquiryFiles(inquiry.id);
+    } catch (error) {
+      console.error("RAG pipeline error:", error);
+    }
   }
 
   return NextResponse.json(inquiry, { status: 201 });

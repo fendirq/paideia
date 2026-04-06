@@ -3,16 +3,23 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { UploadForm } from "@/components/upload-form";
+import { BackButton } from "@/components/back-button";
 
-export default async function UploadPage() {
+export default async function UploadPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ class?: string }>;
+}) {
   const session = await getServerSession(authOptions);
 
   if (!session) {
     redirect("/login");
   }
 
+  const { class: preselectedClassId } = await searchParams;
+
   const existingClasses = await db.inquiry.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, teacherNotes: "add-class" },
     select: {
       id: true,
       subject: true,
@@ -23,7 +30,8 @@ export default async function UploadPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="max-w-3xl mx-auto px-6 py-8 mt-4 mb-8 bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[20px]">
+      <BackButton href="/app" />
       <h1 className="font-serif text-[34px] text-text-primary mb-2">
         Upload coursework
       </h1>
@@ -35,6 +43,7 @@ export default async function UploadPage() {
       <UploadForm
         userRole={session.user.role ?? "STUDENT"}
         existingClasses={existingClasses}
+        preselectedClassId={preselectedClassId}
       />
     </div>
   );

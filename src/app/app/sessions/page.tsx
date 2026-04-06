@@ -2,44 +2,53 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { SessionsList } from "./sessions-list";
+import { ClassFolders } from "./class-folders";
+import { BackButton } from "@/components/back-button";
 
 export default async function SessionsPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const sessions = await db.tutoringSession.findMany({
-    where: { userId: session.user.id },
-    include: {
-      inquiry: {
-        select: { id: true, subject: true, unitName: true, teacherName: true },
-      },
-      _count: { select: { messages: true } },
+  // Only fetch classes created via Add a Class
+  const rawClasses = await db.inquiry.findMany({
+    where: {
+      userId: session.user.id,
+      teacherNotes: "add-class",
     },
-    orderBy: { startedAt: "desc" },
+    include: {
+      sessions: {
+        include: { _count: { select: { messages: true } } },
+        orderBy: { startedAt: "desc" },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
   });
 
-  const serialized = sessions.map((s) => ({
-    id: s.id,
-    inquiryId: s.inquiryId,
-    subject: s.inquiry.subject,
-    unitName: s.inquiry.unitName,
-    teacherName: s.inquiry.teacherName,
-    messageCount: s._count.messages,
-    startedAt: s.startedAt.toISOString(),
+  const classes = rawClasses.map((c) => ({
+    id: c.id,
+    subject: c.subject,
+    unitName: c.unitName,
+    teacherName: c.teacherName,
+    sessions: c.sessions.map((s) => ({
+      id: s.id,
+      messageCount: s._count.messages,
+      startedAt: s.startedAt.toISOString(),
+      status: s.status,
+    })),
   }));
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8 mt-4 mb-8 bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[20px]">
+      <BackButton href="/app" />
       <h1 className="font-serif text-[34px] text-text-primary mb-2">
-        Your sessions
+        Your Classes
       </h1>
       <p className="text-[15px] text-text-secondary mb-8">
-        {sessions.length} session{sessions.length !== 1 ? "s" : ""} across your
-        classes.
+        {classes.length} class{classes.length !== 1 ? "es" : ""} ·{" "}
+        {classes.reduce((sum, c) => sum + c.sessions.length, 0)} total sessions
       </p>
 
-      <SessionsList sessions={serialized} />
+      <ClassFolders classes={classes} />
     </div>
   );
 }

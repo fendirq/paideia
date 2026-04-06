@@ -83,6 +83,41 @@
   line-height: 1.75;
 }
 
+/* Tailwind preflight overrides that break KaTeX:
+   - svg { display: block } → breaks inline SVGs for radicals, fraction bars
+   - table { border-collapse: collapse } → breaks vlist inline-table layout
+   - sup { line-height: 0 } → interferes with superscript positioning
+   - inherited line-height: 1.75 → inflates vlist row heights
+   Reset all of these inside .katex so KaTeX's own CSS takes full control. */
+.chat-prose .katex {
+  line-height: 1.2;
+}
+
+.chat-prose .katex svg {
+  display: inline;
+  vertical-align: initial;
+}
+
+.chat-prose .katex .vlist-t {
+  display: inline-table;
+  border-collapse: initial;
+}
+
+.chat-prose .katex .vlist-r {
+  display: table-row;
+}
+
+.chat-prose .katex .vlist {
+  display: table-cell;
+  vertical-align: bottom;
+  position: relative;
+}
+
+.chat-prose .katex sup {
+  line-height: inherit;
+  vertical-align: inherit;
+}
+
 .chat-prose p {
   margin-bottom: 0.75rem;
 }

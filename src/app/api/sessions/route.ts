@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     data: {
       userId: session.user.id,
       inquiryId,
-      helpType: typeof helpType === "string" && VALID_HELP_TYPES.has(helpType) ? helpType : null,
+      helpType: typeof helpType === "string" && helpType.trim() ? helpType.trim() : null,
     },
   });
 
