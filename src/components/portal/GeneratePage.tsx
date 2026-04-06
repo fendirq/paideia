@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { EssayOutput } from "./EssayOutput";
 
 interface GeneratePageProps {
@@ -9,12 +10,52 @@ interface GeneratePageProps {
 
 export function GeneratePage({ subject }: GeneratePageProps) {
   const [assignment, setAssignment] = useState("");
-  const [wordCount, setWordCount] = useState(500);
+  const wordCount = 500;
   const [requirements, setRequirements] = useState("");
   const [level, setLevel] = useState<1 | 2>(1);
   const [essay, setEssay] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadingRubric, setUploadingRubric] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const rubricInputRef = useRef<HTMLInputElement>(null);
+
+  // Save essay after generation completes
+  const saveEssay = useCallback(
+    async (essayText: string) => {
+      try {
+        await fetch("/api/portal/generations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject,
+            assignment,
+            requirements,
+            level,
+            essay: essayText,
+          }),
+        });
+      } catch {}
+    },
+    [subject, assignment, requirements, level]
+  );
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
+      if (!res.ok) return;
+      const { text } = await res.json();
+      setAssignment(text);
+    } catch {
+      // skip
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const generate = useCallback(async () => {
     if (!assignment.trim() || generating) return;
@@ -42,7 +83,10 @@ export function GeneratePage({ subject }: GeneratePageProps) {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          if (fullText) saveEssay(fullText);
+          break;
+        }
 
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
@@ -70,7 +114,7 @@ export function GeneratePage({ subject }: GeneratePageProps) {
     } finally {
       setGenerating(false);
     }
-  }, [assignment, wordCount, requirements, level, generating]);
+  }, [assignment, wordCount, requirements, level, generating, saveEssay]);
 
   const subjectLabel = subject.charAt(0).toUpperCase() + subject.slice(1);
 
@@ -79,55 +123,122 @@ export function GeneratePage({ subject }: GeneratePageProps) {
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="font-display text-2xl font-bold text-text-primary mb-1">
+          <h1 className="font-display text-2xl font-bold text-white mb-1">
             Generate — {subjectLabel}
           </h1>
-          <p className="text-text-muted text-sm">
-            Describe your assignment and choose a generation level.
-          </p>
         </div>
 
         {/* Assignment input */}
         <div className="glass p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-white/70 mb-2">
               Assignment Prompt
             </label>
-            <textarea
-              value={assignment}
-              onChange={(e) => setAssignment(e.target.value)}
-              placeholder="Paste or describe your assignment here..."
-              rows={4}
-              className="input-field font-serif resize-y"
-            />
+            {/* File upload drop zone */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-white/20 hover:border-white/40 rounded-xl p-6 text-center cursor-pointer transition-colors mb-3"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileUpload(f);
+                  e.target.value = "";
+                }}
+                className="hidden"
+              />
+              <svg className="w-8 h-8 mx-auto mb-2 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+              </svg>
+              <p className="text-white text-sm font-medium">
+                {uploading ? "Extracting text..." : "Upload assignment file"}
+              </p>
+              <p className="text-white/40 text-xs mt-1">PDF or DOCX</p>
+            </div>
+            {assignment && (
+              <div className="relative">
+                <textarea
+                  value={assignment}
+                  onChange={(e) => setAssignment(e.target.value)}
+                  rows={4}
+                  className="input-field font-serif resize-y text-white"
+                />
+                <button
+                  onClick={() => setAssignment("")}
+                  className="absolute top-2 right-2 text-white/30 hover:text-white/60 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Target Word Count
+          <div>
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Rubric / Requirements
               </label>
-              <input
-                type="number"
-                value={wordCount}
-                onChange={(e) => setWordCount(Number(e.target.value))}
-                min={100}
-                max={5000}
-                step={50}
-                className="input-field"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                Additional Requirements
-              </label>
-              <input
-                type="text"
-                value={requirements}
-                onChange={(e) => setRequirements(e.target.value)}
-                placeholder="e.g. MLA format, 3 sources..."
-                className="input-field"
-              />
+              <div
+                onClick={() => !requirements && rubricInputRef.current?.click()}
+                className={`border-2 border-dashed border-white/20 hover:border-white/40 rounded-xl p-3 text-center cursor-pointer transition-colors ${requirements ? "border-solid border-white/[0.06]" : ""}`}
+              >
+                <input
+                  ref={rubricInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.doc"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setUploadingRubric(true);
+                    try {
+                      const form = new FormData();
+                      form.append("file", f);
+                      const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
+                      if (res.ok) {
+                        const { text } = await res.json();
+                        setRequirements(text);
+                      }
+                    } catch {} finally {
+                      setUploadingRubric(false);
+                    }
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+                {requirements ? (
+                  <div className="relative">
+                    <textarea
+                      value={requirements}
+                      onChange={(e) => setRequirements(e.target.value)}
+                      rows={2}
+                      className="input-field font-serif resize-y text-white text-xs border-0 p-0 bg-transparent"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setRequirements(""); }}
+                      className="absolute top-0 right-0 text-white/30 hover:text-white/60 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 mx-auto mb-1 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                    </svg>
+                    <p className="text-white/40 text-xs">
+                      {uploadingRubric ? "Extracting..." : "Upload rubric"}
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -141,10 +252,10 @@ export function GeneratePage({ subject }: GeneratePageProps) {
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-display font-semibold text-text-primary">Level 1</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-text-muted">Standard</span>
+              <span className="text-sm font-display font-semibold text-white">Level 1</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">Standard</span>
             </div>
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-white/50">
               Single-pass generation using your profile and samples. Fast and reliable.
             </p>
           </button>
@@ -155,10 +266,10 @@ export function GeneratePage({ subject }: GeneratePageProps) {
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-display font-semibold text-text-primary">Level 2</span>
+              <span className="text-sm font-display font-semibold text-white">Level 2</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Enhanced</span>
             </div>
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-white/50">
               Two-pass: analyzes your style fingerprint first, then generates. More accurate but slower.
             </p>
           </button>
@@ -172,6 +283,17 @@ export function GeneratePage({ subject }: GeneratePageProps) {
         >
           {generating ? "Generating..." : `Generate with Level ${level}`}
         </button>
+
+        {/* Past assignments link */}
+        <Link
+          href={`/portal/${subject}/history`}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-full border border-white/15 bg-white/[0.05] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          Past Assignments
+        </Link>
 
         {error && (
           <p className="text-red-400 text-sm text-center">{error}</p>

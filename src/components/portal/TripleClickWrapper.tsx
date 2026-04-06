@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 interface TripleClickWrapperProps {
   children: React.ReactNode;
@@ -9,7 +9,9 @@ interface TripleClickWrapperProps {
 
 export function TripleClickWrapper({ children }: TripleClickWrapperProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const clickTimestamps = useRef<number[]>([]);
+  const isPortal = pathname.startsWith("/portal");
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -24,10 +26,11 @@ export function TripleClickWrapper({ children }: TripleClickWrapperProps) {
       if (clickTimestamps.current.length >= 3) {
         e.preventDefault();
         clickTimestamps.current = [];
-        router.push("/portal/access");
+        // Toggle: portal → app, app → portal
+        router.push(isPortal ? "/app" : "/portal/access");
       }
     },
-    [router]
+    [router, isPortal]
   );
 
   return <span onClick={handleClick}>{children}</span>;

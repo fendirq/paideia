@@ -22,6 +22,7 @@ export default async function PortalHomePage() {
 
   return (
     <PortalHome
+      userName={session.user.name}
       classes={classes.map((c) => ({
         id: c.id,
         name: c.unitName,

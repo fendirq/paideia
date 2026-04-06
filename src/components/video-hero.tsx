@@ -4,9 +4,10 @@ import { useEffect, useRef } from "react";
 
 interface VideoHeroProps {
   userName?: string | null;
+  greeting?: string;
 }
 
-export function VideoHero({ userName }: VideoHeroProps) {
+export function VideoHero({ userName, greeting = "Welcome" }: VideoHeroProps) {
   const displayName = userName?.split(" ")[0] ?? "there";
   const videoRef = useRef<HTMLVideoElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export function VideoHero({ userName }: VideoHeroProps) {
       {/* Centered welcome */}
       <div ref={textRef} className="absolute inset-0 flex items-center justify-center will-change-[opacity,transform]">
         <h1 className="font-display text-[42px] md:text-[56px] font-bold tracking-[0.1em] text-text-primary drop-shadow-lg text-center">
-          Welcome, {displayName}.
+          {greeting}, {displayName}.
         </h1>
       </div>
     </div>

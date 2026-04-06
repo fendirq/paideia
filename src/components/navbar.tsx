@@ -20,6 +20,8 @@ interface NavbarProps {
 export function Navbar({ userName, userImage }: NavbarProps) {
   const pathname = usePathname();
   const isSessionPage = /^\/app\/sessions\/[^/]+$/.test(pathname);
+  const isPortal = pathname.startsWith("/portal");
+  const logoHref = isPortal ? "/portal/home" : "/app";
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -53,7 +55,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
       {/* Left: Logo */}
       <TripleClickWrapper>
         <Link
-          href="/app"
+          href={logoHref}
           className="font-display font-bold text-2xl tracking-[0.12em] text-text-primary"
         >
           PAIDEIA
