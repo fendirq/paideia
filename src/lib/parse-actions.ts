@@ -1,22 +1,32 @@
 import { stripThinkingTags } from "./strip-thinking";
 
+// Matches variations: ---ACTIONS---, ACTIONS---, ACTIONS:, ---Actions---
+const ACTION_SEPARATOR = /\n*-*\s*ACTIONS\s*-*:?\s*/i;
+
+export function splitActions(text: string): { before: string; after: string | null } {
+  const match = text.match(ACTION_SEPARATOR);
+  if (!match || match.index === undefined) return { before: text, after: null };
+  return {
+    before: text.slice(0, match.index),
+    after: text.slice(match.index + match[0].length),
+  };
+}
+
 export function parseActionsFromResponse(fullText: string): {
   message: string;
   suggestedActions: string[];
 } {
   const cleaned = stripThinkingTags(fullText);
+  const { before, after } = splitActions(cleaned);
 
-  const separator = "---ACTIONS---";
-  const idx = cleaned.lastIndexOf(separator);
-  if (idx === -1) {
+  if (!after) {
     return { message: cleaned.trim(), suggestedActions: [] };
   }
 
-  const message = cleaned.slice(0, idx).trim();
-  const actionsText = cleaned.slice(idx + separator.length).trim();
-  const suggestedActions = actionsText
-    .split("\n")
-    .map((line) => line.replace(/^\d+\.\s*/, "").replace(/^\[\d+\]\s*/, "").trim())
+  const message = before.trim();
+  const suggestedActions = after
+    .split(/[\n\[\]]/)
+    .map((line) => line.replace(/^\d+\.\s*/, "").trim())
     .filter((line) => line.length > 0 && line !== "I still don't understand")
     .slice(0, 3);
 

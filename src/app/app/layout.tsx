@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
+import { BackgroundVideo } from "@/components/background-video";
 
 export default async function AppLayout({
   children,
@@ -18,11 +19,12 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen">
+      <BackgroundVideo />
       <Navbar
         userName={session.user.name ?? undefined}
         userImage={session.user.image ?? undefined}
       />
-      <main className="pt-14">{children}</main>
+      <main className="relative z-10 pt-14">{children}</main>
     </div>
   );
 }

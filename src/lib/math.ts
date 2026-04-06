@@ -8,9 +8,11 @@ export function tryKatex(expr: string, displayMode: boolean): string | null {
   }
 }
 
-// Strip any raw HTML tags from AI model output to prevent XSS.
+// Strip raw HTML tags from AI model output to prevent XSS.
+// Only matches tags that look like real HTML (start with a letter or /),
+// avoiding false positives on math inequalities like x < 5 or a > b.
 function sanitizeModelOutput(text: string): string {
-  return text.replace(/<[^>]*>/g, "");
+  return text.replace(/<\/?[a-zA-Z][^>]*>/g, "");
 }
 
 // Pre-render all math expressions with KaTeX before passing to ReactMarkdown.
@@ -21,6 +23,31 @@ export function renderMath(text: string): string {
   text = text
     .replace(/\\\((.+?)\\\)/g, (_, e) => `$${e}$`)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$$${e}$$`);
+
+  // Protect existing LaTeX blocks before converting bare carets.
+  // Without this, bare caret conversion matches inside $...$ and breaks them.
+  const latexBlocks: string[] = [];
+  const latexPlaceholder = (i: number) => `%%LTXBLK_${i}%%`;
+
+  text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match) => {
+    latexBlocks.push(match);
+    return latexPlaceholder(latexBlocks.length - 1);
+  });
+  text = text.replace(/\$([^\$\n]+?)\$/g, (match) => {
+    latexBlocks.push(match);
+    return latexPlaceholder(latexBlocks.length - 1);
+  });
+
+  // Convert bare caret notation (e.g. x^2, x^{10}) to inline LaTeX — only on unprotected text
+  text = text.replace(/([a-zA-Z0-9)]+)\^(\{[^}]+\}|\d+)/g, (_, base, exp) => {
+    const cleanExp = exp.startsWith("{") ? exp : `{${exp}}`;
+    return `$${base}^${cleanExp}$`;
+  });
+
+  // Restore protected LaTeX blocks
+  for (let i = 0; i < latexBlocks.length; i++) {
+    text = text.replaceAll(latexPlaceholder(i), latexBlocks[i]);
+  }
 
   const rendered: string[] = [];
   const placeholder = (i: number) => `%%KATEX_${i}%%`;

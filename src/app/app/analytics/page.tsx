@@ -7,6 +7,7 @@ import { ActivityChart } from "@/components/activity-chart";
 import { DonutChart } from "@/components/donut-chart";
 import { ExamCountdown } from "@/components/exam-countdown";
 import { StudyQueue } from "@/components/study-queue";
+import { BackButton } from "@/components/back-button";
 
 export default async function AnalyticsPage() {
   const session = await getServerSession(authOptions);
@@ -138,7 +139,8 @@ export default async function AnalyticsPage() {
   const uniqueSubjects = new Set(totalSessions.map((s) => s.inquiry.subject));
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8 mt-4 mb-8 bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[20px]">
+      <BackButton href="/app" />
       <h1 className="font-serif text-[34px] text-text-primary mb-2">
         Analytics
       </h1>
