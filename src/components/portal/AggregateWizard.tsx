@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 // ─── Types ───
@@ -9,7 +9,6 @@ interface Sample {
   label: string;
   content: string;
   wordCount: number;
-  mode: "paste" | "upload";
 }
 
 interface TeacherProfile {
@@ -33,8 +32,6 @@ interface WritingStyle {
   commonPhrases: string;
   quirks: string;
 }
-
-const EMPTY_SAMPLE: Sample = { label: "", content: "", wordCount: 0, mode: "paste" };
 
 const DEFAULT_TEACHER: TeacherProfile = {
   gradeLevel: "",
@@ -65,12 +62,13 @@ export function AggregateWizard() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [samples, setSamples] = useState<Sample[]>(
-    Array.from({ length: 6 }, () => ({ ...EMPTY_SAMPLE }))
-  );
+  const [uploading, setUploading] = useState(false);
+  const [samples, setSamples] = useState<Sample[]>([]);
   const [teacher, setTeacher] = useState<TeacherProfile>({ ...DEFAULT_TEACHER });
   const [self, setSelf] = useState<SelfAssessment>({ ...DEFAULT_SELF });
   const [style, setStyle] = useState<WritingStyle>({ ...DEFAULT_STYLE });
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing profile on mount
   useEffect(() => {
@@ -83,44 +81,47 @@ export function AggregateWizard() {
           setStyle(data.profile.writingStyle ?? DEFAULT_STYLE);
         }
         if (data.samples?.length) {
-          const loaded = data.samples.map((s: { label: string; content: string; wordCount: number }) => ({
+          setSamples(data.samples.map((s: Sample) => ({
             label: s.label,
             content: s.content,
             wordCount: s.wordCount,
-            mode: "paste" as const,
-          }));
-          while (loaded.length < 6) loaded.push({ ...EMPTY_SAMPLE });
-          setSamples(loaded);
+          })));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const updateSample = (i: number, partial: Partial<Sample>) => {
-    setSamples((prev) => {
-      const next = [...prev];
-      next[i] = { ...next[i], ...partial };
-      if ("content" in partial) {
-        next[i].wordCount = (partial.content ?? "").split(/\s+/).filter(Boolean).length;
+  const uploadFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).slice(0, 6 - samples.length);
+    if (!fileArray.length) return;
+
+    setUploading(true);
+    const newSamples: Sample[] = [];
+
+    for (const file of fileArray) {
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
+        if (!res.ok) continue;
+        const { text, wordCount } = await res.json();
+        newSamples.push({ label: file.name, content: text, wordCount });
+      } catch {
+        // skip failed uploads
       }
-      return next;
-    });
+    }
+
+    setSamples((prev) => [...prev, ...newSamples].slice(0, 6));
+    setUploading(false);
   };
 
-  const handleFileUpload = async (i: number, file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
-    if (!res.ok) return;
-    const { text, wordCount } = await res.json();
-    updateSample(i, { content: text, wordCount, label: samples[i].label || file.name });
+  const removeSample = (index: number) => {
+    setSamples((prev) => prev.filter((_, i) => i !== index));
   };
-
-  const filledSamples = samples.filter((s) => s.content.trim().length > 0);
 
   const canAdvance = (): boolean => {
-    if (step === 0) return filledSamples.length >= 1 && filledSamples.every((s) => s.wordCount >= 200);
+    if (step === 0) return samples.length >= 1;
     if (step === 1) return !!teacher.gradeLevel;
     if (step === 2) return !!self.gradeRange;
     if (step === 3) return style.toneTraits.length > 0;
@@ -134,7 +135,7 @@ export function AggregateWizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          samples: filledSamples.map((s, i) => ({
+          samples: samples.map((s, i) => ({
             label: s.label || `Sample ${i + 1}`,
             content: s.content,
             wordCount: s.wordCount,
@@ -148,10 +149,10 @@ export function AggregateWizard() {
     } finally {
       setSaving(false);
     }
-  }, [filledSamples, teacher, self, style, router]);
+  }, [samples, teacher, self, style, router]);
 
   if (loading) {
-    return <p className="text-text-muted text-center py-12">Loading...</p>;
+    return <p className="text-white/50 text-center py-12">Loading...</p>;
   }
 
   const steps = ["Samples", "Teacher", "Self", "Style", "Review"];
@@ -166,10 +167,10 @@ export function AggregateWizard() {
             onClick={() => i < step && setStep(i)}
             className={`text-xs px-3 py-1 rounded-full transition-colors ${
               i === step
-                ? "bg-accent text-bg-base font-medium"
+                ? "bg-accent text-white font-medium"
                 : i < step
-                  ? "bg-white/10 text-text-secondary cursor-pointer hover:bg-white/20"
-                  : "bg-white/[0.04] text-text-muted"
+                  ? "bg-white/10 text-white/70 cursor-pointer hover:bg-white/20"
+                  : "bg-white/[0.04] text-white/30"
             }`}
           >
             {label}
@@ -177,67 +178,78 @@ export function AggregateWizard() {
         ))}
       </div>
 
-      {/* Step 0: Writing Samples */}
+      {/* Step 0: Writing Samples — single drop zone */}
       {step === 0 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Writing Samples</h2>
-            <p className="text-text-muted text-sm">Upload or paste up to 6 samples. Each must be at least 200 words.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">Writing Samples</h2>
+            <p className="text-white/60 text-sm">
+              Upload up to 6 files of your past writing to be analyzed. We&apos;ll extract the text and study your style, tone, and patterns. Accepted formats: PDF, DOCX.
+            </p>
           </div>
-          {samples.map((sample, i) => (
-            <div key={i} className="border border-white/[0.06] rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <input
-                  type="text"
-                  placeholder={`Sample ${i + 1} label`}
-                  value={sample.label}
-                  onChange={(e) => updateSample(i, { label: e.target.value })}
-                  className="bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none w-48"
-                />
-                <div className="flex items-center gap-2">
+
+          {/* Drop zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors ${
+              dragOver
+                ? "border-accent bg-accent/10"
+                : "border-white/20 hover:border-white/40"
+            } ${samples.length >= 6 ? "opacity-30 pointer-events-none" : ""}`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,.doc"
+              multiple
+              onChange={(e) => {
+                if (e.target.files?.length) uploadFiles(e.target.files);
+                e.target.value = "";
+              }}
+              className="hidden"
+            />
+            <svg className="w-10 h-10 mx-auto mb-3 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+            </svg>
+            <p className="text-white font-medium text-sm mb-1">
+              {uploading ? "Uploading..." : "Drop files here or click to browse"}
+            </p>
+            <p className="text-white/40 text-xs">
+              {samples.length}/6 files uploaded &middot; PDF or DOCX
+            </p>
+          </div>
+
+          {/* Uploaded files list */}
+          {samples.length > 0 && (
+            <div className="space-y-2">
+              {samples.map((sample, i) => (
+                <div key={i} className="flex items-center justify-between border border-white/[0.08] rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <svg className="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                    <span className="text-white text-sm truncate">{sample.label}</span>
+                    <span className="text-white/40 text-xs shrink-0">{sample.wordCount} words</span>
+                  </div>
                   <button
-                    onClick={() => updateSample(i, { mode: "paste" })}
-                    className={`text-xs px-2 py-0.5 rounded ${sample.mode === "paste" ? "bg-white/10 text-text-primary" : "text-text-muted"}`}
+                    onClick={() => removeSample(i)}
+                    className="text-white/30 hover:text-white/60 transition-colors ml-2"
                   >
-                    Paste
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
                   </button>
-                  <button
-                    onClick={() => updateSample(i, { mode: "upload" })}
-                    className={`text-xs px-2 py-0.5 rounded ${sample.mode === "upload" ? "bg-white/10 text-text-primary" : "text-text-muted"}`}
-                  >
-                    Upload
-                  </button>
-                  <span className={`text-xs ${sample.wordCount >= 200 ? "text-accent" : "text-text-muted"}`}>
-                    {sample.wordCount} words
-                  </span>
                 </div>
-              </div>
-              {sample.mode === "paste" ? (
-                <textarea
-                  value={sample.content}
-                  onChange={(e) => updateSample(i, { content: e.target.value })}
-                  placeholder="Paste your writing here..."
-                  rows={4}
-                  className="w-full bg-bg-base border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-y font-serif"
-                />
-              ) : (
-                <div>
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.doc"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleFileUpload(i, f);
-                    }}
-                    className="text-sm text-text-muted file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:bg-white/10 file:text-text-primary"
-                  />
-                  {sample.content && (
-                    <p className="text-xs text-accent mt-2">Extracted {sample.wordCount} words</p>
-                  )}
-                </div>
-              )}
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -245,8 +257,8 @@ export function AggregateWizard() {
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Teacher Profile</h2>
-            <p className="text-text-muted text-sm">Help us understand what your teacher expects.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">Teacher Profile</h2>
+            <p className="text-white/60 text-sm">Help us understand what your teacher expects.</p>
           </div>
 
           <Field label="Grade Level">
@@ -296,8 +308,8 @@ export function AggregateWizard() {
       {step === 2 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Self-Assessment</h2>
-            <p className="text-text-muted text-sm">Be honest — this helps us match your level.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">Self-Assessment</h2>
+            <p className="text-white/60 text-sm">Be honest — this helps us match your level.</p>
           </div>
 
           <Field label="Your Biggest Strength">
@@ -350,8 +362,8 @@ export function AggregateWizard() {
       {step === 3 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Writing Style</h2>
-            <p className="text-text-muted text-sm">Describe how you naturally write.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">Writing Style</h2>
+            <p className="text-white/60 text-sm">Describe how you naturally write.</p>
           </div>
 
           <Field label="Tone Traits">
@@ -410,11 +422,11 @@ export function AggregateWizard() {
       {step === 4 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Review & Save</h2>
-            <p className="text-text-muted text-sm">Confirm your profile before saving.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">Review & Save</h2>
+            <p className="text-white/60 text-sm">Confirm your profile before saving.</p>
           </div>
 
-          <ReviewSection title="Writing Samples" items={[`${filledSamples.length} sample(s) — ${filledSamples.reduce((sum, s) => sum + s.wordCount, 0)} total words`]} />
+          <ReviewSection title="Writing Samples" items={[`${samples.length} file(s) — ${samples.reduce((sum, s) => sum + s.wordCount, 0)} total words`]} />
           <ReviewSection title="Teacher Profile" items={[
             `Grade: ${teacher.gradeLevel || "Not set"}`,
             `Focus: ${teacher.focusAreas.join(", ") || "None"}`,
@@ -435,11 +447,11 @@ export function AggregateWizard() {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between mt-8 pt-6 border-t border-white/[0.06]">
+      <div className="flex justify-between mt-8 pt-6 border-t border-white/[0.08]">
         <button
           onClick={() => setStep(step - 1)}
           disabled={step === 0}
-          className="text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-30"
+          className="text-sm text-white/40 hover:text-white transition-colors disabled:opacity-30"
         >
           Back
         </button>
@@ -470,7 +482,7 @@ export function AggregateWizard() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-text-secondary mb-2">{label}</label>
+      <label className="block text-sm font-medium text-white/70 mb-2">{label}</label>
       {children}
     </div>
   );
@@ -499,7 +511,7 @@ function CheckboxGroup({
             className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
               active
                 ? "bg-accent/20 border-accent/40 text-accent-light"
-                : "bg-white/[0.04] border-white/[0.08] text-text-muted hover:text-text-secondary"
+                : "bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/70"
             }`}
           >
             {opt}
@@ -529,7 +541,7 @@ function RadioGroup({
           className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer transition-colors ${
             selected === opt
               ? "bg-accent/20 border-accent/40 text-accent-light"
-              : "bg-white/[0.04] border-white/[0.08] text-text-muted hover:text-text-secondary"
+              : "bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/70"
           }`}
         >
           <input
@@ -549,11 +561,11 @@ function RadioGroup({
 
 function ReviewSection({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="border border-white/[0.06] rounded-xl p-4">
-      <h3 className="text-sm font-medium text-text-primary mb-2">{title}</h3>
+    <div className="border border-white/[0.08] rounded-xl p-4">
+      <h3 className="text-sm font-medium text-white mb-2">{title}</h3>
       <ul className="space-y-1">
         {items.map((item) => (
-          <li key={item} className="text-xs text-text-secondary">{item}</li>
+          <li key={item} className="text-xs text-white/60">{item}</li>
         ))}
       </ul>
     </div>

@@ -52,6 +52,7 @@ model User {
   tutoringSessions TutoringSession[]
   writingProfile   WritingProfile?
   writingSamples   WritingSample[]
+  generatedEssays  GeneratedEssay[]
   createdAt        DateTime          @default(now())
 }
 
@@ -198,4 +199,17 @@ model WritingSample {
   content   String
   wordCount Int
   createdAt DateTime @default(now())
+}
+
+model GeneratedEssay {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject      String
+  assignment   String
+  requirements String?
+  level        Int
+  essay        String
+  wordCount    Int
+  createdAt    DateTime @default(now())
 }
