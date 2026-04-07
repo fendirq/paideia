@@ -54,9 +54,12 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
 
-  const [profile, samples] = await Promise.all([
+  const [profile, samples, paymentUser] = await Promise.all([
     db.writingProfile.findUnique({ where: { userId } }),
     db.writingSample.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
+    level === 2
+      ? db.user.findUnique({ where: { id: userId }, select: { level2PaidAt: true, role: true } })
+      : null,
   ]);
 
   if (!profile || !samples.length) {
@@ -66,6 +69,11 @@ export async function POST(req: Request) {
   // Guard: Level 2 generation requires a Level 2 profile
   if (level === 2 && profile.level !== 2) {
     return NextResponse.json({ error: "Level 2 generation requires a Level 2 profile. Update your profile first." }, { status: 400 });
+  }
+
+  // Guard: Level 2 generation requires payment (admin bypass)
+  if (level === 2 && paymentUser?.role !== "ADMIN" && !paymentUser?.level2PaidAt) {
+    return NextResponse.json({ error: "Level 2 requires an upgrade. Visit the upgrade page to unlock." }, { status: 403 });
   }
 
   const sampleData = samples.map((s) => ({ label: s.label, content: s.content }));

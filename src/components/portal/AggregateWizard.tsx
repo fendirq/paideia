@@ -202,7 +202,7 @@ function MultiSelect({
 
 // ─── Wizard ───
 
-export function AggregateWizard() {
+export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -413,19 +413,30 @@ export function AggregateWizard() {
               </p>
             </button>
             <button
-              onClick={() => { setLevel(2); setStep(0); }}
+              onClick={() => hasLevel2 ? (() => { setLevel(2); setStep(0); })() : (window.location.href = "/portal/upgrade")}
               className={`text-left p-6 rounded-2xl transition-all ${
-                level === 2
-                  ? "bg-accent/10 ring-2 ring-accent/60 border border-accent/30"
-                  : "bg-white/[0.04] border border-white/[0.08] opacity-60 hover:opacity-80"
+                !hasLevel2
+                  ? "bg-white/[0.04] border border-white/[0.08] opacity-50 hover:opacity-70"
+                  : level === 2
+                    ? "bg-accent/10 ring-2 ring-accent/60 border border-accent/30"
+                    : "bg-white/[0.04] border border-white/[0.08] opacity-60 hover:opacity-80"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
+                {!hasLevel2 && (
+                  <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                )}
                 <span className="text-sm font-display font-semibold text-white">Level 2</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Enhanced</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">
+                  {hasLevel2 ? "Enhanced" : "Unlock"}
+                </span>
               </div>
               <p className="text-sm text-white/50">
-                12 in-depth questions for the most accurate voice match. Powered by Claude Sonnet 4.
+                {hasLevel2
+                  ? "12 in-depth questions for the most accurate voice match. Powered by Claude Sonnet 4."
+                  : "Unlock enhanced voice matching powered by Claude Sonnet 4."}
               </p>
             </button>
           </div>

@@ -47,6 +47,8 @@ model User {
   emailVerified    DateTime?
   image            String?
   role             Role?
+  level2PaidAt     DateTime?
+  stripePaymentId  String?           @unique
   accounts         Account[]
   inquiries        Inquiry[]
   tutoringSessions TutoringSession[]
