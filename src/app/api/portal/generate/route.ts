@@ -2,16 +2,26 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import Anthropic from "@anthropic-ai/sdk";
 import {
   buildLevel1Prompt,
-  buildLevel2StyleAnalysisPrompt,
+  buildLevel2OutlinePrompt,
   buildLevel2GenerationPrompt,
+  buildLegacyLevel1Prompt,
 } from "@/lib/essay-generator";
+import type {
+  StyleFingerprint,
+  TeacherProfile,
+  SelfAssessment,
+  GenerateOptions,
+  LegacyGenerateOptions,
+} from "@/lib/essay-generator";
+
+export const maxDuration = 120;
 
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 const LEVEL1_MODEL = "deepseek-ai/DeepSeek-V3";
-const LEVEL2_ANALYSIS_MODEL = "deepseek-ai/DeepSeek-R1";
-const LEVEL2_GENERATION_MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8";
+const LEVEL2_MODEL = "claude-sonnet-4-20250514";
 
 interface GenerateBody {
   assignment: string;
@@ -38,7 +48,7 @@ export async function POST(req: Request) {
   if (level !== 1 && level !== 2) {
     return NextResponse.json({ error: "Invalid level" }, { status: 400 });
   }
-  if (assignment.length > 5000 || (requirements && requirements.length > 1000)) {
+  if (assignment.length > 5000 || (requirements && requirements.length > 5000)) {
     return NextResponse.json({ error: "Input too long" }, { status: 400 });
   }
 
@@ -53,25 +63,52 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Complete your writing profile first" }, { status: 400 });
   }
 
-  const profileData = {
-    teacherProfile: profile.teacherProfile as Record<string, unknown>,
-    selfAssessment: profile.selfAssessment as Record<string, unknown>,
-    writingStyle: profile.writingStyle as Record<string, unknown>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
-
   const sampleData = samples.map((s) => ({ label: s.label, content: s.content }));
+  const fingerprint = profile.styleFingerprint as StyleFingerprint | null;
 
-  const opts = { profile: profileData, samples: sampleData, assignment, wordCount, requirements };
+  if (fingerprint) {
+    const tp = profile.teacherProfile as unknown as TeacherProfile;
+    const sa = profile.selfAssessment as unknown as SelfAssessment;
 
-  if (level === 1) {
-    return streamLevel1(opts);
+    const opts: GenerateOptions = {
+      teacherProfile: tp,
+      selfAssessment: sa,
+      fingerprint,
+      samples: sampleData,
+      assignment,
+      wordCount,
+      requirements,
+    };
+
+    if (level === 1) {
+      return streamLevel1(opts);
+    } else {
+      return await streamLevel2Anthropic(opts);
+    }
   } else {
-    return await streamLevel2(opts);
+    // Legacy fallback — old profile shape, no fingerprint
+    const profileData = {
+      teacherProfile: profile.teacherProfile as Record<string, unknown>,
+      selfAssessment: profile.selfAssessment as Record<string, unknown>,
+      writingStyle: (profile.writingStyle ?? {}) as Record<string, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+
+    const legacyOpts: LegacyGenerateOptions = {
+      profile: profileData,
+      samples: sampleData,
+      assignment,
+      wordCount,
+      requirements,
+    };
+
+    return streamLegacy(legacyOpts);
   }
 }
 
-function streamLevel1(opts: Parameters<typeof buildLevel1Prompt>[0]): Response {
+// ─── Level 1: DeepSeek-V3 via Together AI ───
+
+function streamLevel1(opts: GenerateOptions): Response {
   const apiKey = process.env.TOGETHER_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "Together API key not configured" }, { status: 500 });
@@ -97,7 +134,7 @@ function streamLevel1(opts: Parameters<typeof buildLevel1Prompt>[0]): Response {
             ],
             stream: true,
             max_tokens: 4096,
-            temperature: 0.8,
+            temperature: 0.7,
           }),
         });
 
@@ -108,9 +145,13 @@ function streamLevel1(opts: Parameters<typeof buildLevel1Prompt>[0]): Response {
           return;
         }
 
-        await pipeStream(res.body, controller, encoder);
+        await pipeTogetherStream(res.body, controller, encoder);
       } catch {
-        // pipeStream closes controller in its finally block
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Connection failed" })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch { /* controller may already be closed by pipeTogetherStream */ }
       }
     },
   });
@@ -120,41 +161,78 @@ function streamLevel1(opts: Parameters<typeof buildLevel1Prompt>[0]): Response {
   });
 }
 
-async function streamLevel2(opts: Parameters<typeof buildLevel1Prompt>[0]): Promise<Response> {
+// ─── Level 2: Claude Sonnet 4 via Anthropic (outline + essay) ───
+
+async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "Anthropic API key not configured" }, { status: 500 });
+  }
+
+  const anthropic = new Anthropic({ apiKey });
+
+  // Step 1: Generate outline (non-streaming)
+  const outlinePrompt = buildLevel2OutlinePrompt(opts);
+  const outlineMsg = await anthropic.messages.create({
+    model: LEVEL2_MODEL,
+    max_tokens: 1024,
+    temperature: 0.4,
+    system: "You are an essay planning assistant. Create structured outlines that match a student's writing patterns.",
+    messages: [{ role: "user", content: outlinePrompt }],
+  });
+
+  const outline = outlineMsg.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+
+  // Step 2: Generate essay from outline (streaming)
+  const generationPrompt = buildLevel2GenerationPrompt(opts, outline);
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const messageStream = anthropic.messages.stream({
+          model: LEVEL2_MODEL,
+          max_tokens: 4096,
+          temperature: 0.5,
+          system: generationPrompt,
+          messages: [{ role: "user", content: "Write the essay now, following the outline." }],
+        });
+
+        for await (const event of messageStream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content: event.delta.text })}\n\n`)
+            );
+          }
+        }
+
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      } catch (err) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+  });
+}
+
+// ─── Legacy: DeepSeek-V3 for old profiles without fingerprint ───
+
+function streamLegacy(opts: LegacyGenerateOptions): Response {
   const apiKey = process.env.TOGETHER_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "Together API key not configured" }, { status: 500 });
   }
 
-  // Step 1: Get style fingerprint (non-streaming)
-  const analysisPrompt = buildLevel2StyleAnalysisPrompt(opts.samples);
-  const analysisRes = await fetch(TOGETHER_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: LEVEL2_ANALYSIS_MODEL,
-      messages: [
-        { role: "system", content: "You are a writing style analyst. Return only JSON." },
-        { role: "user", content: analysisPrompt },
-      ],
-      stream: false,
-      max_tokens: 2048,
-      temperature: 0.3,
-    }),
-  });
-
-  if (!analysisRes.ok) {
-    return NextResponse.json({ error: `Style analysis failed: ${analysisRes.status}` }, { status: 500 });
-  }
-
-  const analysisData = await analysisRes.json();
-  const fingerprint = analysisData.choices?.[0]?.message?.content ?? "{}";
-
-  // Step 2: Generate essay using fingerprint (streaming)
-  const generationPrompt = buildLevel2GenerationPrompt(opts, fingerprint);
+  const systemPrompt = buildLegacyLevel1Prompt(opts);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -167,14 +245,14 @@ async function streamLevel2(opts: Parameters<typeof buildLevel1Prompt>[0]): Prom
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: LEVEL2_GENERATION_MODEL,
+            model: LEVEL1_MODEL,
             messages: [
-              { role: "system", content: generationPrompt },
+              { role: "system", content: systemPrompt },
               { role: "user", content: "Write the essay now." },
             ],
             stream: true,
             max_tokens: 4096,
-            temperature: 0.8,
+            temperature: 0.7,
           }),
         });
 
@@ -185,9 +263,13 @@ async function streamLevel2(opts: Parameters<typeof buildLevel1Prompt>[0]): Prom
           return;
         }
 
-        await pipeStream(res.body, controller, encoder);
+        await pipeTogetherStream(res.body, controller, encoder);
       } catch {
-        // pipeStream closes controller in its finally block
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Connection failed" })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        } catch { /* controller may already be closed by pipeTogetherStream */ }
       }
     },
   });
@@ -197,7 +279,9 @@ async function streamLevel2(opts: Parameters<typeof buildLevel1Prompt>[0]): Prom
   });
 }
 
-async function pipeStream(
+// ─── Together AI stream helper ───
+
+async function pipeTogetherStream(
   body: ReadableStream<Uint8Array>,
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder

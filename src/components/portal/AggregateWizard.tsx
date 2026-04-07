@@ -13,46 +13,30 @@ interface Sample {
 
 interface TeacherProfile {
   gradeLevel: string;
-  strictness: string[];
-  focusAreas: string[];
-  notes: string;
+  teacherPriorities: string[];
+  teacherPenalizes: string;
+  formattingRules: string[];
 }
 
 interface SelfAssessment {
-  writingStrength: string;
-  writingWeakness: string;
   gradeRange: string;
-  effortLevel: string;
-}
-
-interface WritingStyle {
-  toneTraits: string[];
-  sentenceStyle: string[];
-  vocabularyLevel: string;
-  commonPhrases: string;
-  quirks: string;
+  writingApproach: string;
+  voiceDescription: string;
+  additionalNotes: string;
 }
 
 const DEFAULT_TEACHER: TeacherProfile = {
   gradeLevel: "",
-  strictness: [],
-  focusAreas: [],
-  notes: "",
+  teacherPriorities: [],
+  teacherPenalizes: "",
+  formattingRules: [],
 };
 
 const DEFAULT_SELF: SelfAssessment = {
-  writingStrength: "",
-  writingWeakness: "",
   gradeRange: "",
-  effortLevel: "",
-};
-
-const DEFAULT_STYLE: WritingStyle = {
-  toneTraits: [],
-  sentenceStyle: [],
-  vocabularyLevel: "",
-  commonPhrases: "",
-  quirks: "",
+  writingApproach: "",
+  voiceDescription: "",
+  additionalNotes: "",
 };
 
 // ─── Wizard ───
@@ -62,12 +46,14 @@ export function AggregateWizard() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [teacher, setTeacher] = useState<TeacherProfile>({ ...DEFAULT_TEACHER });
   const [self, setSelf] = useState<SelfAssessment>({ ...DEFAULT_SELF });
-  const [style, setStyle] = useState<WritingStyle>({ ...DEFAULT_STYLE });
   const [dragOver, setDragOver] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing profile on mount
@@ -76,9 +62,31 @@ export function AggregateWizard() {
       .then((r) => r.json())
       .then((data) => {
         if (data.profile) {
-          setTeacher(data.profile.teacherProfile ?? DEFAULT_TEACHER);
-          setSelf(data.profile.selfAssessment ?? DEFAULT_SELF);
-          setStyle(data.profile.writingStyle ?? DEFAULT_STYLE);
+          setHasExistingProfile(true);
+          const tp = data.profile.teacherProfile ?? {};
+          const sa = data.profile.selfAssessment ?? {};
+
+          if (tp.teacherPriorities) {
+            setTeacher(tp);
+          } else {
+            setTeacher({
+              gradeLevel: tp.gradeLevel || "",
+              teacherPriorities: tp.focusAreas || [],
+              teacherPenalizes: tp.notes || "",
+              formattingRules: [],
+            });
+          }
+
+          if (sa.writingApproach !== undefined) {
+            setSelf(sa);
+          } else {
+            setSelf({
+              gradeRange: sa.gradeRange || "",
+              writingApproach: sa.effortLevel || "",
+              voiceDescription: "",
+              additionalNotes: "",
+            });
+          }
         }
         if (data.samples?.length) {
           setSamples(data.samples.map((s: Sample) => ({
@@ -118,18 +126,19 @@ export function AggregateWizard() {
 
   const removeSample = (index: number) => {
     setSamples((prev) => prev.filter((_, i) => i !== index));
+    setConfirmDelete(null);
   };
 
   const canAdvance = (): boolean => {
     if (step === 0) return samples.length >= 1;
-    if (step === 1) return !!teacher.gradeLevel;
+    if (step === 1) return !!teacher.gradeLevel && teacher.teacherPriorities.length > 0;
     if (step === 2) return !!self.gradeRange;
-    if (step === 3) return style.toneTraits.length > 0;
     return true;
   };
 
   const save = useCallback(async () => {
     setSaving(true);
+    setAnalyzing(true);
     try {
       const res = await fetch("/api/portal/aggregate", {
         method: "POST",
@@ -142,33 +151,38 @@ export function AggregateWizard() {
           })),
           teacherProfile: teacher,
           selfAssessment: self,
-          writingStyle: style,
         }),
       });
       if (res.ok) router.push("/portal/home");
     } finally {
       setSaving(false);
+      setAnalyzing(false);
     }
-  }, [samples, teacher, self, style, router]);
+  }, [samples, teacher, self, router]);
 
   if (loading) {
     return <p className="text-white/50 text-center py-12">Loading...</p>;
   }
 
-  const steps = ["Samples", "Teacher", "Self", "Style", "Review"];
+  const steps = ["Samples", "Class", "You", "Review"];
 
   return (
     <div className="glass p-8">
-      {/* Step indicator */}
+      {/* Step indicator — clickable to any step when editing existing profile */}
       <div className="flex items-center justify-center gap-2 mb-8">
         {steps.map((label, i) => (
           <button
             key={label}
-            onClick={() => i < step && setStep(i)}
+            onClick={() => {
+              if (hasExistingProfile || i < step) {
+                setConfirmDelete(null);
+                setStep(i);
+              }
+            }}
             className={`text-xs px-3 py-1 rounded-full transition-colors ${
               i === step
                 ? "bg-accent text-white font-medium"
-                : i < step
+                : hasExistingProfile || i < step
                   ? "bg-white/10 text-white/70 cursor-pointer hover:bg-white/20"
                   : "bg-white/[0.04] text-white/30"
             }`}
@@ -178,13 +192,13 @@ export function AggregateWizard() {
         ))}
       </div>
 
-      {/* Step 0: Writing Samples — single drop zone */}
+      {/* Step 0: Writing Samples */}
       {step === 0 && (
         <div className="space-y-6">
           <div>
             <h2 className="font-display text-lg font-semibold text-white mb-1">Writing Samples</h2>
             <p className="text-white/60 text-sm">
-              Upload up to 6 files of your past writing to be analyzed. We&apos;ll extract the text and study your style, tone, and patterns. Accepted formats: PDF, DOCX.
+              Upload 3-6 past essays. We&apos;ll analyze your writing style, tone, and patterns automatically.
             </p>
           </div>
 
@@ -230,7 +244,7 @@ export function AggregateWizard() {
           {samples.length > 0 && (
             <div className="space-y-2">
               {samples.map((sample, i) => (
-                <div key={i} className="flex items-center justify-between border border-white/[0.08] rounded-xl px-4 py-3">
+                <div key={i} className="flex items-center justify-between border border-white/15 rounded-full px-5 py-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <svg className="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -238,14 +252,32 @@ export function AggregateWizard() {
                     <span className="text-white text-sm truncate">{sample.label}</span>
                     <span className="text-white/40 text-xs shrink-0">{sample.wordCount} words</span>
                   </div>
-                  <button
-                    onClick={() => removeSample(i)}
-                    className="text-white/30 hover:text-white/60 transition-colors ml-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  {confirmDelete === i ? (
+                    <div className="flex items-center gap-2 ml-2 shrink-0">
+                      <span className="text-white/50 text-xs">Remove?</span>
+                      <button
+                        onClick={() => removeSample(i)}
+                        className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="text-white/40 hover:text-white/60 text-xs transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(i)}
+                      className="text-white/30 hover:text-white/60 transition-colors ml-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -253,12 +285,12 @@ export function AggregateWizard() {
         </div>
       )}
 
-      {/* Step 1: Teacher Profile */}
+      {/* Step 1: About Your Class */}
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Teacher Profile</h2>
-            <p className="text-white/60 text-sm">Help us understand what your teacher expects.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">About Your Class</h2>
+            <p className="text-white/60 text-sm">Tell us about your teacher and their expectations.</p>
           </div>
 
           <Field label="Grade Level">
@@ -268,180 +300,141 @@ export function AggregateWizard() {
               className="select-field"
             >
               <option value="">Select...</option>
-              <option value="9">9th Grade</option>
-              <option value="10">10th Grade</option>
-              <option value="11">11th Grade</option>
-              <option value="12">12th Grade</option>
-              <option value="college">College</option>
+              <option value="9th">9th Grade</option>
+              <option value="10th">10th Grade</option>
+              <option value="11th">11th Grade</option>
+              <option value="12th">12th Grade</option>
+              <option value="College">College</option>
             </select>
           </Field>
 
-          <Field label="Teacher Strictness">
+          <Field label="What does your teacher care most about? (pick 2-3)">
             <CheckboxGroup
-              options={["Strict on grammar", "Strict on formatting", "Strict on citations", "Values creativity", "Prefers formal tone", "Lenient grader"]}
-              selected={teacher.strictness}
-              onChange={(v) => setTeacher({ ...teacher, strictness: v })}
+              options={[
+                "Clear thesis/argument",
+                "Quality of evidence",
+                "Depth of analysis",
+                "Essay structure",
+                "Grammar & mechanics",
+                "Original thinking",
+                "Following the rubric",
+              ]}
+              selected={teacher.teacherPriorities}
+              onChange={(v) => setTeacher({ ...teacher, teacherPriorities: v })}
             />
           </Field>
 
-          <Field label="Focus Areas">
-            <CheckboxGroup
-              options={["Thesis development", "Evidence & analysis", "Organization", "Voice & tone", "Grammar & mechanics", "Close reading"]}
-              selected={teacher.focusAreas}
-              onChange={(v) => setTeacher({ ...teacher, focusAreas: v })}
-            />
-          </Field>
-
-          <Field label="Additional Notes">
+          <Field label="What does your teacher usually mark you down for?">
             <textarea
-              value={teacher.notes}
-              onChange={(e) => setTeacher({ ...teacher, notes: e.target.value })}
-              placeholder="Any other details about your teacher's expectations..."
+              value={teacher.teacherPenalizes}
+              onChange={(e) => setTeacher({ ...teacher, teacherPenalizes: e.target.value })}
+              placeholder="e.g. weak thesis statements, not enough evidence, run-on sentences..."
               rows={3}
               className="input-field font-serif resize-y"
+            />
+          </Field>
+
+          <Field label="Formatting rules">
+            <CheckboxGroup
+              options={[
+                "MLA format",
+                "No first person",
+                "No contractions",
+                "Must include thesis in intro",
+                "5-paragraph structure",
+                "None / no specific rules",
+              ]}
+              selected={teacher.formattingRules}
+              onChange={(v) => setTeacher({ ...teacher, formattingRules: v })}
             />
           </Field>
         </div>
       )}
 
-      {/* Step 2: Self-Assessment */}
+      {/* Step 2: About You */}
       {step === 2 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Self-Assessment</h2>
-            <p className="text-white/60 text-sm">Be honest — this helps us match your level.</p>
+            <h2 className="font-display text-lg font-semibold text-white mb-1">About You</h2>
+            <p className="text-white/60 text-sm">Help us calibrate the output to match your level.</p>
           </div>
 
-          <Field label="Your Biggest Strength">
-            <RadioGroup
-              name="strength"
-              options={["Strong arguments", "Clear writing", "Good vocabulary", "Creative ideas", "Solid structure"]}
-              selected={self.writingStrength}
-              onChange={(v) => setSelf({ ...self, writingStrength: v })}
-            />
-          </Field>
-
-          <Field label="Your Biggest Weakness">
-            <RadioGroup
-              name="weakness"
-              options={["Run-on sentences", "Weak thesis", "Poor organization", "Grammar errors", "Too informal"]}
-              selected={self.writingWeakness}
-              onChange={(v) => setSelf({ ...self, writingWeakness: v })}
-            />
-          </Field>
-
-          <Field label="Typical Grade Range">
+          <Field label="What grade do you typically get on essays?">
             <select
               value={self.gradeRange}
               onChange={(e) => setSelf({ ...self, gradeRange: e.target.value })}
               className="select-field"
             >
               <option value="">Select...</option>
-              <option value="A">A (90-100)</option>
-              <option value="B+">B+ (87-89)</option>
-              <option value="B">B (83-86)</option>
-              <option value="B-">B- (80-82)</option>
-              <option value="C+">C+ (77-79)</option>
-              <option value="C">C (70-76)</option>
-              <option value="below-C">Below C</option>
+              <option value="A/A-">A / A-</option>
+              <option value="B+/B">B+ / B</option>
+              <option value="B-/C+">B- / C+</option>
+              <option value="C or below">C or below</option>
             </select>
           </Field>
 
-          <Field label="Effort You Typically Put In">
+          <Field label="How do you usually approach essays?">
             <RadioGroup
-              name="effort"
-              options={["Last minute", "Moderate effort", "High effort", "Perfectionist"]}
-              selected={self.effortLevel}
-              onChange={(v) => setSelf({ ...self, effortLevel: v })}
+              name="approach"
+              options={[
+                "Write it all last minute",
+                "Moderate effort over a few days",
+                "Careful drafting and revision",
+                "Depends on the assignment",
+              ]}
+              selected={self.writingApproach}
+              onChange={(v) => setSelf({ ...self, writingApproach: v })}
+            />
+          </Field>
+
+          <Field label="How would a friend recognize your writing without your name on it?">
+            <textarea
+              value={self.voiceDescription}
+              onChange={(e) => setSelf({ ...self, voiceDescription: e.target.value })}
+              placeholder="1-3 sentences — what makes your writing yours?"
+              rows={3}
+              className="input-field font-serif resize-y"
+            />
+          </Field>
+
+          <Field label="Anything else we should know? (optional)">
+            <textarea
+              value={self.additionalNotes}
+              onChange={(e) => setSelf({ ...self, additionalNotes: e.target.value })}
+              placeholder="e.g. my teacher loves class discussion references, I always get marked down for run-ons..."
+              rows={2}
+              className="input-field font-serif resize-y"
             />
           </Field>
         </div>
       )}
 
-      {/* Step 3: Writing Style */}
+      {/* Step 3: Review & Save */}
       {step === 3 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Writing Style</h2>
-            <p className="text-white/60 text-sm">Describe how you naturally write.</p>
-          </div>
-
-          <Field label="Tone Traits">
-            <CheckboxGroup
-              options={["Casual", "Formal", "Conversational", "Academic", "Sarcastic", "Straightforward", "Flowery", "Dry"]}
-              selected={style.toneTraits}
-              onChange={(v) => setStyle({ ...style, toneTraits: v })}
-            />
-          </Field>
-
-          <Field label="Sentence Style">
-            <CheckboxGroup
-              options={["Short & punchy", "Long & complex", "Mix of both", "Lots of commas", "Uses dashes", "Fragment-heavy"]}
-              selected={style.sentenceStyle}
-              onChange={(v) => setStyle({ ...style, sentenceStyle: v })}
-            />
-          </Field>
-
-          <Field label="Vocabulary Level">
-            <select
-              value={style.vocabularyLevel}
-              onChange={(e) => setStyle({ ...style, vocabularyLevel: e.target.value })}
-              className="select-field"
-            >
-              <option value="">Select...</option>
-              <option value="basic">Basic — simple words</option>
-              <option value="moderate">Moderate — occasional SAT words</option>
-              <option value="advanced">Advanced — strong vocabulary</option>
-              <option value="mixed">Mixed — inconsistent</option>
-            </select>
-          </Field>
-
-          <Field label="Common Phrases or Filler Words">
-            <textarea
-              value={style.commonPhrases}
-              onChange={(e) => setStyle({ ...style, commonPhrases: e.target.value })}
-              placeholder='e.g. "In conclusion", "This shows that", "Furthermore"...'
-              rows={2}
-              className="input-field font-serif resize-y"
-            />
-          </Field>
-
-          <Field label="Any Quirks or Habits">
-            <textarea
-              value={style.quirks}
-              onChange={(e) => setStyle({ ...style, quirks: e.target.value })}
-              placeholder="e.g. overuse of semicolons, always start with a quote, tend to repeat words..."
-              rows={2}
-              className="input-field font-serif resize-y"
-            />
-          </Field>
-        </div>
-      )}
-
-      {/* Step 4: Review & Save */}
-      {step === 4 && (
-        <div className="space-y-6">
-          <div>
             <h2 className="font-display text-lg font-semibold text-white mb-1">Review & Save</h2>
-            <p className="text-white/60 text-sm">Confirm your profile before saving.</p>
+            <p className="text-white/60 text-sm">
+              {analyzing
+                ? "Analyzing your writing style..."
+                : "Confirm your profile before saving. We'll automatically analyze your writing samples to build a style fingerprint."}
+            </p>
           </div>
 
-          <ReviewSection title="Writing Samples" items={[`${samples.length} file(s) — ${samples.reduce((sum, s) => sum + s.wordCount, 0)} total words`]} />
-          <ReviewSection title="Teacher Profile" items={[
+          <ReviewSection title="Writing Samples" items={[
+            `${samples.length} file(s) — ${samples.reduce((sum, s) => sum + s.wordCount, 0)} total words`,
+          ]} />
+          <ReviewSection title="Class Info" items={[
             `Grade: ${teacher.gradeLevel || "Not set"}`,
-            `Focus: ${teacher.focusAreas.join(", ") || "None"}`,
-            `Style: ${teacher.strictness.join(", ") || "None"}`,
+            `Teacher priorities: ${teacher.teacherPriorities.join(", ") || "None"}`,
+            `Marks down for: ${teacher.teacherPenalizes || "Not specified"}`,
+            `Format rules: ${teacher.formattingRules.join(", ") || "None"}`,
           ]} />
-          <ReviewSection title="Self-Assessment" items={[
-            `Strength: ${self.writingStrength || "Not set"}`,
-            `Weakness: ${self.writingWeakness || "Not set"}`,
-            `Grade range: ${self.gradeRange || "Not set"}`,
-            `Effort: ${self.effortLevel || "Not set"}`,
-          ]} />
-          <ReviewSection title="Writing Style" items={[
-            `Tone: ${style.toneTraits.join(", ") || "Not set"}`,
-            `Sentences: ${style.sentenceStyle.join(", ") || "Not set"}`,
-            `Vocabulary: ${style.vocabularyLevel || "Not set"}`,
+          <ReviewSection title="About You" items={[
+            `Typical grade: ${self.gradeRange || "Not set"}`,
+            `Approach: ${self.writingApproach || "Not set"}`,
+            `Voice: ${self.voiceDescription || "Not described"}`,
+            ...(self.additionalNotes ? [`Notes: ${self.additionalNotes}`] : []),
           ]} />
         </div>
       )}
@@ -449,13 +442,12 @@ export function AggregateWizard() {
       {/* Navigation */}
       <div className="flex justify-between mt-8 pt-6 border-t border-white/[0.08]">
         <button
-          onClick={() => setStep(step - 1)}
-          disabled={step === 0}
-          className="text-sm text-white/40 hover:text-white transition-colors disabled:opacity-30"
+          onClick={() => step === 0 ? router.back() : setStep(step - 1)}
+          className="text-sm text-white/40 hover:text-white transition-colors"
         >
           Back
         </button>
-        {step < 4 ? (
+        {step < 3 ? (
           <button
             onClick={() => setStep(step + 1)}
             disabled={!canAdvance()}
@@ -469,7 +461,15 @@ export function AggregateWizard() {
             disabled={saving}
             className="btn-primary text-sm disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save Profile"}
+            {analyzing ? (
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Analyzing your style...
+              </span>
+            ) : saving ? "Saving..." : "Save Profile"}
           </button>
         )}
       </div>

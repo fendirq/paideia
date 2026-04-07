@@ -39,7 +39,7 @@ export function PortalHome({ userName, classes, hasProfile }: PortalHomeProps) {
               </svg>
             </div>
             <span className="bg-accent hover:bg-accent-light rounded-full px-6 py-2 text-[13px] font-medium text-white transition-colors">
-              {hasProfile ? "Edit Writing Profile" : "Aggregate Writing"}
+              {hasProfile ? "Edit Writing Profile" : "Create Writing Profile"}
             </span>
           </Link>
 

@@ -181,14 +181,15 @@ model StudyItem {
 // ─── Portal Models ───
 
 model WritingProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teacherProfile  Json
-  selfAssessment  Json
-  writingStyle    Json
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teacherProfile   Json
+  selfAssessment   Json
+  writingStyle     Json?
+  styleFingerprint Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model WritingSample {
