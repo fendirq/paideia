@@ -15,9 +15,10 @@ const navItems = [
 interface NavbarProps {
   userName?: string;
   userImage?: string;
+  userRole?: string | null;
 }
 
-export function Navbar({ userName, userImage }: NavbarProps) {
+export function Navbar({ userName, userImage, userRole }: NavbarProps) {
   const pathname = usePathname();
   const isSessionPage = /^\/app\/sessions\/[^/]+$/.test(pathname);
   const isPortal = pathname.startsWith("/portal");
@@ -31,7 +32,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
   const handleSignOut = useCallback(() => {
     // Clear portal cookie before signing out (prevents stale access on shared devices)
     document.cookie = "portal_access=; Path=/; Max-Age=0";
-    signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: "/" });
   }, []);
 
   useEffect(() => {
@@ -111,6 +112,14 @@ export function Navbar({ userName, userImage }: NavbarProps) {
                     {userName ?? "User"}
                   </p>
                   <hr className="my-1 border-white/[0.04]" />
+                  {userRole === "ADMIN" && (
+                    <Link
+                      href="/app/admin"
+                      className="block px-4 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-bg-elevated/50 transition-colors"
+                    >
+                      Admin Dashboard
+                    </Link>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-bg-elevated/50 transition-colors"
@@ -184,6 +193,14 @@ export function Navbar({ userName, userImage }: NavbarProps) {
               );
             })}
             <hr className="border-white/[0.04]" />
+            {userRole === "ADMIN" && (
+              <Link
+                href="/app/admin"
+                className="block px-4 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text-secondary hover:bg-white/[0.04] transition-colors"
+              >
+                Admin Dashboard
+              </Link>
+            )}
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-sm text-text-secondary">{userName ?? "User"}</span>
               <button

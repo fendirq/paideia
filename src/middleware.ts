@@ -30,8 +30,13 @@ export default withAuth(
       authorized({ token, req }) {
         const { pathname } = req.nextUrl;
 
-        // Allow login page for everyone
-        if (pathname === "/login") return true;
+        // Allow public pages for everyone
+        if (pathname === "/login" || pathname === "/signup") return true;
+
+        // Admin routes require ADMIN role
+        if (pathname.startsWith("/app/admin")) {
+          return token?.role === "ADMIN";
+        }
 
         // Protect /app/*, /onboarding, and /portal/* routes
         if (
@@ -47,7 +52,7 @@ export default withAuth(
       },
     },
     pages: {
-      signIn: "/login",
+      signIn: "/",
     },
   }
 );

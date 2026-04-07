@@ -21,7 +21,7 @@ export const maxDuration = 120;
 
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 const LEVEL1_MODEL = "deepseek-ai/DeepSeek-V3";
-const LEVEL2_MODEL = "claude-sonnet-4-20250514";
+const LEVEL2_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 
 interface GenerateBody {
   assignment: string;
