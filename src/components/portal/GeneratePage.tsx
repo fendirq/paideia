@@ -49,6 +49,10 @@ export function GeneratePage({ subject }: GeneratePageProps) {
       const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
       if (!res.ok) return;
       const { text } = await res.json();
+      if (text.length > 5000) {
+        setError("Extracted text is too long (max 5,000 characters). Try a shorter document or paste the key parts manually.");
+        return;
+      }
       setAssignment(text);
     } catch {
       // skip
@@ -201,6 +205,10 @@ export function GeneratePage({ subject }: GeneratePageProps) {
                       const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
                       if (res.ok) {
                         const { text } = await res.json();
+                        if (text.length > 5000) {
+                          setError("Rubric text is too long (max 5,000 characters). Try a shorter document.");
+                          return;
+                        }
                         setRequirements(text);
                       }
                     } catch {} finally {
@@ -284,16 +292,27 @@ export function GeneratePage({ subject }: GeneratePageProps) {
           {generating ? "Generating..." : `Generate with Level ${level}`}
         </button>
 
-        {/* Past assignments link */}
-        <Link
-          href={`/portal/${subject}/history`}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-full border border-white/15 bg-white/[0.05] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
-          Past Assignments
-        </Link>
+        {/* Past assignments + Edit profile links */}
+        <div className="flex gap-3">
+          <Link
+            href={`/portal/${subject}/history`}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-full border border-white/15 bg-white/[0.05] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            Past Assignments
+          </Link>
+          <Link
+            href="/portal/aggregate"
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-full border border-white/15 bg-white/[0.05] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+            </svg>
+            Edit Profile
+          </Link>
+        </div>
 
         {error && (
           <p className="text-red-400 text-sm text-center">{error}</p>
