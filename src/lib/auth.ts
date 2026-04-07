@@ -1,17 +1,38 @@
 import { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { validatePasscode } from "./passcode";
+import bcrypt from "bcrypt";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
   session: { strategy: "jwt" },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    CredentialsProvider({
+      id: "credentials",
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await db.user.findUnique({
+          where: { email: credentials.email.toLowerCase() },
+        });
+
+        if (!user || !user.passwordHash) return null;
+
+        const valid = await bcrypt.compare(credentials.password, user.passwordHash);
+        if (!valid) return null;
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        };
+      },
     }),
     CredentialsProvider({
       id: "passcode",
@@ -24,7 +45,6 @@ export const authOptions: NextAuthOptions = {
           typeof credentials?.passcode === "string" &&
           validatePasscode(credentials.passcode)
         ) {
-          // Ensure admin user exists in DB for full access
           const adminEmail = "admin@paideia.local";
           let adminUser = await db.user.findUnique({
             where: { email: adminEmail },
@@ -50,29 +70,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "google") {
-        const email = user.email ?? "";
-        if (!email.endsWith("@drewschool.org")) {
-          return "/login?error=drew-only";
-        }
-      }
-      return true;
-    },
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
         token.role = user.role ?? null;
       }
-      // For Google users, refresh role from DB (set during onboarding)
-      if (token.userId && !token.role) {
+      // Always refresh role from DB to pick up changes (e.g. after onboarding or admin updates)
+      if (token.userId) {
         const dbUser = await db.user.findUnique({
           where: { id: token.userId },
           select: { role: true },
         });
-        if (dbUser?.role) {
-          token.role = dbUser.role;
-        }
+        token.role = dbUser?.role ?? null;
       }
       return token;
     },
@@ -85,7 +94,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/login",
+    signIn: "/",
     error: "/login",
   },
 };

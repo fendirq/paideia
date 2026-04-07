@@ -23,6 +23,7 @@ export default async function AppLayout({
       <Navbar
         userName={session.user.name ?? undefined}
         userImage={session.user.image ?? undefined}
+        userRole={session.user.role}
       />
       <main className="relative z-10 pt-14">{children}</main>
     </div>

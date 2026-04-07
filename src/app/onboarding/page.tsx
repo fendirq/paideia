@@ -8,7 +8,6 @@ export default async function OnboardingPage() {
   const session = await getServerSession(authOptions);
 
   if (!session) redirect("/login");
-  if (session.user.id === "guest") redirect("/app");
   if (session.user.role) redirect("/app");
 
   return (

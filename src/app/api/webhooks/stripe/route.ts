@@ -39,8 +39,9 @@ export async function POST(req: Request) {
         },
       });
     } catch (err) {
-      // P2002 = unique constraint on stripePaymentId — duplicate webhook delivery, safe to ignore
-      if ((err as { code?: string }).code === "P2002") {
+      const prismaErr = err as { code?: string; meta?: { target?: string[] } };
+      if (prismaErr.code === "P2002" && prismaErr.meta?.target?.includes("stripePaymentId")) {
+        // Duplicate webhook delivery — already processed, safe to ignore
       } else {
         console.error("stripe webhook: db update failed", err);
         return NextResponse.json({ error: "DB error" }, { status: 500 });

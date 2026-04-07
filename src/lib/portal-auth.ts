@@ -22,5 +22,5 @@ export async function hasPortalAccess(): Promise<boolean> {
 }
 
 export function portalCookieHeader(): string {
-  return `${COOKIE_NAME}=granted; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${COOKIE_MAX_AGE}`;
+  return `${COOKIE_NAME}=granted; Secure; SameSite=Lax; Path=/; Max-Age=${COOKIE_MAX_AGE}`;
 }

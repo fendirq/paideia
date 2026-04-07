@@ -47,6 +47,8 @@ model User {
   emailVerified    DateTime?
   image            String?
   role             Role?
+  phone            String?           @unique
+  passwordHash     String?
   level2PaidAt     DateTime?
   stripePaymentId  String?           @unique
   accounts         Account[]
@@ -202,6 +204,12 @@ model WritingSample {
   label     String
   content   String
   wordCount Int
+  createdAt DateTime @default(now())
+}
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  phone     String   @unique
   createdAt DateTime @default(now())
 }
 

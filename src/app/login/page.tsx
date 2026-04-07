@@ -1,28 +1,29 @@
+import { Suspense } from "react";
 import { LoginForm } from "@/components/login-form";
-import { FullBleedBg } from "@/components/full-bleed-bg";
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
-      <FullBleedBg />
-      <div className="w-full max-w-md flex flex-col items-center gap-8">
-        {/* Logo */}
-        <div className="text-center space-y-4">
-          <h2 className="font-display text-[13px] font-semibold tracking-[3px] uppercase text-accent">
-            PAIDEIA
-          </h2>
-          <h1 className="font-serif text-[38px] leading-[1.2] text-text-primary">
-            Your Socratic tutor,
-            <br />
-            <em className="text-text-secondary">always ready.</em>
-          </h1>
-          <p className="text-[15px] text-text-secondary max-w-sm mx-auto leading-relaxed">
-            AI-powered learning for Drew School students and faculty.
-          </p>
-        </div>
+    <div className="min-h-screen relative">
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="fixed inset-0 w-full h-full object-cover z-0"
+      >
+        <source src="/hero-bg.mp4" type="video/mp4" />
+      </video>
+      <div className="fixed inset-0 bg-bg-base/50 z-0" />
 
-        <LoginForm />
-      </div>
-    </main>
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-12">
+        <h1 className="font-display font-bold text-base tracking-[0.1em] mb-10">
+          PAIDEIA
+        </h1>
+
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
+      </main>
+    </div>
   );
 }
