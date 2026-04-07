@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -14,6 +14,26 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
   const canceled = searchParams.get("canceled") === "true";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmed, setConfirmed] = useState(hasPaid);
+
+  // Poll for payment confirmation when redirected from Stripe
+  useEffect(() => {
+    if (!success || hasPaid) return;
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch("/api/portal/payment-status");
+        const data = await res.json();
+        if (data.hasLevel2) {
+          setConfirmed(true);
+          clearInterval(poll);
+        }
+      } catch { /* retry */ }
+      if (attempts >= 10) clearInterval(poll);
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [success, hasPaid]);
 
   const handleCheckout = async () => {
     setLoading(true);
@@ -37,8 +57,8 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
     }
   };
 
-  // Already paid or just completed payment
-  if (hasPaid || success) {
+  // Already paid or payment confirmed via polling
+  if (confirmed) {
     return (
       <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-6">
         <div className="glass p-8 max-w-md w-full text-center space-y-6">
@@ -59,6 +79,27 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
           >
             Back to Portal
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Payment redirect but webhook hasn't fired yet
+  if (success && !confirmed) {
+    return (
+      <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-6">
+        <div className="glass p-8 max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mx-auto animate-pulse">
+            <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="font-display text-xl font-bold text-white mb-2">Processing Payment...</h1>
+            <p className="text-white/60 text-sm">
+              Confirming your purchase. This usually takes a few seconds.
+            </p>
+          </div>
         </div>
       </div>
     );

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -10,5 +11,9 @@ export default async function UpgradeRoute() {
 
   const hasPaid = await hasLevel2Access(session.user.id, session.user.role);
 
-  return <UpgradePage hasPaid={hasPaid} />;
+  return (
+    <Suspense fallback={null}>
+      <UpgradePage hasPaid={hasPaid} />
+    </Suspense>
+  );
 }
