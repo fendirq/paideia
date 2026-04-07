@@ -6,9 +6,10 @@ import { EssayOutput } from "./EssayOutput";
 
 interface GeneratePageProps {
   subject: string;
+  hasLevel2?: boolean;
 }
 
-export function GeneratePage({ subject }: GeneratePageProps) {
+export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) {
   const [assignment, setAssignment] = useState("");
   const wordCount = 500;
   const [requirements, setRequirements] = useState("");
@@ -21,15 +22,16 @@ export function GeneratePage({ subject }: GeneratePageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rubricInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch user's profile level on mount to pre-select
+  // Fetch user's profile level on mount to pre-select (only if they have Level 2 access)
   useEffect(() => {
+    if (!hasLevel2) return;
     fetch("/api/portal/aggregate")
       .then((r) => r.json())
       .then((data) => {
         if (data.profile?.level === 2) setLevel(2);
       })
       .catch(() => {});
-  }, []);
+  }, [hasLevel2]);
 
   // Save essay after generation completes
   const saveEssay = useCallback(
@@ -278,17 +280,30 @@ export function GeneratePage({ subject }: GeneratePageProps) {
             </p>
           </button>
           <button
-            onClick={() => setLevel(2)}
+            onClick={() => hasLevel2 ? setLevel(2) : (window.location.href = "/portal/upgrade")}
             className={`glass p-5 text-left transition-all ${
-              level === 2 ? "ring-2 ring-accent/60" : "opacity-60 hover:opacity-80"
+              !hasLevel2
+                ? "opacity-50 hover:opacity-70"
+                : level === 2
+                  ? "ring-2 ring-accent/60"
+                  : "opacity-60 hover:opacity-80"
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
+              {!hasLevel2 && (
+                <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              )}
               <span className="text-sm font-display font-semibold text-white">Level 2</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Enhanced</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">
+                {hasLevel2 ? "Enhanced" : "Unlock"}
+              </span>
             </div>
             <p className="text-xs text-white/50">
-              Two-pass: analyzes your style fingerprint first, then generates. More accurate but slower.
+              {hasLevel2
+                ? "Two-pass: analyzes your style fingerprint first, then generates. More accurate but slower."
+                : "Unlock enhanced generation powered by Claude Sonnet 4."}
             </p>
           </button>
         </div>
