@@ -130,7 +130,14 @@ export async function POST(req: Request) {
       return await streamLevel2Anthropic(opts);
     }
   } else {
-    // Legacy fallback — old profile shape, no fingerprint
+    // Legacy fallback — old profile shape, no fingerprint (Level 1 only)
+    if (level === 2) {
+      return NextResponse.json(
+        { error: "Level 2 requires a style fingerprint. Please update your writing profile first." },
+        { status: 400 }
+      );
+    }
+
     const profileData = {
       teacherProfile: profile.teacherProfile as Record<string, unknown>,
       selfAssessment: profile.selfAssessment as Record<string, unknown>,

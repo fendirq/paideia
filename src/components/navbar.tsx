@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { TripleClickWrapper } from "./portal/TripleClickWrapper";
 
 const navItems = [
@@ -27,6 +27,12 @@ export function Navbar({ userName, userImage }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLDivElement>(null);
+
+  const handleSignOut = useCallback(() => {
+    // Clear portal cookie before signing out (prevents stale access on shared devices)
+    document.cookie = "portal_access=; Path=/; Max-Age=0";
+    signOut({ callbackUrl: "/login" });
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -106,7 +112,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
                   </p>
                   <hr className="my-1 border-white/[0.04]" />
                   <button
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-bg-elevated/50 transition-colors"
                   >
                     Sign out
@@ -181,7 +187,7 @@ export function Navbar({ userName, userImage }: NavbarProps) {
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-sm text-text-secondary">{userName ?? "User"}</span>
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={handleSignOut}
                 className="text-sm text-text-muted hover:text-text-primary transition-colors"
               >
                 Sign out

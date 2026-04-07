@@ -15,6 +15,7 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmed, setConfirmed] = useState(hasPaid);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
 
   // Poll for payment confirmation when redirected from Stripe
   useEffect(() => {
@@ -30,7 +31,10 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
           clearInterval(poll);
         }
       } catch { /* retry */ }
-      if (attempts >= 10) clearInterval(poll);
+      if (attempts >= 10) {
+        clearInterval(poll);
+        setPollTimedOut(true);
+      }
     }, 2000);
     return () => clearInterval(poll);
   }, [success, hasPaid]);
@@ -89,17 +93,29 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
     return (
       <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-6">
         <div className="glass p-8 max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mx-auto animate-pulse">
+          <div className={`w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mx-auto ${pollTimedOut ? "" : "animate-pulse"}`}>
             <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-white mb-2">Processing Payment...</h1>
+            <h1 className="font-display text-xl font-bold text-white mb-2">
+              {pollTimedOut ? "Almost There" : "Processing Payment..."}
+            </h1>
             <p className="text-white/60 text-sm">
-              Confirming your purchase. This usually takes a few seconds.
+              {pollTimedOut
+                ? "Your payment was received but confirmation is taking longer than usual. Try refreshing the page."
+                : "Confirming your purchase. This usually takes a few seconds."}
             </p>
           </div>
+          {pollTimedOut && (
+            <button
+              onClick={() => window.location.reload()}
+              className="btn-primary text-sm px-6 py-2.5"
+            >
+              Refresh Page
+            </button>
+          )}
         </div>
       </div>
     );

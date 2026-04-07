@@ -39,9 +39,8 @@ export async function POST(req: Request) {
         },
       });
     } catch (err) {
-      // P2002 = unique constraint violation — already processed (idempotent)
+      // P2002 = unique constraint on stripePaymentId — duplicate webhook delivery, safe to ignore
       if ((err as { code?: string }).code === "P2002") {
-        // Already processed — safe to ignore
       } else {
         console.error("stripe webhook: db update failed", err);
         return NextResponse.json({ error: "DB error" }, { status: 500 });

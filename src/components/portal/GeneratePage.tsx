@@ -97,12 +97,10 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
       const decoder = new TextDecoder();
       let fullText = "";
 
+      let streamError = false;
       while (true) {
         const { done, value } = await reader.read();
-        if (done) {
-          if (fullText) saveEssay(fullText);
-          break;
-        }
+        if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
@@ -114,7 +112,8 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
             const parsed = JSON.parse(data);
             if (parsed.error) {
               setError(parsed.error);
-              continue;
+              streamError = true;
+              break;
             }
             if (parsed.content) {
               fullText += parsed.content;
@@ -124,7 +123,10 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
             // skip
           }
         }
+        if (streamError) break;
       }
+
+      if (!streamError && fullText) saveEssay(fullText);
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
