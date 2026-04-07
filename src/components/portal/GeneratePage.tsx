@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { EssayOutput } from "./EssayOutput";
 
@@ -20,6 +20,16 @@ export function GeneratePage({ subject }: GeneratePageProps) {
   const [uploadingRubric, setUploadingRubric] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rubricInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch user's profile level on mount to pre-select
+  useEffect(() => {
+    fetch("/api/portal/aggregate")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.profile?.level === 2) setLevel(2);
+      })
+      .catch(() => {});
+  }, []);
 
   // Save essay after generation completes
   const saveEssay = useCallback(
@@ -292,25 +302,31 @@ export function GeneratePage({ subject }: GeneratePageProps) {
           {generating ? "Generating..." : `Generate with Level ${level}`}
         </button>
 
-        {/* Past assignments + Edit profile links */}
-        <div className="flex gap-3">
+        {/* Past assignments + Edit profile */}
+        <div className="space-y-2">
           <Link
             href={`/portal/${subject}/history`}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-full border border-white/15 bg-white/[0.05] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-4 h-4 text-white/30 group-hover:text-white/50 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-            Past Assignments
+            <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors flex-1">Past Assignments</span>
+            <svg className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
           </Link>
           <Link
             href="/portal/aggregate"
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-full border border-white/15 bg-white/[0.05] text-sm text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+            <svg className="w-4 h-4 text-white/30 group-hover:text-white/50 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
             </svg>
-            Edit Profile
+            <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors flex-1">Writing Profile</span>
+            <svg className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
           </Link>
         </div>
 

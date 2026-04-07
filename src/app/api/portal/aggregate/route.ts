@@ -17,6 +17,7 @@ interface SampleInput {
 }
 
 interface AggregateBody {
+  level: number;
   samples: SampleInput[];
   teacherProfile: Prisma.InputJsonValue;
   selfAssessment: Prisma.InputJsonValue;
@@ -72,7 +73,9 @@ export async function POST(req: Request) {
   }
 
   const body: AggregateBody = await req.json();
-  const { samples, teacherProfile, selfAssessment } = body;
+  const { level, samples, teacherProfile, selfAssessment } = body;
+
+  const profileLevel = level === 2 ? 2 : 1;
 
   if (!samples?.length) {
     return NextResponse.json({ error: "At least one writing sample is required" }, { status: 400 });
@@ -99,10 +102,12 @@ export async function POST(req: Request) {
       where: { userId },
       create: {
         userId,
+        level: profileLevel,
         teacherProfile,
         selfAssessment,
       },
       update: {
+        level: profileLevel,
         teacherProfile,
         selfAssessment,
         writingStyle: Prisma.JsonNull, // clear legacy field
@@ -155,6 +160,7 @@ export async function GET() {
 
   return NextResponse.json({
     profile: {
+      level: profile.level,
       teacherProfile: profile.teacherProfile,
       selfAssessment: profile.selfAssessment,
       hasFingerprint: !!profile.styleFingerprint,
