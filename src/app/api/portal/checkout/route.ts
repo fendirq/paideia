@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
 
   const checkoutSession = await getStripe().checkout.sessions.create({
-    mode: "payment",
+    mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     customer_email: session.user.email ?? undefined,
     metadata: { userId: session.user.id },
