@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   if (typeof wordCount !== "number" || wordCount < 100 || wordCount > 5000) {
     return NextResponse.json({ error: "Word count must be between 100 and 5000" }, { status: 400 });
   }
-  if (level !== 1 && level !== 2) {
+  if (typeof level !== "number" || (level !== 1 && level !== 2)) {
     return NextResponse.json({ error: "Invalid level" }, { status: 400 });
   }
   if (assignment.length > 5000 || (requirements && requirements.length > 5000)) {
@@ -63,6 +63,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Complete your writing profile first" }, { status: 400 });
   }
 
+  // Guard: Level 2 generation requires a Level 2 profile
+  if (level === 2 && profile.level !== 2) {
+    return NextResponse.json({ error: "Level 2 generation requires a Level 2 profile. Update your profile first." }, { status: 400 });
+  }
+
   const sampleData = samples.map((s) => ({ label: s.label, content: s.content }));
   const fingerprint = profile.styleFingerprint as StyleFingerprint | null;
 
@@ -70,9 +75,40 @@ export async function POST(req: Request) {
     const tp = profile.teacherProfile as unknown as TeacherProfile;
     const sa = profile.selfAssessment as unknown as SelfAssessment;
 
+    // Ensure backward compat: if old profile shape is loaded, provide defaults
+    const teacherProfile: TeacherProfile = {
+      gradeLevel: tp.gradeLevel || "",
+      gradeOther: tp.gradeOther || "",
+      losesPointsFor: tp.losesPointsFor || [],
+      losesPointsOther: tp.losesPointsOther || "",
+    };
+
+    const selfAssessment: SelfAssessment = {
+      gradeRange: sa.gradeRange || "",
+      gradeRangeOther: sa.gradeRangeOther || "",
+      revisionLevel: sa.revisionLevel || "",
+      revisionOther: sa.revisionOther || "",
+      evidenceApproach: sa.evidenceApproach || "",
+      evidenceOther: sa.evidenceOther || "",
+      conclusionApproach: sa.conclusionApproach || "",
+      conclusionOther: sa.conclusionOther || "",
+      wordCountTendency: sa.wordCountTendency || "",
+      wordCountOther: sa.wordCountOther || "",
+      writingHabits: sa.writingHabits || [],
+      writingHabitsOther: sa.writingHabitsOther || "",
+      quoteIntroStyle: sa.quoteIntroStyle,
+      quoteIntroOther: sa.quoteIntroOther,
+      overusedPhrases: sa.overusedPhrases,
+      overusedPhrasesOther: sa.overusedPhrasesOther,
+      selfEditFocus: sa.selfEditFocus,
+      selfEditOther: sa.selfEditOther,
+      timeSpentOn: sa.timeSpentOn,
+      timeSpentOther: sa.timeSpentOther,
+    };
+
     const opts: GenerateOptions = {
-      teacherProfile: tp,
-      selfAssessment: sa,
+      teacherProfile,
+      selfAssessment,
       fingerprint,
       samples: sampleData,
       assignment,

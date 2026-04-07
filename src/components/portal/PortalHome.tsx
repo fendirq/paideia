@@ -28,19 +28,20 @@ export function PortalHome({ userName, classes, hasProfile }: PortalHomeProps) {
       {/* Scroll-down section */}
       <div className="relative z-10 min-h-screen border-t border-white/[0.1] rounded-t-3xl">
         <div className="flex flex-col items-center py-20 gap-6">
-          {/* Aggregate Writing button — solid green, white text */}
+          {/* Writing Profile link — slim banner row */}
           <Link
             href="/portal/aggregate"
-            className="flex flex-col items-center gap-4 group"
+            className="group flex items-center gap-3 px-6 py-2 rounded-full border border-white/20 bg-black/30 hover:bg-black/40 backdrop-blur-xl transition-all"
           >
-            <div className="w-16 h-16 rounded-full bg-accent border-2 border-accent-light flex items-center justify-center shadow-[0_0_20px_rgba(74,157,91,0.3)] group-hover:bg-accent-light transition-colors">
-              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-              </svg>
-            </div>
-            <span className="bg-accent hover:bg-accent-light rounded-full px-6 py-2 text-[13px] font-medium text-white transition-colors">
-              {hasProfile ? "Edit Writing Profile" : "Create Writing Profile"}
+            <svg className="w-4.5 h-4.5 text-white/40 group-hover:text-white/60 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
+            </svg>
+            <span className="text-sm text-white/60 group-hover:text-white/80 transition-colors flex-1">
+              {hasProfile ? "Writing Profile" : "Create Writing Profile"}
             </span>
+            <svg className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
           </Link>
 
           {/* Class pills — same style as main app */}

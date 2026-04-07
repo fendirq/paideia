@@ -184,6 +184,7 @@ model WritingProfile {
   id               String   @id @default(cuid())
   userId           String   @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level            Int      @default(1)
   teacherProfile   Json
   selfAssessment   Json
   writingStyle     Json?
