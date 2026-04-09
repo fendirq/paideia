@@ -59,6 +59,11 @@ export default withAuth(
           return token?.role === "STUDENT" || token?.role === "ADMIN";
         }
 
+        // Portal entry points are public (own PIN-based access system)
+        if (pathname === "/portal/access" || pathname === "/api/portal/verify-code") {
+          return true;
+        }
+
         // Protect /app/*, /onboarding, and /portal/* routes
         if (
           pathname.startsWith("/app") ||
