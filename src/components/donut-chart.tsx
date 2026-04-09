@@ -27,7 +27,7 @@ export function DonutChart({ segments, total }: DonutChartProps) {
   }, []);
 
   return (
-    <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-6">
+    <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] p-6">
       <h3 className="font-display text-[13px] font-semibold mb-5">
         Study Breakdown
       </h3>

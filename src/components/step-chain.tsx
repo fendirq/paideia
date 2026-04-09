@@ -22,7 +22,7 @@ export function StepChain({ steps }: StepChainProps) {
           key={i}
           className={`py-4 ${
             i < steps.length - 1
-              ? "border-b border-white/[0.04]"
+              ? "border-b border-[rgba(168,152,128,0.12)]"
               : ""
           }`}
         >
@@ -40,7 +40,7 @@ export function StepChain({ steps }: StepChainProps) {
 
           {/* Math block */}
           {step.math && (
-            <div className="bg-bg-surface/50 border border-white/[0.04] rounded-lg px-3.5 py-2.5 text-base leading-relaxed">
+            <div className="bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.12)] rounded-lg px-3.5 py-2.5 text-base leading-relaxed">
               <ReactMarkdown rehypePlugins={[rehypeRaw, [rehypeSanitize, katexSanitizeSchema]]}>
                 {renderMath(step.math)}
               </ReactMarkdown>

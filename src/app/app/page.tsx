@@ -7,19 +7,30 @@ import { HomeContent } from "@/components/home-content";
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
+  if (!session.user.role) redirect("/onboarding");
+  if (session.user.role === "TEACHER") redirect("/app/teacher");
 
-  const allInquiries = await db.inquiry.findMany({
-    where: { userId: session.user.id },
-    orderBy: { updatedAt: "desc" },
+  const enrollments = await db.classEnrollment.findMany({
+    where: { studentId: session.user.id },
+    include: {
+      class: {
+        include: {
+          teacher: { select: { name: true } },
+          _count: { select: { enrollments: true } },
+        },
+      },
+    },
+    orderBy: { joinedAt: "desc" },
   });
 
-  // Only show classes created via the "Add a Class" form
-  const classes = allInquiries
-    .filter((c) => c.teacherNotes === "add-class")
-    .map((c) => ({
-      id: c.id,
-      name: c.unitName,
-    }));
+  const enrolledClasses = enrollments.map((e) => ({
+    id: e.class.id,
+    name: e.class.name,
+    subject: e.class.subject,
+    period: e.class.period,
+    teacherName: e.class.teacher?.name ?? null,
+    studentCount: e.class._count.enrollments,
+  }));
 
-  return <HomeContent userName={session.user.name} existingClasses={classes} />;
+  return <HomeContent userName={session.user.name} enrolledClasses={enrolledClasses} />;
 }

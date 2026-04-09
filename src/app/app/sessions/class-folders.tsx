@@ -28,7 +28,7 @@ export function ClassFolders({ classes }: ClassFoldersProps) {
 
   if (classes.length === 0) {
     return (
-      <div className="bg-bg-inner border border-white/[0.04] rounded-[16px] p-12 text-center">
+      <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] p-12 text-center">
         <p className="text-text-muted mb-3">No classes yet.</p>
         <Link
           href="/app"
@@ -48,7 +48,7 @@ export function ClassFolders({ classes }: ClassFoldersProps) {
         const label = SUBJECT_LABELS[cls.subject] ?? "Other";
 
         return (
-          <div key={cls.id} className="rounded-[16px] border border-white/[0.04] overflow-hidden">
+          <div key={cls.id} className="rounded-[16px] border border-[rgba(168,152,128,0.12)] overflow-hidden">
             {/* Folder header */}
             <button
               onClick={() => setOpenFolder(isOpen ? null : cls.id)}
@@ -100,27 +100,27 @@ export function ClassFolders({ classes }: ClassFoldersProps) {
 
             {/* Folder contents — sessions */}
             {isOpen && (
-              <div className="border-t border-white/[0.04] bg-bg-base/40">
+              <div className="border-t border-[rgba(168,152,128,0.12)] bg-bg-base/40">
                 {cls.sessions.length === 0 ? (
                   <div className="px-5 py-6 text-center">
                     <p className="text-text-muted text-sm mb-4">No sessions in this class yet.</p>
                     <Link
                       href={`/app/start/${cls.id}`}
-                      className="inline-block bg-accent border-2 border-accent-light rounded-full px-6 py-2.5 text-[13px] font-medium text-white shadow-[0_0_20px_rgba(74,157,91,0.3)] hover:bg-accent-light transition-colors"
+                      className="inline-block bg-accent border-2 border-accent-light rounded-full px-6 py-2.5 text-[13px] font-medium text-[#281c14] shadow-[0_0_20px_rgba(168,152,128,0.25)] hover:bg-accent-light transition-colors"
                     >
                       Start New Chat
                     </Link>
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/[0.04]">
+                  <div className="divide-y divide-[rgba(168,152,128,0.12)]">
                     {cls.sessions.map((s, i) => (
                       <Link
                         key={s.id}
                         href={`/app/sessions/${s.id}`}
-                        className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-colors"
+                        className="flex items-center justify-between px-5 py-3 hover:bg-[rgba(168,152,128,0.06)] transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-[11px] text-text-muted font-medium">
+                          <span className="w-6 h-6 rounded-full bg-[rgba(168,152,128,0.12)] flex items-center justify-center text-[11px] text-text-muted font-medium">
                             {i + 1}
                           </span>
                           <div>

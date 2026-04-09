@@ -7,7 +7,7 @@ interface ActivityChartProps {
 export function ActivityChart({ data }: ActivityChartProps) {
   const max = Math.max(...data.map((d) => d.count), 1);
   return (
-    <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-6">
+    <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] p-6">
       <h3 className="font-display text-[13px] font-semibold mb-4">
         Weekly Activity
       </h3>

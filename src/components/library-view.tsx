@@ -99,7 +99,7 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by unit, teacher, or topic..."
-          className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+          className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
         />
       </div>
 
@@ -111,7 +111,7 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
             className={`px-4 py-[7px] rounded-[20px] font-display text-[13px] font-medium transition-all border ${
               activeSubject === "ALL"
                 ? "border-accent bg-accent/[0.08] text-text-primary"
-                : "border-white/[0.05] bg-bg-surface text-text-secondary hover:border-white/[0.1]"
+                : "border-[rgba(168,152,128,0.15)] bg-bg-surface text-text-secondary hover:border-[rgba(168,152,128,0.30)]"
             }`}
           >
             All
@@ -126,7 +126,7 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
                 className={`flex items-center gap-[7px] px-4 py-[7px] rounded-[20px] font-display text-[13px] font-medium transition-all border ${
                   activeSubject === subj
                     ? "border-accent bg-accent/[0.08] text-text-primary"
-                    : "border-white/[0.05] bg-bg-surface text-text-secondary hover:border-white/[0.1]"
+                    : "border-[rgba(168,152,128,0.15)] bg-bg-surface text-text-secondary hover:border-[rgba(168,152,128,0.30)]"
                 }`}
               >
                 <span
@@ -142,7 +142,7 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
 
       {/* Card grid */}
       {filtered.length === 0 ? (
-        <div className="bg-bg-inner border border-white/[0.04] rounded-[16px] p-12 text-center">
+        <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] p-12 text-center">
           <p className="text-text-muted text-[14px]">
             {search || activeSubject !== "ALL"
               ? "No matching inquiries found."
@@ -167,7 +167,7 @@ export function LibraryView({ inquiries }: LibraryViewProps) {
               <div key={inq.id} className="group relative">
                 <Link
                   href={`/app/inquiry/${inq.id}`}
-                  className="block bg-bg-inner border border-white/[0.04] rounded-[16px] overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,0,0,0.2)] hover:border-white/[0.08]"
+                  className="block bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,0,0,0.2)] hover:border-[rgba(168,152,128,0.15)]"
                   style={{
                     transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
                   }}
@@ -250,7 +250,7 @@ function DeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-[rgba(30,25,20,0.60)]"
         aria-hidden="true"
         onClick={onCancel}
       />
@@ -258,7 +258,7 @@ function DeleteModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-dialog-title"
-        className="relative bg-bg-surface border border-white/[0.06] rounded-[20px] p-6 w-full max-w-sm shadow-xl"
+        className="relative bg-bg-surface border border-[rgba(168,152,128,0.15)] rounded-[20px] p-6 w-full max-w-sm shadow-xl"
       >
         <h3 id="delete-dialog-title" className="text-[16px] font-display font-semibold text-text-primary mb-2">
           Delete inquiry?
@@ -276,7 +276,7 @@ function DeleteModal({
           <button
             onClick={onCancel}
             disabled={isDeleting}
-            className="px-4 py-2.5 text-[13px] text-text-secondary hover:text-text-primary border border-white/[0.06] rounded-[10px] transition-colors disabled:opacity-50"
+            className="px-4 py-2.5 text-[13px] text-text-secondary hover:text-text-primary border border-[rgba(168,152,128,0.15)] rounded-[10px] transition-colors disabled:opacity-50"
           >
             Cancel
           </button>

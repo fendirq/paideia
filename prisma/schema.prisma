@@ -49,11 +49,17 @@ model User {
   role             Role?
   phone            String?           @unique
   passwordHash     String?
+  school           String?
+  grade            String?
+  subjectsTaught   Subject[]
   level2PaidAt     DateTime?
   stripePaymentId  String?           @unique
+  stripeCustomerId String?           @unique
   accounts         Account[]
   inquiries        Inquiry[]
   tutoringSessions TutoringSession[]
+  teacherClasses   Class[]           @relation("teacherClasses")
+  enrollments      ClassEnrollment[] @relation("studentEnrollments")
   writingProfile   WritingProfile?
   writingSamples   WritingSample[]
   generatedEssays  GeneratedEssay[]
@@ -89,6 +95,8 @@ model Inquiry {
   unitName    String
   description  String
   teacherNotes String?
+  classId     String?
+  class       Class?            @relation(fields: [classId], references: [id])
   files        File[]
   chunks      TextChunk[]
   sessions    TutoringSession[]
@@ -123,18 +131,23 @@ model TextChunk {
 }
 
 model TutoringSession {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   userId        String
-  user          User          @relation(fields: [userId], references: [id])
-  inquiryId     String
-  inquiry       Inquiry       @relation(fields: [inquiryId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  inquiryId     String?
+  inquiry       Inquiry?       @relation(fields: [inquiryId], references: [id])
+  classId       String?
+  class         Class?         @relation(fields: [classId], references: [id])
+  materialId    String?
+  material      ClassMaterial? @relation("materialSessions", fields: [materialId], references: [id])
   helpType      String?
+  summary       String?
   messages      Message[]
   rating        Int?
   ratingComment String?
-  status        SessionStatus @default(ACTIVE)
+  status        SessionStatus  @default(ACTIVE)
   duration      Int?
-  startedAt     DateTime      @default(now())
+  startedAt     DateTime       @default(now())
   endedAt       DateTime?
 }
 
@@ -180,6 +193,78 @@ model StudyItem {
   status    StudyStatus @default(NEW)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+}
+
+// ─── Class Models ───
+
+model Class {
+  id          String            @id @default(cuid())
+  teacherId   String
+  teacher     User              @relation("teacherClasses", fields: [teacherId], references: [id])
+  name        String
+  subject     Subject
+  description String?
+  period      Int?
+  pinnedNote  String?
+  joinCode    String            @unique
+  enrollments ClassEnrollment[]
+  sessions    TutoringSession[]
+  inquiries   Inquiry[]
+  materials   ClassMaterial[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model ClassEnrollment {
+  id            String    @id @default(cuid())
+  classId       String
+  class         Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       User      @relation("studentEnrollments", fields: [studentId], references: [id])
+  joinedAt      DateTime  @default(now())
+  lastVisitedAt DateTime?
+
+  @@unique([classId, studentId])
+}
+
+// ─── Class Material Models ───
+
+model ClassMaterial {
+  id          String              @id @default(cuid())
+  classId     String
+  class       Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  dueDate     DateTime?
+  files       ClassMaterialFile[]
+  chunks      MaterialChunk[]
+  sessions    TutoringSession[]   @relation("materialSessions")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model ClassMaterialFile {
+  id            String         @id @default(cuid())
+  materialId    String
+  material      ClassMaterial  @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileUrl       String
+  fileType      String
+  extractedText String?
+  chunks        MaterialChunk[]
+  createdAt     DateTime       @default(now())
+}
+
+model MaterialChunk {
+  id         String                      @id @default(cuid())
+  fileId     String
+  file       ClassMaterialFile           @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  materialId String
+  material   ClassMaterial               @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  content    String
+  embedding  Unsupported("vector(1024)")
+  chunkIndex Int
+  createdAt  DateTime                    @default(now())
 }
 
 // ─── Portal Models ───

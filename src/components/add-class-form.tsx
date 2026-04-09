@@ -7,17 +7,11 @@ import { SUBJECT_LABELS } from "@/lib/subject-constants";
 
 const SEMESTERS = ["Fall 2026", "Spring 2026"];
 
-interface CreatedClass {
-  id: string;
-  name: string;
-}
-
 interface AddClassFormProps {
   onCancel?: () => void;
-  onCreated?: (cls: CreatedClass) => void;
 }
 
-export function AddClassForm({ onCancel, onCreated }: AddClassFormProps) {
+export function AddClassForm({ onCancel }: AddClassFormProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
@@ -45,24 +39,19 @@ export function AddClassForm({ onCancel, onCreated }: AddClassFormProps) {
 
     if (res.ok) {
       const data = await res.json();
-      const createdName = className;
-      setClassName("");
-      setTeacher("");
-      setSemester(SEMESTERS[0]);
-      setSubject("OTHER");
-      onCreated?.({ id: data.id, name: createdName });
-      router.refresh();
+      router.push(`/app/start/${data.id}`);
+      return;
     }
 
     setSaving(false);
   }
 
-  const selectClass = "w-full bg-bg-base/60 border border-white/[0.08] rounded-xl px-4 py-3 pr-10 text-sm text-text-primary focus:outline-none focus:border-accent/50 transition-colors appearance-none bg-no-repeat bg-[length:16px_16px] bg-[center_right_12px] bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22%23999%22%20stroke-width%3D%222%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22m19.5%208.25-7.5%207.5-7.5-7.5%22%2F%3E%3C%2Fsvg%3E')]";
+  const selectClass = "w-full bg-bg-base/60 border border-[rgba(168,152,128,0.15)] rounded-xl px-4 py-3 pr-10 text-sm text-text-primary focus:outline-none focus:border-accent/50 transition-colors appearance-none bg-no-repeat bg-[length:16px_16px] bg-[center_right_12px] bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22%238a7e70%22%20stroke-width%3D%222%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20d%3D%22m19.5%208.25-7.5%207.5-7.5-7.5%22%2F%3E%3C%2Fsvg%3E')]";
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-16 w-full">
-      <form onSubmit={handleSubmit} className="bg-bg-inner/80 backdrop-blur-sm border border-white/[0.08] rounded-2xl p-8 space-y-6">
-        <h2 className="font-display text-xl font-semibold text-text-primary">New Class</h2>
+      <form onSubmit={handleSubmit} className="bg-bg-inner/80 backdrop-blur-sm border border-[rgba(168,152,128,0.15)] rounded-2xl p-8 space-y-6">
+        <h2 className="font-display text-xl font-semibold text-text-primary">New Session</h2>
 
         <div className="space-y-4">
           <div>
@@ -73,7 +62,7 @@ export function AddClassForm({ onCancel, onCreated }: AddClassFormProps) {
               onChange={(e) => setClassName(e.target.value)}
               placeholder="e.g. AP US History"
               required
-              className="w-full bg-bg-base/60 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+              className="w-full bg-bg-base/60 border border-[rgba(168,152,128,0.15)] rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
             />
           </div>
 
@@ -85,7 +74,7 @@ export function AddClassForm({ onCancel, onCreated }: AddClassFormProps) {
               onChange={(e) => setTeacher(e.target.value)}
               placeholder="e.g. Ms. Johnson"
               required
-              className="w-full bg-bg-base/60 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+              className="w-full bg-bg-base/60 border border-[rgba(168,152,128,0.15)] rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
             />
           </div>
 
@@ -122,15 +111,15 @@ export function AddClassForm({ onCancel, onCreated }: AddClassFormProps) {
           <button
             type="submit"
             disabled={saving}
-            className="bg-accent border-2 border-accent-light rounded-full px-6 py-2 text-[13px] font-medium text-white hover:bg-accent-light transition-colors disabled:opacity-50"
+            className="bg-accent border-2 border-accent-light rounded-full px-6 py-2 text-[13px] font-medium text-[#281c14] hover:bg-accent-light transition-colors disabled:opacity-50"
           >
-            {saving ? "Adding..." : "Add Class"}
+            {saving ? "Starting..." : "Begin"}
           </button>
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="bg-white/20 backdrop-blur-xl border border-white/30 rounded-full px-6 py-2 text-[13px] font-medium text-white hover:bg-white/30 transition-colors"
+              className="bg-[rgba(40,32,24,0.50)] backdrop-blur-xl border border-[rgba(168,152,128,0.15)] rounded-full px-6 py-2 text-[13px] font-medium text-text-primary hover:bg-[rgba(168,152,128,0.18)] transition-colors"
             >
               Cancel
             </button>

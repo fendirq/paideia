@@ -74,14 +74,20 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.userId = user.id;
         token.role = user.role ?? null;
+        token.roleCheckedAt = Date.now();
       }
-      // Always refresh role from DB to pick up changes (e.g. after onboarding or admin updates)
-      if (token.userId) {
+      // Refresh role from DB: immediately if null (onboarding), otherwise every 5 min
+      const ROLE_REFRESH_MS = 5 * 60 * 1000;
+      const neverFetched = token.roleCheckedAt === undefined;
+      const stale = !neverFetched && Date.now() - token.roleCheckedAt! > ROLE_REFRESH_MS;
+      const roleIsNull = token.role === null || token.role === undefined;
+      if (token.userId && (neverFetched || stale || roleIsNull)) {
         const dbUser = await db.user.findUnique({
-          where: { id: token.userId },
+          where: { id: token.userId as string },
           select: { role: true },
         });
         token.role = dbUser?.role ?? null;
+        token.roleCheckedAt = Date.now();
       }
       return token;
     },

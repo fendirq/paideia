@@ -63,7 +63,7 @@ export function HistoryPage({ subject }: HistoryPageProps) {
         <div className="max-w-3xl mx-auto space-y-6">
           <button
             onClick={() => setSelected(null)}
-            className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -72,17 +72,17 @@ export function HistoryPage({ subject }: HistoryPageProps) {
           </button>
 
           <div>
-            <h1 className="font-display text-2xl font-bold text-white mb-1">
+            <h1 className="font-display text-2xl font-bold text-text-primary mb-1">
               Past Assignment
             </h1>
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/50">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted">
                 Level {selected.level}
               </span>
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-text-muted">
                 {selected.wordCount} words
               </span>
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-text-muted">
                 {new Date(selected.createdAt).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -94,12 +94,12 @@ export function HistoryPage({ subject }: HistoryPageProps) {
 
           {/* Assignment prompt */}
           <div className="glass p-5">
-            <p className="text-xs font-medium text-white/40 mb-2">Assignment</p>
-            <p className="text-sm text-white/80 whitespace-pre-wrap">{selected.assignment}</p>
+            <p className="text-xs font-medium text-text-muted mb-2">Assignment</p>
+            <p className="text-sm text-text-primary whitespace-pre-wrap">{selected.assignment}</p>
             {selected.requirements && (
               <>
-                <p className="text-xs font-medium text-white/40 mt-4 mb-2">Requirements</p>
-                <p className="text-sm text-white/60 whitespace-pre-wrap">{selected.requirements}</p>
+                <p className="text-xs font-medium text-text-muted mt-4 mb-2">Requirements</p>
+                <p className="text-sm text-text-secondary whitespace-pre-wrap">{selected.requirements}</p>
               </>
             )}
           </div>
@@ -107,19 +107,19 @@ export function HistoryPage({ subject }: HistoryPageProps) {
           {/* Essay */}
           <div className="glass p-5">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-white/40">Generated Essay</p>
+              <p className="text-xs font-medium text-text-muted">Generated Essay</p>
               <button
                 onClick={async () => {
                   await navigator.clipboard.writeText(selected.essay);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="text-xs px-3 py-1 rounded-full bg-white/10 text-white/50 hover:text-white transition-colors"
+                className="text-xs px-3 py-1 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted hover:text-text-primary transition-colors"
               >
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <div className="font-serif text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
+            <div className="font-serif text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
               {selected.essay}
             </div>
           </div>
@@ -134,12 +134,12 @@ export function HistoryPage({ subject }: HistoryPageProps) {
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-2xl font-bold text-white">
+          <h1 className="font-display text-2xl font-bold text-text-primary">
             History — {subjectLabel}
           </h1>
           <Link
             href={`/portal/${subject}/generate`}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-sm text-white/70 hover:text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[rgba(168,152,128,0.08)] text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -150,7 +150,7 @@ export function HistoryPage({ subject }: HistoryPageProps) {
 
         {/* Search */}
         <div className="relative">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
           <input
@@ -158,18 +158,18 @@ export function HistoryPage({ subject }: HistoryPageProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search assignments..."
-            className="w-full bg-white/[0.08] border border-white/10 rounded-full pl-11 pr-4 py-3 text-sm font-display text-white placeholder:text-white focus:outline-none focus:border-white/20 transition-colors"
+            className="w-full bg-[rgba(168,152,128,0.14)] border border-[rgba(168,152,128,0.15)] rounded-full pl-11 pr-4 py-3 text-sm font-display text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
           />
         </div>
 
         {/* Essay list */}
         {loading ? (
-          <p className="text-sm text-white/50 text-center py-12 animate-pulse">
+          <p className="text-sm text-text-muted text-center py-12 animate-pulse">
             Loading...
           </p>
         ) : filtered.length === 0 ? (
           <div className="glass px-8 py-4 text-center">
-            <p className="text-white/40 text-sm">
+            <p className="text-text-muted text-sm">
               {essays.length === 0
                 ? "Nothing to see here."
                 : "No results match your search."}
@@ -182,21 +182,21 @@ export function HistoryPage({ subject }: HistoryPageProps) {
                 key={item.id}
                 onClick={() => openEssay(item.id)}
                 disabled={loadingEssay}
-                className="w-full text-left glass p-5 hover:bg-white/[0.04] transition-colors"
+                className="w-full text-left glass p-5 hover:bg-[rgba(168,152,128,0.08)] transition-colors"
               >
-                <p className="text-sm text-white font-medium truncate">
+                <p className="text-sm text-text-primary font-medium truncate">
                   {item.assignment.length > 100
                     ? item.assignment.slice(0, 100) + "..."
                     : item.assignment}
                 </p>
                 <div className="flex items-center gap-4 mt-2">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/50">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted">
                     Level {item.level}
                   </span>
-                  <span className="text-xs text-white/40">
+                  <span className="text-xs text-text-muted">
                     {item.wordCount} words
                   </span>
-                  <span className="text-xs text-white/40">
+                  <span className="text-xs text-text-muted">
                     {new Date(item.createdAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",

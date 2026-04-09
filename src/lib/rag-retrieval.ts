@@ -8,7 +8,8 @@ interface RetrievedChunk {
   similarity: number;
 }
 
-// Embedding-based similarity search (preferred when API is available)
+// ─── Inquiry-based (TextChunk) ───
+
 async function retrieveByEmbedding(
   query: string,
   inquiryId: string,
@@ -17,16 +18,17 @@ async function retrieveByEmbedding(
   const queryEmbedding = await generateSingleEmbedding(query);
   const vectorStr = `[${queryEmbedding.join(",")}]`;
 
-  return db.$queryRaw<RetrievedChunk[]>(Prisma.sql`
-    SELECT id, content, 1 - (embedding <=> ${vectorStr}::vector(1024)) as similarity
-    FROM "TextChunk"
-    WHERE "inquiryId" = ${inquiryId}
-    ORDER BY embedding <=> ${vectorStr}::vector(1024)
+  const rows = await db.$queryRaw<RetrievedChunk[]>(Prisma.sql`
+    WITH q AS (SELECT ${vectorStr}::vector(1024) AS qvec)
+    SELECT t.id, t.content, COALESCE(1 - (t.embedding <=> q.qvec), 0) as similarity
+    FROM "TextChunk" t, q
+    WHERE t."inquiryId" = ${inquiryId}
+    ORDER BY t.embedding <=> q.qvec
     LIMIT ${topK}
   `);
+  return rows.map((r) => ({ ...r, similarity: Number(r.similarity) || 0 }));
 }
 
-// Direct DB fallback — retrieves chunks by index order (no embeddings needed)
 async function retrieveByIndex(
   inquiryId: string,
   limit: number
@@ -41,20 +43,74 @@ async function retrieveByIndex(
   return chunks.map((c, i) => ({
     id: c.id,
     content: c.content,
-    similarity: 1 - i * 0.05, // synthetic score for ordering
+    similarity: 1 - i * 0.05,
   }));
 }
 
+// ─── Material-based (MaterialChunk) ───
+
+async function retrieveMaterialByEmbedding(
+  query: string,
+  materialId: string,
+  topK: number
+): Promise<RetrievedChunk[]> {
+  const queryEmbedding = await generateSingleEmbedding(query);
+  const vectorStr = `[${queryEmbedding.join(",")}]`;
+
+  const rows = await db.$queryRaw<RetrievedChunk[]>(Prisma.sql`
+    WITH q AS (SELECT ${vectorStr}::vector(1024) AS qvec)
+    SELECT t.id, t.content, COALESCE(1 - (t.embedding <=> q.qvec), 0) as similarity
+    FROM "MaterialChunk" t, q
+    WHERE t."materialId" = ${materialId}
+    ORDER BY t.embedding <=> q.qvec
+    LIMIT ${topK}
+  `);
+  return rows.map((r) => ({ ...r, similarity: Number(r.similarity) || 0 }));
+}
+
+async function retrieveMaterialByIndex(
+  materialId: string,
+  limit: number
+): Promise<RetrievedChunk[]> {
+  const chunks = await db.$queryRaw<{ id: string; content: string }[]>(
+    Prisma.sql`
+      SELECT id, content FROM "MaterialChunk"
+      WHERE "materialId" = ${materialId}
+      ORDER BY "chunkIndex" ASC
+      LIMIT ${limit}
+    `
+  );
+
+  return chunks.map((c, i) => ({
+    id: c.id,
+    content: c.content,
+    similarity: 1 - i * 0.05,
+  }));
+}
+
+// ─── Public API ───
+
 export async function retrieveRelevantChunks(
   query: string,
-  inquiryId: string,
-  topK: number = 6
+  sourceId: string,
+  topK: number = 6,
+  source: "inquiry" | "material" = "inquiry"
 ): Promise<RetrievedChunk[]> {
-  // Try embedding-based search first, fall back to direct DB query
+  if (!sourceId) return [];
+
+  if (source === "material") {
+    try {
+      return await retrieveMaterialByEmbedding(query, sourceId, topK);
+    } catch (e) {
+      console.error("Material embedding search failed, using index fallback:", e);
+      return retrieveMaterialByIndex(sourceId, topK);
+    }
+  }
+
   try {
-    return await retrieveByEmbedding(query, inquiryId, topK);
+    return await retrieveByEmbedding(query, sourceId, topK);
   } catch (e) {
     console.error("Embedding search failed, using direct retrieval:", e);
-    return retrieveByIndex(inquiryId, topK);
+    return retrieveByIndex(sourceId, topK);
   }
 }

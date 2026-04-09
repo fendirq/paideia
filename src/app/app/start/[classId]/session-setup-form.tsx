@@ -126,7 +126,7 @@ export function SessionSetupForm({ classId }: SessionSetupFormProps) {
           rows={4}
           required
           placeholder="e.g. I don't understand how to solve integrals using substitution..."
-          className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors resize-none"
+          className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors resize-none"
         />
       </div>
 
@@ -141,7 +141,7 @@ export function SessionSetupForm({ classId }: SessionSetupFormProps) {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files); }}
           onClick={() => fileInputRef.current?.click()}
           className={`border-2 border-dashed rounded-[12px] p-6 text-center cursor-pointer transition-colors ${
-            dragOver ? "border-accent bg-accent/5" : "border-white/[0.06] hover:border-white/[0.1]"
+            dragOver ? "border-accent bg-accent/5" : "border-[rgba(168,152,128,0.15)] hover:border-[rgba(168,152,128,0.35)]"
           }`}
         >
           <svg className="w-7 h-7 mx-auto mb-2 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -162,7 +162,7 @@ export function SessionSetupForm({ classId }: SessionSetupFormProps) {
         {files.length > 0 && (
           <div className="mt-3 space-y-2">
             {files.map((f, i) => (
-              <div key={f.key} className="flex items-center justify-between bg-bg-surface/50 rounded-[10px] px-3 py-2 border border-white/[0.04]">
+              <div key={f.key} className="flex items-center justify-between bg-[rgba(35,28,20,0.50)] rounded-[10px] px-3 py-2 border border-[rgba(168,152,128,0.12)]">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-[13px] text-text-primary truncate">{f.file.name}</span>
                   <span className="text-[11px] text-text-muted flex-shrink-0">{formatSize(f.file.size)}</span>
@@ -186,7 +186,7 @@ export function SessionSetupForm({ classId }: SessionSetupFormProps) {
       <button
         type="submit"
         disabled={submitting || !description.trim()}
-        className="w-full bg-accent hover:bg-accent/90 text-white font-display text-[14px] font-semibold rounded-[12px] px-5 py-3.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full bg-accent hover:bg-accent/90 text-[#281c14] font-display text-[14px] font-semibold rounded-[12px] px-5 py-3.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {submitting ? "Starting session..." : "Start Session"}
       </button>

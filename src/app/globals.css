@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-base: #1a1915;
-  --color-bg-inner: #22211e;
-  --color-bg-surface: #2d2b28;
-  --color-bg-elevated: #3d3a37;
-  --color-accent: #4a9d5b;
-  --color-accent-light: #6bc47d;
-  --color-text-primary: #e8e0d8;
-  --color-text-secondary: #a39e98;
-  --color-text-muted: #706b65;
+  --color-bg-base: #1e1914;
+  --color-bg-inner: #28211a;
+  --color-bg-surface: #332b24;
+  --color-bg-elevated: #3d3530;
+  --color-accent: #a89880;
+  --color-accent-light: #b8a890;
+  --color-text-primary: #f0e6d8;
+  --color-text-secondary: #c0b4a0;
+  --color-text-muted: #8a7e70;
 
   /* Subject colors */
   --color-subject-math: #5b9bd5;
   --color-subject-history: #e8a838;
   --color-subject-english: #c57bdb;
-  --color-subject-science: #4a9d5b;
+  --color-subject-science: #7a9a6b;
 
-  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
-  --font-body: var(--font-inter), system-ui, sans-serif;
-  --font-serif: var(--font-libre-baskerville), "Times New Roman", serif;
+  --font-display: var(--font-playfair), "Times New Roman", serif;
+  --font-body: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-playfair), "Times New Roman", serif;
 }
 
 @layer base {
@@ -30,6 +30,7 @@
   body {
     background-color: var(--color-bg-base);
     color: var(--color-text-primary);
+    font-variant-numeric: lining-nums tabular-nums;
   }
 
   ::selection {
@@ -53,7 +54,7 @@
 @utility btn-secondary {
   background-color: var(--color-bg-elevated);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-bg-elevated);
+  border: 1px solid rgba(168, 152, 128, 0.18);
   padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
   transition: background-color 0.15s;
@@ -69,9 +70,9 @@
 }
 
 @utility glass {
-  background: rgba(26, 25, 21, 0.6);
+  background: rgba(40, 32, 24, 0.55);
   backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(168, 152, 128, 0.15);
   border-radius: 16px;
 }
 
@@ -225,7 +226,7 @@
 @utility input-field {
   width: 100%;
   background-color: var(--color-bg-base);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(168, 152, 128, 0.15);
   border-radius: 0.75rem;
   padding: 0.625rem 0.75rem;
   font-size: 0.875rem;
@@ -235,26 +236,26 @@
   }
   &:focus {
     outline: none;
-    border-color: rgba(74, 157, 91, 0.5);
+    border-color: rgba(168, 152, 128, 0.5);
   }
 }
 
 @utility select-field {
   width: 100%;
   background-color: var(--color-bg-base);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(168, 152, 128, 0.15);
   border-radius: 0.75rem;
   padding: 0.625rem 2.5rem 0.625rem 0.75rem;
   font-size: 0.875rem;
   color: var(--color-text-primary);
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a39e98' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a7e70' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 1rem;
   &:focus {
     outline: none;
-    border-color: rgba(74, 157, 91, 0.5);
+    border-color: rgba(168, 152, 128, 0.5);
   }
 }
 

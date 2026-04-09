@@ -19,7 +19,7 @@ export default async function StartPage() {
   });
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8 mt-4 mb-8 bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[20px]">
+    <div className="max-w-2xl mx-auto px-6 py-8 mt-4 mb-8 bg-[rgba(40,32,24,0.55)] backdrop-blur-2xl border border-[rgba(168,152,128,0.15)] rounded-[20px]">
       <BackButton href="/app" />
       <h1 className="font-serif text-[34px] text-text-primary mb-2">
         Start a Session
@@ -29,7 +29,7 @@ export default async function StartPage() {
       </p>
 
       {classes.length === 0 ? (
-        <div className="bg-bg-inner border border-white/[0.04] rounded-[16px] p-12 text-center">
+        <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] p-12 text-center">
           <p className="text-text-muted mb-3">No classes yet.</p>
           <Link href="/app" className="text-accent text-sm hover:text-accent-light transition-colors">
             Go to Home to add a class
@@ -44,7 +44,7 @@ export default async function StartPage() {
               <Link
                 key={cls.id}
                 href={`/app/start/${cls.id}`}
-                className="group flex items-center gap-4 bg-bg-inner border border-white/[0.04] rounded-[16px] px-5 py-4 hover:-translate-y-0.5 hover:border-white/[0.08] transition-all"
+                className="group flex items-center gap-4 bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] px-5 py-4 hover:-translate-y-0.5 hover:border-[rgba(168,152,128,0.15)] transition-all"
                 style={{ transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}
               >
                 <div

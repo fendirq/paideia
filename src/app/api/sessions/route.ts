@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { inquiryId, helpType } = await req.json();
+  const { inquiryId, helpType, classId } = await req.json();
   if (!inquiryId) {
     return NextResponse.json({ error: "inquiryId required" }, { status: 400 });
   }
@@ -20,10 +20,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
   }
 
+  // If classId provided, verify student is enrolled
+  if (classId) {
+    const enrollment = await db.classEnrollment.findUnique({
+      where: { classId_studentId: { classId, studentId: session.user.id } },
+    });
+    if (!enrollment) {
+      return NextResponse.json({ error: "Not enrolled in this class" }, { status: 403 });
+    }
+  }
+
   const tutoringSession = await db.tutoringSession.create({
     data: {
       userId: session.user.id,
       inquiryId,
+      classId: classId || null,
       helpType: typeof helpType === "string" && helpType.trim() && VALID_HELP_TYPES.has(helpType.trim()) ? helpType.trim() : null,
     },
   });

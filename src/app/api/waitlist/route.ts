@@ -24,9 +24,9 @@ export async function POST(req: Request) {
   try {
     await db.waitlistEntry.create({ data: { phone: normalized } });
   } catch (err) {
-    // P2002 = unique constraint — already on waitlist
+    // P2002 = unique constraint — already on waitlist (same response to prevent enumeration)
     if ((err as { code?: string }).code === "P2002") {
-      return NextResponse.json({ success: true, alreadyOnList: true });
+      return NextResponse.json({ success: true });
     }
     throw err;
   }

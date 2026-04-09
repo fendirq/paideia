@@ -72,8 +72,8 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
             </svg>
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-white mb-2">Level 2 Unlocked</h1>
-            <p className="text-white/60 text-sm">
+            <h1 className="font-display text-xl font-bold text-text-primary mb-2">Level 2 Unlocked</h1>
+            <p className="text-text-secondary text-sm">
               You now have access to enhanced essay generation powered by Claude Sonnet 4.
             </p>
           </div>
@@ -93,16 +93,16 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
     return (
       <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center px-6">
         <div className="glass p-8 max-w-md w-full text-center space-y-6">
-          <div className={`w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mx-auto ${pollTimedOut ? "" : "animate-pulse"}`}>
-            <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className={`w-16 h-16 rounded-2xl bg-[rgba(168,152,128,0.08)] flex items-center justify-center mx-auto ${pollTimedOut ? "" : "animate-pulse"}`}>
+            <svg className="w-8 h-8 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-white mb-2">
+            <h1 className="font-display text-xl font-bold text-text-primary mb-2">
               {pollTimedOut ? "Almost There" : "Processing Payment..."}
             </h1>
-            <p className="text-white/60 text-sm">
+            <p className="text-text-secondary text-sm">
               {pollTimedOut
                 ? "Your payment was received but confirmation is taking longer than usual. Try refreshing the page."
                 : "Confirming your purchase. This usually takes a few seconds."}
@@ -126,10 +126,10 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
       <div className="glass p-8 max-w-lg w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="font-display text-2xl font-bold text-white mb-2">
+          <h1 className="font-display text-2xl font-bold text-text-primary mb-2">
             Unlock Level 2
           </h1>
-          <p className="text-white/60 text-sm">
+          <p className="text-text-secondary text-sm">
             One-time purchase. Enhanced generation forever.
           </p>
         </div>
@@ -143,26 +143,26 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
         {/* Comparison */}
         <div className="space-y-3">
           {/* Level 1 */}
-          <div className="border border-white/[0.08] rounded-xl p-5">
+          <div className="border border-[rgba(168,152,128,0.15)] rounded-xl p-5">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-display font-semibold text-white">Level 1</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">Current</span>
+              <span className="text-sm font-display font-semibold text-text-primary">Level 1</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted">Current</span>
             </div>
-            <ul className="space-y-2 text-sm text-white/50">
+            <ul className="space-y-2 text-sm text-text-muted">
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
                 8 profile questions
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
                 Single-pass generation (DeepSeek-V3)
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
                 Fast and reliable
@@ -173,10 +173,10 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
           {/* Level 2 */}
           <div className="border border-accent/30 bg-accent/[0.06] rounded-xl p-5">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-display font-semibold text-white">Level 2</span>
+              <span className="text-sm font-display font-semibold text-text-primary">Level 2</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Enhanced</span>
             </div>
-            <ul className="space-y-2 text-sm text-white/70">
+            <ul className="space-y-2 text-sm text-text-secondary">
               <li className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-accent-light shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -220,7 +220,7 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
 
         <Link
           href="/portal/home"
-          className="block text-center text-white/40 hover:text-white/60 text-xs transition-colors"
+          className="block text-center text-text-muted hover:text-text-secondary text-xs transition-colors"
         >
           Maybe later
         </Link>

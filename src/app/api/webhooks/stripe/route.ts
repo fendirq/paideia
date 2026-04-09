@@ -36,15 +36,36 @@ export async function POST(req: Request) {
         data: {
           level2PaidAt: new Date(),
           stripePaymentId: session.id,
+          stripeCustomerId: typeof session.customer === "string" ? session.customer : null,
         },
       });
     } catch (err) {
-      const prismaErr = err as { code?: string; meta?: { target?: string[] } };
-      if (prismaErr.code === "P2002" && prismaErr.meta?.target?.includes("stripePaymentId")) {
+      const prismaErr = err as { code?: string };
+      if (prismaErr.code === "P2002") {
         // Duplicate webhook delivery — already processed, safe to ignore
       } else {
         console.error("stripe webhook: db update failed", err);
         return NextResponse.json({ error: "DB error" }, { status: 500 });
+      }
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object;
+    const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+
+    if (customerId) {
+      try {
+        await db.user.update({
+          where: { stripeCustomerId: customerId },
+          data: { level2PaidAt: null },
+        });
+      } catch (err) {
+        const prismaErr = err as { code?: string };
+        if (prismaErr.code !== "P2025") {
+          console.error("stripe webhook: subscription.deleted db update failed", err);
+          return NextResponse.json({ error: "DB error" }, { status: 500 });
+        }
       }
     }
   }
