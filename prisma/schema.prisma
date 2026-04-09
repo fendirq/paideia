@@ -294,7 +294,7 @@ model WritingSample {
 
 model WaitlistEntry {
   id        String   @id @default(cuid())
-  phone     String   @unique
+  email     String   @unique
   createdAt DateTime @default(now())
 }
 

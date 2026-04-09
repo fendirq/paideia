@@ -6,5 +6,5 @@ export default async function LandingPage() {
   const session = await getServerSession(authOptions);
   if (session) redirect("/app");
 
-  redirect("/login");
+  redirect("/waitlist");
 }

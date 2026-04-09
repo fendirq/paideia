@@ -27,7 +27,7 @@ export default async function AdminPage() {
     <AdminDashboard
       waitlistEntries={waitlistEntries.map((e) => ({
         id: e.id,
-        phone: e.phone,
+        email: e.email,
         createdAt: e.createdAt.toISOString(),
       }))}
       users={users.map((u) => ({
