@@ -9,6 +9,7 @@ import {
   parseActionsFromResponse,
 } from "@/lib/together-chat";
 import { filterResponseBySubject } from "@/lib/content-filter";
+import { buildCompressedHistory, getSummaryContext, maybeCompressThread } from "@/lib/thread-compression";
 
 export async function POST(
   req: NextRequest,
@@ -31,7 +32,14 @@ export async function POST(
     where: { id },
     include: {
       inquiry: true,
-      messages: { orderBy: { createdAt: "asc" }, take: 20 },
+      material: {
+        select: {
+          title: true,
+          description: true,
+          class: { select: { subject: true, teacher: { select: { name: true } } } },
+        },
+      },
+      messages: { orderBy: { createdAt: "desc" }, take: 50 },
     },
   });
 
@@ -39,40 +47,52 @@ export async function POST(
     return new Response("Not found", { status: 404 });
   }
 
+  // Derive context from inquiry OR material
+  const mat = tutoringSession.material;
+  const subject = tutoringSession.inquiry?.subject ?? mat?.class?.subject ?? "";
+  const unitName = tutoringSession.inquiry?.unitName ?? mat?.title ?? "";
+  const teacherName = tutoringSession.inquiry?.teacherName ?? mat?.class?.teacher?.name ?? "";
+  const description = tutoringSession.inquiry?.description ?? mat?.description ?? "";
+
   // Retrieve RAG context (graceful fallback if embedding API is down)
+  const ragSource = tutoringSession.materialId ? "material" : "inquiry";
+  const ragSourceId = tutoringSession.materialId ?? tutoringSession.inquiryId ?? "";
   let ragChunks: { id: string; content: string; similarity: number }[] = [];
   try {
-    ragChunks = await retrieveRelevantChunks(
-      message,
-      tutoringSession.inquiryId
-    );
+    ragChunks = await retrieveRelevantChunks(message, ragSourceId, 6, ragSource);
   } catch (e) {
     console.error("RAG retrieval failed, continuing without context:", e);
   }
 
   // Build system prompt with Socratic instructions + RAG context
   const systemPrompt = buildSystemPrompt({
-    subject: tutoringSession.inquiry.subject,
-    unitName: tutoringSession.inquiry.unitName,
-    teacherName: tutoringSession.inquiry.teacherName,
-    description: tutoringSession.inquiry.description,
+    subject,
+    unitName,
+    teacherName,
+    description,
     ragChunks,
     helpType: tutoringSession.helpType,
   });
 
-  // Build messages array from already-fetched history + new message
-  // (user message not yet in DB, so no duplicate risk)
+  // Append conversation summary to system prompt (avoids second system message)
+  const summaryCtx = getSummaryContext(
+    tutoringSession.messages.length,
+    tutoringSession.summary
+  );
+  const fullSystemPrompt = systemPrompt + summaryCtx;
+
+  // Build messages array with compression for long threads
+  // Messages fetched in desc order for efficient "last N" query — reverse to chronological
+  const messagesAsc = [...tutoringSession.messages].reverse();
+  const history = buildCompressedHistory(messagesAsc, tutoringSession.summary);
   const chatMessages = [
-    { role: "system" as const, content: systemPrompt },
-    ...tutoringSession.messages.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })),
+    { role: "system" as const, content: fullSystemPrompt },
+    ...history,
     { role: "user" as const, content: message },
   ];
 
   // Save user message to DB now (after building chatMessages to avoid duplication)
-  await db.message.create({
+  const userMsg = await db.message.create({
     data: {
       sessionId: id,
       role: "user",
@@ -81,7 +101,15 @@ export async function POST(
   });
 
   // Stream response from Together.ai
-  const upstreamBody = await streamChatCompletion(chatMessages);
+  let upstreamBody: ReadableStream<Uint8Array>;
+  try {
+    upstreamBody = await streamChatCompletion(chatMessages);
+  } catch (e) {
+    // Clean up orphaned user message so history stays consistent
+    await db.message.delete({ where: { id: userMsg.id } }).catch(() => {});
+    console.error("LLM stream failed:", e);
+    return new Response("AI service unavailable", { status: 503 });
+  }
 
   // Transform stream: forward to client + collect full text for DB save
   let fullResponse = "";
@@ -92,7 +120,7 @@ export async function POST(
     assistantSaved = true;
     const filtered = filterResponseBySubject(
       fullResponse,
-      tutoringSession.inquiry.subject
+      subject
     );
     const { message: aiMessage, suggestedActions } =
       parseActionsFromResponse(filtered);
@@ -104,6 +132,11 @@ export async function POST(
         suggestedActions,
       },
     });
+
+    // Trigger compression in background (non-blocking)
+    maybeCompressThread(id).catch((e) =>
+      console.error("Thread compression failed:", e)
+    );
   };
 
   const transform = new TransformStream<Uint8Array, Uint8Array>({

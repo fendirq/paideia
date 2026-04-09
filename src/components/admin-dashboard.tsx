@@ -41,7 +41,7 @@ function RoleBadge({ role }: { role: string | null }) {
     TEACHER: "bg-blue-500/20 text-blue-300",
     STUDENT: "bg-accent/20 text-accent-light",
   };
-  const cls = role ? styles[role] ?? "bg-white/10 text-white/50" : "bg-white/10 text-white/50";
+  const cls = role ? styles[role] ?? "bg-[rgba(168,152,128,0.08)] text-text-muted" : "bg-[rgba(168,152,128,0.08)] text-text-muted";
   return (
     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cls}`}>
       {role ?? "—"}
@@ -53,15 +53,15 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] px-6 py-12">
       <div className="max-w-5xl mx-auto space-y-10">
-        <h1 className="font-display text-2xl font-bold text-white">
+        <h1 className="font-display text-2xl font-bold text-text-primary">
           Admin Dashboard
         </h1>
 
         {/* Waitlist */}
         <section className="space-y-4">
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-lg font-semibold text-white">Waitlist</h2>
-            <span className="text-xs text-text-muted bg-white/[0.06] px-2.5 py-0.5 rounded-full">
+            <h2 className="font-display text-lg font-semibold text-text-primary">Waitlist</h2>
+            <span className="text-xs text-text-muted bg-[rgba(168,152,128,0.14)] px-2.5 py-0.5 rounded-full">
               {waitlistEntries.length}
             </span>
           </div>
@@ -72,7 +72,7 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
             <div className="bg-bg-surface border border-bg-elevated rounded-xl overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/[0.04]">
+                  <tr className="border-b border-[rgba(168,152,128,0.12)]">
                     <th className="text-left px-5 py-3 text-text-muted font-display text-xs uppercase tracking-wide">
                       Phone
                     </th>
@@ -83,7 +83,7 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
                 </thead>
                 <tbody>
                   {waitlistEntries.map((entry) => (
-                    <tr key={entry.id} className="border-b border-white/[0.04] last:border-0">
+                    <tr key={entry.id} className="border-b border-[rgba(168,152,128,0.12)] last:border-0">
                       <td className="px-5 py-3 text-sm text-text-secondary font-mono">
                         {formatPhone(entry.phone)}
                       </td>
@@ -101,8 +101,8 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
         {/* Users */}
         <section className="space-y-4">
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-lg font-semibold text-white">Users</h2>
-            <span className="text-xs text-text-muted bg-white/[0.06] px-2.5 py-0.5 rounded-full">
+            <h2 className="font-display text-lg font-semibold text-text-primary">Users</h2>
+            <span className="text-xs text-text-muted bg-[rgba(168,152,128,0.14)] px-2.5 py-0.5 rounded-full">
               {users.length}
             </span>
           </div>
@@ -113,7 +113,7 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
             <div className="bg-bg-surface border border-bg-elevated rounded-xl overflow-hidden overflow-x-auto">
               <table className="w-full min-w-[600px]">
                 <thead>
-                  <tr className="border-b border-white/[0.04]">
+                  <tr className="border-b border-[rgba(168,152,128,0.12)]">
                     <th className="text-left px-5 py-3 text-text-muted font-display text-xs uppercase tracking-wide">
                       Name
                     </th>
@@ -133,7 +133,7 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
                 </thead>
                 <tbody>
                   {users.map((user) => (
-                    <tr key={user.id} className="border-b border-white/[0.04] last:border-0">
+                    <tr key={user.id} className="border-b border-[rgba(168,152,128,0.12)] last:border-0">
                       <td className="px-5 py-3 text-sm text-text-secondary">
                         {user.name || "—"}
                       </td>

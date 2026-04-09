@@ -1,25 +1,11 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, Libre_Baskerville } from "next/font/google";
+import { Playfair_Display } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
+const playfair = Playfair_Display({
   subsets: ["latin"],
-  variable: "--font-space-grotesk",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const libreBaskerville = Libre_Baskerville({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
-  variable: "--font-libre-baskerville",
+  variable: "--font-playfair",
   display: "swap",
 });
 
@@ -37,7 +23,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${inter.variable} ${libreBaskerville.variable}`}
+      className={playfair.variable}
     >
       <body className="bg-bg-base font-body text-text-primary antialiased">
         <Providers>{children}</Providers>

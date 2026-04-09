@@ -73,7 +73,7 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
   };
 
   return (
-    <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-6">
+    <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] p-6">
       <h3 className="font-display text-[13px] font-semibold mb-5">
         To Study
       </h3>
@@ -89,7 +89,7 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
             return (
               <div
                 key={item.id}
-                className="flex items-center gap-3 py-2.5 px-2 rounded-[8px] hover:bg-bg-surface/30 transition-colors"
+                className="flex items-center gap-3 py-2.5 px-2 rounded-[8px] hover:bg-[rgba(35,28,20,0.30)] transition-colors"
               >
                 <button
                   onClick={() => toggleComplete(item.id)}
@@ -101,7 +101,7 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
                 >
                   {item.completed && (
                     <svg
-                      className="w-3 h-3 text-white"
+                      className="w-3 h-3 text-[#281c14]"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"

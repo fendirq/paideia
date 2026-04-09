@@ -22,7 +22,14 @@ export default async function SessionPage({
       inquiry: {
         select: { subject: true, unitName: true, teacherName: true, description: true },
       },
-      messages: { orderBy: { createdAt: "asc" } },
+      material: {
+        select: {
+          title: true,
+          description: true,
+          class: { select: { name: true, subject: true, teacher: { select: { name: true } } } },
+        },
+      },
+      messages: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
 
@@ -30,22 +37,34 @@ export default async function SessionPage({
     redirect("/app");
   }
 
-  const initialMessages = tutoringSession.messages.map((m) => ({
+  // Messages fetched desc for efficient "last N" — reverse to chronological
+  const initialMessages = [...tutoringSession.messages].reverse().map((m) => ({
     id: m.id,
     role: m.role as "user" | "assistant",
     content: m.content,
     suggestedActions: m.suggestedActions,
   }));
 
-  const subjectLabel =
-    tutoringSession.inquiry.subject.charAt(0) +
-    tutoringSession.inquiry.subject.slice(1).toLowerCase();
+  // Derive context from inquiry OR material
+  const mat = tutoringSession.material;
+  const subject = tutoringSession.inquiry?.subject ?? mat?.class?.subject ?? "Unknown";
+  const unitName = tutoringSession.inquiry?.unitName ?? mat?.title ?? "Unknown";
+  const teacherName = tutoringSession.inquiry?.teacherName ?? mat?.class?.teacher?.name ?? "Unknown";
+  const description = tutoringSession.inquiry?.description ?? mat?.description ?? "";
+
+  const subjectLabel = subject.charAt(0) + subject.slice(1).toLowerCase();
+
+  const backHref = tutoringSession.materialId && tutoringSession.classId
+    ? `/app/enrolled/${tutoringSession.classId}`
+    : tutoringSession.inquiryId
+      ? `/app/start/${tutoringSession.inquiryId}`
+      : "/app";
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-bg-inner">
-      <div className="border-b border-white/[0.08] px-6 py-3 flex items-center gap-4">
+      <div className="border-b border-[rgba(168,152,128,0.15)] px-6 py-3 flex items-center gap-4">
         <Link
-          href={`/app/class/${tutoringSession.inquiryId}`}
+          href={backHref}
           className="text-text-muted hover:text-text-primary transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -54,14 +73,14 @@ export default async function SessionPage({
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-display font-semibold truncate">
-            {tutoringSession.inquiry.unitName}
+            {unitName}
           </h1>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-sm text-text-muted">
-              {subjectLabel} &middot; {tutoringSession.inquiry.teacherName}
+              {subjectLabel} &middot; {teacherName}
             </p>
             <SocraticBanner
-              subject={tutoringSession.inquiry.subject}
+              subject={subject}
               helpType={tutoringSession.helpType}
             />
           </div>
@@ -72,10 +91,10 @@ export default async function SessionPage({
           sessionId={id}
           initialMessages={initialMessages}
           inquiry={{
-            subject: tutoringSession.inquiry.subject,
-            unitName: tutoringSession.inquiry.unitName,
-            teacherName: tutoringSession.inquiry.teacherName,
-            description: tutoringSession.inquiry.description,
+            subject,
+            unitName,
+            teacherName,
+            description,
           }}
           helpType={tutoringSession.helpType}
         />

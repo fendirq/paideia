@@ -25,8 +25,8 @@ export default async function SignupPage() {
           PAIDEIA
         </h1>
 
-        <div className="w-full max-w-sm bg-[rgba(34,33,30,0.7)] backdrop-blur-[20px] border border-white/[0.06] rounded-[20px] p-8">
-          <h2 className="font-display font-semibold text-lg text-white text-center mb-6">
+        <div className="w-full max-w-sm bg-[rgba(40,32,24,0.55)] backdrop-blur-[20px] border border-[rgba(168,152,128,0.15)] rounded-[20px] p-8">
+          <h2 className="font-display font-semibold text-lg text-text-primary text-center mb-6">
             Create Account
           </h2>
           <SignupForm />

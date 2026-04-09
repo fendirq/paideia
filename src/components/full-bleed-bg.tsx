@@ -7,7 +7,7 @@ export function FullBleedBg() {
           className="absolute inset-0"
           style={{
             background: [
-              "radial-gradient(ellipse at 20% 50%, rgba(74,157,91,0.10) 0%, transparent 50%)",
+              "radial-gradient(ellipse at 20% 50%, rgba(168,152,128,0.08) 0%, transparent 50%)",
               "radial-gradient(ellipse at 80% 20%, rgba(91,155,213,0.06) 0%, transparent 50%)",
               "radial-gradient(ellipse at 60% 80%, rgba(232,168,56,0.05) 0%, transparent 50%)",
               "linear-gradient(180deg, #1a1915 0%, #22211e 100%)",

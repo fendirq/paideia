@@ -29,7 +29,7 @@ export function ClassGrid({ classes }: ClassGridProps) {
             <Link
               key={cls.id}
               href={`/app/inquiry/${cls.id}`}
-              className="group relative bg-bg-inner border border-white/[0.04] rounded-[16px] overflow-hidden transition-all hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.2)] hover:border-white/[0.08]"
+              className="group relative bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] overflow-hidden transition-all hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.2)] hover:border-[rgba(168,152,128,0.15)]"
               style={{ transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)" }}
             >
               {/* Subject accent bar */}
@@ -64,7 +64,7 @@ export function ClassGrid({ classes }: ClassGridProps) {
       </div>
 
       {classes.length === 0 && (
-        <div className="bg-bg-inner border border-white/[0.04] rounded-[16px] p-12 text-center">
+        <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] p-12 text-center">
           <p className="text-text-muted mb-3">No classes yet.</p>
           <Link
             href="/app/upload"

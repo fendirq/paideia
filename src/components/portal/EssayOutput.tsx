@@ -65,7 +65,7 @@ export function EssayOutput({ essay, generating, onRegenerate }: EssayOutputProp
       </div>
 
       {/* Essay text */}
-      <div className="bg-bg-base border border-white/[0.06] rounded-xl p-5 max-h-[60vh] overflow-y-auto">
+      <div className="bg-bg-base border border-[rgba(168,152,128,0.15)] rounded-xl p-5 max-h-[60vh] overflow-y-auto">
         <div className="font-serif text-sm text-text-primary leading-relaxed whitespace-pre-wrap">
           {essay || "Waiting for output..."}
         </div>
@@ -76,25 +76,25 @@ export function EssayOutput({ essay, generating, onRegenerate }: EssayOutputProp
         <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={handleCopy}
-            className="text-xs px-4 py-2 rounded-full bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
+            className="text-xs px-4 py-2 rounded-full bg-[rgba(168,152,128,0.08)] text-text-secondary hover:text-text-primary transition-colors"
           >
             {copied ? "Copied!" : "Copy to Clipboard"}
           </button>
           <button
             onClick={handleDownload}
-            className="text-xs px-4 py-2 rounded-full bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
+            className="text-xs px-4 py-2 rounded-full bg-[rgba(168,152,128,0.08)] text-text-secondary hover:text-text-primary transition-colors"
           >
             Download .docx
           </button>
           <button
             onClick={onRegenerate}
-            className="text-xs px-4 py-2 rounded-full bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
+            className="text-xs px-4 py-2 rounded-full bg-[rgba(168,152,128,0.08)] text-text-secondary hover:text-text-primary transition-colors"
           >
             Regenerate
           </button>
           <Link
             href="/portal/aggregate"
-            className="text-xs px-4 py-2 rounded-full bg-white/[0.04] text-text-muted hover:text-text-secondary transition-colors"
+            className="text-xs px-4 py-2 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted hover:text-text-secondary transition-colors"
           >
             Edit Profile
           </Link>

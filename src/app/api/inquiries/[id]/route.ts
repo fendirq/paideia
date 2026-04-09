@@ -60,10 +60,25 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const notes =
-    typeof body.teacherNotes === "string"
-      ? body.teacherNotes.slice(0, 5000)
-      : undefined;
+  // Verify teacher has a class with this student enrolled
+  if (session.user.role === "TEACHER") {
+    const sharedClass = await db.classEnrollment.findFirst({
+      where: {
+        studentId: inquiry.userId,
+        class: { teacherId: session.user.id },
+      },
+    });
+    if (!sharedClass) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
+  if (body.teacherNotes !== null && typeof body.teacherNotes !== "string") {
+    return NextResponse.json({ error: "teacherNotes must be a string or null" }, { status: 400 });
+  }
+  const notes = typeof body.teacherNotes === "string"
+    ? body.teacherNotes.slice(0, 5000)
+    : null;
 
   const updated = await db.inquiry.update({
     where: { id },

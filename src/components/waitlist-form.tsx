@@ -75,7 +75,7 @@ export function WaitlistForm() {
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
           </svg>
         </div>
-        <p className="text-white font-display font-semibold text-sm">You&apos;re on the list!</p>
+        <p className="text-text-primary font-display font-semibold text-sm">You&apos;re on the list!</p>
         <p className="text-text-secondary text-xs">We&apos;ll text you when Paideia is ready.</p>
       </div>
     );
@@ -89,13 +89,13 @@ export function WaitlistForm() {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 123-4567"
-          className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+          className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-lg px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
           autoComplete="tel"
         />
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-accent hover:bg-accent/90 text-white font-display text-[13px] font-semibold rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+          className="w-full bg-accent hover:bg-accent/90 text-[#281c14] font-display text-[13px] font-semibold rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
         >
           {loading ? "Joining..." : "Join Waitlist"}
         </button>
@@ -104,7 +104,7 @@ export function WaitlistForm() {
 
       <button
         onClick={() => setCodeOpen(!codeOpen)}
-        className="block w-full text-center bg-bg-surface/50 border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-text-muted hover:text-text-primary transition-colors"
+        className="block w-full text-center bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-lg px-3 py-2 text-[13px] text-text-muted hover:text-text-primary transition-colors"
       >
         Access with Code
       </button>
@@ -116,13 +116,13 @@ export function WaitlistForm() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="Enter access code"
-            className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-lg px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+            className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-lg px-3 py-2 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
             autoFocus
           />
           <button
             type="submit"
             disabled={codeLoading || !code}
-            className="w-full bg-accent hover:bg-accent/90 text-white font-display text-[13px] font-semibold rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+            className="w-full bg-accent hover:bg-accent/90 text-[#281c14] font-display text-[13px] font-semibold rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
           >
             {codeLoading ? "Verifying..." : "Enter"}
           </button>

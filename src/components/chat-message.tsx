@@ -28,8 +28,8 @@ export function ChatMessage({
           className="max-w-[75%] px-[18px] py-3"
           style={{
             borderRadius: "20px 20px 6px 20px",
-            background: "rgba(74, 157, 91, 0.3)",
-            border: "1px solid rgba(74, 157, 91, 0.15)",
+            background: "rgba(168, 152, 128, 0.20)",
+            border: "1px solid rgba(168, 152, 128, 0.15)",
           }}
         >
           <p className="text-text-primary text-[15px] leading-relaxed font-serif whitespace-pre-wrap">
@@ -56,7 +56,7 @@ export function ChatMessage({
   }
 
   return (
-    <div className="mb-8 max-w-[90%] pb-6 border-b border-white/[0.04] last:border-b-0">
+    <div className="mb-8 max-w-[90%] pb-6 border-b border-[rgba(168,152,128,0.12)] last:border-b-0">
       <div className="chat-prose">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

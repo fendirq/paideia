@@ -48,7 +48,7 @@ export default async function ClassDetailPage({
   const estimatedMinutes = totalMessages * 1;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 mt-4 mb-8 bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[20px]">
+    <div className="max-w-3xl mx-auto px-6 py-8 mt-4 mb-8 bg-[rgba(40,32,24,0.55)] backdrop-blur-2xl border border-[rgba(168,152,128,0.15)] rounded-[20px]">
       <BackButton href="/app" />
 
       {/* Class header */}
@@ -71,19 +71,19 @@ export default async function ClassDetailPage({
 
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-3 mb-8">
-        <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] px-4 py-3">
+        <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] px-4 py-3">
           <p className="text-[22px] font-display font-semibold text-text-primary">
             {inquiry.sessions.length}
           </p>
           <p className="text-[12px] text-text-muted">Sessions</p>
         </div>
-        <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] px-4 py-3">
+        <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] px-4 py-3">
           <p className="text-[22px] font-display font-semibold text-text-primary">
             {totalMessages}
           </p>
           <p className="text-[12px] text-text-muted">Messages</p>
         </div>
-        <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] px-4 py-3">
+        <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] px-4 py-3">
           <p className="text-[22px] font-display font-semibold text-text-primary">
             {estimatedMinutes < 60
               ? `${estimatedMinutes}m`
@@ -100,12 +100,12 @@ export default async function ClassDetailPage({
             href={`/app/start/${classId}`}
             className="flex flex-col items-center gap-3 group"
           >
-            <div className="w-14 h-14 rounded-full bg-accent border-2 border-accent-light flex items-center justify-center shadow-[0_0_20px_rgba(74,157,91,0.3)] group-hover:bg-accent-light transition-colors">
-              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <div className="w-14 h-14 rounded-full bg-accent border-2 border-accent-light flex items-center justify-center shadow-[0_0_20px_rgba(168,152,128,0.25)] group-hover:bg-accent-light transition-colors">
+              <svg className="w-7 h-7 text-[#281c14]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
             </div>
-            <span className="bg-white/20 backdrop-blur-xl border border-white/30 rounded-full px-6 py-2 text-[13px] font-medium text-white hover:bg-white/30 transition-colors">
+            <span className="bg-[rgba(40,32,24,0.50)] backdrop-blur-xl border border-[rgba(168,152,128,0.20)] rounded-full px-6 py-2 text-[13px] font-medium text-text-primary hover:bg-[rgba(168,152,128,0.18)] transition-colors">
               Start New Chat
             </span>
           </Link>
@@ -116,11 +116,11 @@ export default async function ClassDetailPage({
         </h2>
 
         {inquiry.sessions.length === 0 ? (
-          <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-8 text-center">
+          <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] p-8 text-center">
             <p className="text-text-muted text-[14px] mb-4">No sessions yet.</p>
             <Link
               href={`/app/start/${classId}`}
-              className="inline-block bg-accent border-2 border-accent-light rounded-full px-6 py-2.5 text-[13px] font-medium text-white shadow-[0_0_20px_rgba(74,157,91,0.3)] hover:bg-accent-light transition-colors"
+              className="inline-block bg-accent border-2 border-accent-light rounded-full px-6 py-2.5 text-[13px] font-medium text-[#281c14] shadow-[0_0_20px_rgba(168,152,128,0.25)] hover:bg-accent-light transition-colors"
             >
               Start New Chat
             </Link>
@@ -134,7 +134,7 @@ export default async function ClassDetailPage({
                 <Link
                   key={s.id}
                   href={`/app/sessions/${s.id}`}
-                  className="group flex items-center gap-4 bg-bg-inner border border-white/[0.04] rounded-[14px] px-4 py-3.5 hover:border-white/[0.08] transition-all"
+                  className="group flex items-center gap-4 bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] px-4 py-3.5 hover:border-[rgba(168,152,128,0.15)] transition-all"
                 >
                   <span className="w-7 h-7 rounded-full bg-bg-elevated flex items-center justify-center text-[12px] font-mono text-text-muted flex-shrink-0">
                     {inquiry.sessions.length - i}

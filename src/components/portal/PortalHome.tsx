@@ -26,20 +26,27 @@ export function PortalHome({ userName, classes, hasProfile }: PortalHomeProps) {
       <div className="h-screen" />
 
       {/* Scroll-down section */}
-      <div className="relative z-10 min-h-screen border-t border-white/[0.1] rounded-t-3xl">
+      <div className="relative z-10 min-h-screen border-t border-[rgba(168,152,128,0.10)] rounded-t-3xl">
         <div className="flex flex-col items-center py-20 gap-6">
-          {/* Writing Profile link — slim banner row */}
+          {/* Writing Profile link */}
           <Link
             href="/portal/aggregate"
-            className="group flex items-center gap-3 px-6 py-2 rounded-full border border-white/20 bg-black/30 hover:bg-black/40 backdrop-blur-xl transition-all"
+            className="group flex items-center gap-4 px-5 py-3 rounded-2xl border border-[rgba(168,152,128,0.18)] bg-[rgba(40,32,24,0.40)] hover:bg-[rgba(40,32,24,0.60)] hover:border-accent/30 hover:shadow-[0_0_20px_rgba(168,152,128,0.12)] backdrop-blur-xl transition-all duration-300"
           >
-            <svg className="w-4.5 h-4.5 text-white/40 group-hover:text-white/60 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
-            </svg>
-            <span className="text-sm text-white/60 group-hover:text-white/80 transition-colors flex-1">
-              {hasProfile ? "Writing Profile" : "Create Writing Profile"}
+            <span className="w-9 h-9 rounded-xl bg-accent/10 group-hover:bg-accent/20 flex items-center justify-center transition-colors shrink-0">
+              <svg className="w-[18px] h-[18px] text-accent group-hover:text-accent-light transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0 1 19.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 0 0 4 10.5a7.464 7.464 0 0 1-1.15 3.993m1.989 3.559A11.209 11.209 0 0 0 8.25 10.5a3.75 3.75 0 1 1 7.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 0 1-3.6 9.75m6.633-4.596a18.666 18.666 0 0 1-2.485 5.33" />
+              </svg>
             </span>
-            <svg className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="flex-1">
+              <span className="text-sm font-display font-semibold text-text-primary block">
+                {hasProfile ? "Writing Profile" : "Create Writing Profile"}
+              </span>
+              <span className="text-[11px] text-text-muted">
+                {hasProfile ? "View your style fingerprint" : "Build your style fingerprint"}
+              </span>
+            </div>
+            <svg className="w-4 h-4 text-text-muted/50 group-hover:text-text-muted group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
           </Link>
@@ -59,7 +66,7 @@ export function PortalHome({ userName, classes, hasProfile }: PortalHomeProps) {
                   <Link
                     key={cls.id}
                     href={href}
-                    className="bg-black/30 backdrop-blur-xl border border-white/20 rounded-full px-6 py-2 text-[13px] font-medium text-white hover:bg-black/40 transition-colors"
+                    className="bg-[rgba(40,32,24,0.35)] backdrop-blur-xl border border-[rgba(168,152,128,0.20)] rounded-full px-6 py-2 text-[13px] font-medium text-text-primary hover:bg-[rgba(40,32,24,0.55)] transition-colors"
                   >
                     {cls.name}
                   </Link>

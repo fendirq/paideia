@@ -23,7 +23,7 @@ export function SessionCard({
   return (
     <Link
       href={`/app/sessions/${id}`}
-      className="group flex items-center gap-4 px-4 py-3.5 rounded-[12px] border border-transparent hover:bg-bg-surface/50 hover:border-white/[0.04] transition-all"
+      className="group flex items-center gap-4 px-4 py-3.5 rounded-[12px] border border-transparent hover:bg-[rgba(35,28,20,0.50)] hover:border-[rgba(168,152,128,0.12)] transition-all"
     >
       <span
         className="w-[8px] h-[8px] rounded-full flex-shrink-0"

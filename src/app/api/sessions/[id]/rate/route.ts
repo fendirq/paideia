@@ -15,8 +15,11 @@ export async function POST(
   const { id } = await params;
   const { rating, comment } = await req.json();
 
-  if (!rating || rating < 1 || rating > 5) {
-    return NextResponse.json({ error: "Rating must be 1-5" }, { status: 400 });
+  if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return NextResponse.json({ error: "Rating must be an integer 1-5" }, { status: 400 });
+  }
+  if (comment != null && (typeof comment !== "string" || comment.length > 2000)) {
+    return NextResponse.json({ error: "Comment must be under 2000 characters" }, { status: 400 });
   }
 
   const tutoringSession = await db.tutoringSession.findUnique({

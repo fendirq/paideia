@@ -27,7 +27,7 @@ export function SessionsList({ sessions }: SessionsListProps) {
 
   if (sessions.length === 0) {
     return (
-      <div className="bg-bg-inner border border-white/[0.04] rounded-[16px] p-12 text-center">
+      <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] p-12 text-center">
         <p className="text-text-muted mb-3">No sessions yet.</p>
         <Link
           href="/app/upload"
@@ -81,7 +81,7 @@ export function SessionsList({ sessions }: SessionsListProps) {
           className={`px-4 py-[7px] rounded-[20px] font-display text-[13px] font-medium transition-all border ${
             filter === "ALL"
               ? "border-accent bg-accent/[0.08] text-text-primary"
-              : "border-white/[0.05] bg-bg-surface text-text-secondary hover:border-white/[0.1]"
+              : "border-[rgba(168,152,128,0.15)] bg-bg-surface text-text-secondary hover:border-[rgba(168,152,128,0.30)]"
           }`}
         >
           All
@@ -96,7 +96,7 @@ export function SessionsList({ sessions }: SessionsListProps) {
               className={`flex items-center gap-[7px] px-4 py-[7px] rounded-[20px] font-display text-[13px] font-medium transition-all border ${
                 filter === subj
                   ? "border-accent bg-accent/[0.08] text-text-primary"
-                  : "border-white/[0.05] bg-bg-surface text-text-secondary hover:border-white/[0.1]"
+                  : "border-[rgba(168,152,128,0.15)] bg-bg-surface text-text-secondary hover:border-[rgba(168,152,128,0.30)]"
               }`}
             >
               <span
@@ -127,7 +127,7 @@ export function SessionsList({ sessions }: SessionsListProps) {
                 <span className="text-[11px] text-text-muted">
                   · {group.teacherName}
                 </span>
-                <div className="flex-1 h-px bg-white/[0.04]" />
+                <div className="flex-1 h-px bg-[rgba(168,152,128,0.08)]" />
                 <span className="text-[11px] text-text-muted">
                   {group.sessions.length}
                 </span>

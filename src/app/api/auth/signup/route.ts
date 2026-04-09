@@ -16,6 +16,9 @@ export async function POST(req: Request) {
   if (!name || typeof name !== "string" || !name.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
+  if (name.trim().length > 200) {
+    return NextResponse.json({ error: "Name too long" }, { status: 400 });
+  }
   if (!email || typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
   }
@@ -24,6 +27,9 @@ export async function POST(req: Request) {
   }
   if (!password || typeof password !== "string" || password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+  }
+  if (password.length > 128) {
+    return NextResponse.json({ error: "Password too long" }, { status: 400 });
   }
 
   const normalizedPhone = normalizePhone(phone);

@@ -12,7 +12,7 @@ interface ExamCountdownProps {
 
 export function ExamCountdown({ exams }: ExamCountdownProps) {
   return (
-    <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-6">
+    <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] p-6">
       <h3 className="font-display text-[13px] font-semibold mb-5">
         Upcoming Exams
       </h3>
@@ -27,7 +27,7 @@ export function ExamCountdown({ exams }: ExamCountdownProps) {
                 ? "#ef4444"
                 : exam.daysRemaining < 7
                   ? "#e8a838"
-                  : "#4a9d5b";
+                  : "#7a9a6b";
 
             return (
               <div key={exam.id} className="flex items-center gap-4">

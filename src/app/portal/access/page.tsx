@@ -16,11 +16,11 @@ export default function PortalAccessPage() {
 
       {/* Centered glass panel */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-6">
-        <div className="bg-white/10 backdrop-blur-2xl border border-white/15 rounded-2xl p-10 text-center shadow-2xl">
-          <h1 className="font-display text-2xl font-bold tracking-[0.12em] text-white mb-2">
+        <div className="bg-[rgba(40,32,24,0.55)] backdrop-blur-2xl border border-[rgba(168,152,128,0.15)] rounded-2xl p-10 text-center shadow-2xl">
+          <h1 className="font-display text-2xl font-bold tracking-[0.12em] text-text-primary mb-2">
             PAIDEIA
           </h1>
-          <p className="text-white/50 text-sm mb-8">Enter access code</p>
+          <p className="text-text-muted text-sm mb-8">Enter access code</p>
           <PinInput />
         </div>
       </div>

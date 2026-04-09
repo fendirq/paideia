@@ -32,6 +32,7 @@ export function VideoHero({ userName, greeting = "Welcome" }: VideoHeroProps) {
     }
 
     window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 

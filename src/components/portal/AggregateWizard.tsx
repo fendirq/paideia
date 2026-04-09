@@ -84,7 +84,7 @@ function SingleSelect({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-[15px] font-medium text-white">{question}</h3>
+      <h3 className="text-[15px] font-medium text-text-primary">{question}</h3>
       <div className="space-y-1.5">
         {options.map((opt) => (
           <button
@@ -92,21 +92,21 @@ function SingleSelect({
             onClick={() => onChange(opt)}
             className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
               selected === opt
-                ? "bg-accent/20 border border-accent/40 text-white"
-                : "bg-white/[0.04] border border-white/[0.06] text-white/60 hover:bg-white/[0.08] hover:text-white/80"
+                ? "bg-accent/20 border border-accent/40 text-accent-light"
+                : "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] text-text-secondary hover:bg-[rgba(168,152,128,0.14)] hover:text-text-primary"
             }`}
           >
             {opt}
           </button>
         ))}
       </div>
-      <div className="border-t border-white/[0.08]" />
+      <div className="border-t border-[rgba(168,152,128,0.15)]" />
       <button
         onClick={() => onChange("__other__")}
         className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 ${
           isOther
-            ? "bg-accent/20 border border-accent/40 text-white"
-            : "bg-white/[0.04] border border-white/[0.06] text-white/40 hover:bg-white/[0.08] hover:text-white/60"
+            ? "bg-accent/20 border border-accent/40 text-accent-light"
+            : "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] text-text-muted hover:bg-[rgba(168,152,128,0.14)] hover:text-text-secondary"
         }`}
       >
         <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -118,7 +118,7 @@ function SingleSelect({
             value={otherValue}
             onChange={(e) => onOtherChange(e.target.value)}
             placeholder="Type your answer..."
-            className="bg-transparent outline-none flex-1 text-white placeholder:text-white/30"
+            className="bg-transparent outline-none flex-1 text-text-primary placeholder:text-text-muted"
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />
@@ -155,7 +155,7 @@ function MultiSelect({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-[15px] font-medium text-white">{question}</h3>
+      <h3 className="text-[15px] font-medium text-text-primary">{question}</h3>
       <div className="space-y-1.5">
         {options.map((opt) => {
           const active = selected.includes(opt);
@@ -165,15 +165,15 @@ function MultiSelect({
               onClick={() => toggle(opt)}
               className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center gap-3 ${
                 active
-                  ? "bg-accent/20 border border-accent/40 text-white"
-                  : "bg-white/[0.04] border border-white/[0.06] text-white/60 hover:bg-white/[0.08] hover:text-white/80"
+                  ? "bg-accent/20 border border-accent/40 text-accent-light"
+                  : "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] text-text-secondary hover:bg-[rgba(168,152,128,0.14)] hover:text-text-primary"
               }`}
             >
               <div className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
-                active ? "border-accent bg-accent" : "border-white/30"
+                active ? "border-accent bg-accent" : "border-[rgba(168,152,128,0.30)]"
               }`}>
                 {active && (
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <svg className="w-3 h-3 text-[#281c14]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                   </svg>
                 )}
@@ -183,9 +183,9 @@ function MultiSelect({
           );
         })}
       </div>
-      <div className="border-t border-white/[0.08]" />
-      <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
-        <svg className="w-4 h-4 text-white/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <div className="border-t border-[rgba(168,152,128,0.15)]" />
+      <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)]">
+        <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
         </svg>
         <input
@@ -193,7 +193,7 @@ function MultiSelect({
           value={otherValue}
           onChange={(e) => onOtherChange(e.target.value)}
           placeholder="Something else..."
-          className="bg-transparent outline-none flex-1 text-sm text-white/60 placeholder:text-white/30"
+          className="bg-transparent outline-none flex-1 text-sm text-text-secondary placeholder:text-text-muted"
         />
       </div>
     </div>
@@ -356,7 +356,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
   }, [level, samples, teacher, self, router]);
 
   if (loading) {
-    return <p className="text-white/50 text-center py-12">Loading...</p>;
+    return <p className="text-text-muted text-center py-12">Loading...</p>;
   }
 
   return (
@@ -374,10 +374,10 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
             }}
             className={`text-xs px-3 py-1 rounded-full transition-colors ${
               i === step
-                ? "bg-accent text-white font-medium"
+                ? "bg-accent text-[#281c14] font-medium"
                 : hasExistingProfile || i < step
-                  ? "bg-white/10 text-white/70 cursor-pointer hover:bg-white/20"
-                  : "bg-white/[0.04] text-white/30"
+                  ? "bg-[rgba(168,152,128,0.10)] text-text-secondary cursor-pointer hover:bg-[rgba(168,152,128,0.20)]"
+                  : "bg-[rgba(168,152,128,0.08)] text-text-muted"
             }`}
           >
             {label}
@@ -389,8 +389,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       {step === 0 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Choose Your Level</h2>
-            <p className="text-white/60 text-sm">
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Choose Your Level</h2>
+            <p className="text-text-secondary text-sm">
               This determines how many questions we ask and which AI model generates your essays.
             </p>
           </div>
@@ -401,14 +401,14 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               className={`text-left p-6 rounded-2xl transition-all ${
                 level === 1
                   ? "bg-accent/10 ring-2 ring-accent/60 border border-accent/30"
-                  : "bg-white/[0.04] border border-white/[0.08] opacity-60 hover:opacity-80"
+                  : "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] opacity-60 hover:opacity-80"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-display font-semibold text-white">Level 1</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">Standard</span>
+                <span className="text-sm font-display font-semibold text-text-primary">Level 1</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted">Standard</span>
               </div>
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-text-muted">
                 8 questions about your writing. Fast setup, solid results with DeepSeek-V3.
               </p>
             </button>
@@ -416,24 +416,24 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               onClick={() => hasLevel2 ? (() => { setLevel(2); setStep(0); })() : (window.location.href = "/portal/upgrade")}
               className={`text-left p-6 rounded-2xl transition-all ${
                 !hasLevel2
-                  ? "bg-white/[0.04] border border-white/[0.08] opacity-50 hover:opacity-70"
+                  ? "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] opacity-50 hover:opacity-70"
                   : level === 2
                     ? "bg-accent/10 ring-2 ring-accent/60 border border-accent/30"
-                    : "bg-white/[0.04] border border-white/[0.08] opacity-60 hover:opacity-80"
+                    : "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] opacity-60 hover:opacity-80"
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 {!hasLevel2 && (
-                  <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                   </svg>
                 )}
-                <span className="text-sm font-display font-semibold text-white">Level 2</span>
+                <span className="text-sm font-display font-semibold text-text-primary">Level 2</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">
                   {hasLevel2 ? "Enhanced" : "Unlock"}
                 </span>
               </div>
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-text-muted">
                 {hasLevel2
                   ? "12 in-depth questions for the most accurate voice match. Powered by Claude Sonnet 4."
                   : "Unlock enhanced voice matching powered by Claude Sonnet 4."}
@@ -447,8 +447,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       {step === 1 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Writing Samples</h2>
-            <p className="text-white/60 text-sm">
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Writing Samples</h2>
+            <p className="text-text-secondary text-sm">
               Upload 3-6 past essays. We&apos;ll analyze your writing style, tone, and patterns automatically.
             </p>
           </div>
@@ -466,7 +466,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
             className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors ${
               dragOver
                 ? "border-accent bg-accent/10"
-                : "border-white/20 hover:border-white/40"
+                : "border-[rgba(168,152,128,0.20)] hover:border-[rgba(168,152,128,0.40)]"
             } ${samples.length >= 6 ? "opacity-30 pointer-events-none" : ""}`}
           >
             <input
@@ -480,13 +480,13 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               }}
               className="hidden"
             />
-            <svg className="w-10 h-10 mx-auto mb-3 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-10 h-10 mx-auto mb-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
             </svg>
-            <p className="text-white font-medium text-sm mb-1">
+            <p className="text-text-primary font-medium text-sm mb-1">
               {uploading ? "Uploading..." : "Drop files here or click to browse"}
             </p>
-            <p className="text-white/40 text-xs">
+            <p className="text-text-muted text-xs">
               {samples.length}/6 files uploaded &middot; PDF or DOCX
             </p>
           </div>
@@ -497,18 +497,18 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               {samples.map((sample, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3"
+                  className="flex items-center justify-between bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] rounded-xl px-4 py-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <svg className="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                     </svg>
-                    <span className="text-white text-sm truncate">{sample.label}</span>
-                    <span className="text-white/40 text-xs shrink-0">{sample.wordCount} words</span>
+                    <span className="text-text-primary text-sm truncate">{sample.label}</span>
+                    <span className="text-text-muted text-xs shrink-0">{sample.wordCount} words</span>
                   </div>
                   {confirmDelete === i ? (
                     <div className="flex items-center gap-3 ml-3 shrink-0">
-                      <span className="text-white/40 text-xs">Remove?</span>
+                      <span className="text-text-muted text-xs">Remove?</span>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeSample(i); }}
                         className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
@@ -517,7 +517,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDelete(null); }}
-                        className="text-white/40 hover:text-white/60 text-xs transition-colors"
+                        className="text-text-muted hover:text-text-secondary text-xs transition-colors"
                       >
                         No
                       </button>
@@ -525,7 +525,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
                   ) : (
                     <button
                       onClick={() => setConfirmDelete(i)}
-                      className="text-white/30 hover:text-white/60 transition-colors ml-3 p-1 rounded-lg hover:bg-white/[0.06]"
+                      className="text-text-muted hover:text-text-secondary transition-colors ml-3 p-1 rounded-lg hover:bg-[rgba(168,152,128,0.08)]"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -543,8 +543,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       {step === 2 && (
         <div className="space-y-8">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Your Class</h2>
-            <p className="text-white/50 text-sm">Tell us about your class and teacher.</p>
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Your Class</h2>
+            <p className="text-text-muted text-sm">Tell us about your class and teacher.</p>
           </div>
 
           <SingleSelect
@@ -590,8 +590,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       {step === 3 && (
         <div className="space-y-8">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">About You</h2>
-            <p className="text-white/50 text-sm">Help us match your writing level and habits.</p>
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">About You</h2>
+            <p className="text-text-muted text-sm">Help us match your writing level and habits.</p>
           </div>
 
           <SingleSelect
@@ -683,10 +683,10 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       {step === 4 && level === 2 && (
         <div className="space-y-8">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Enhanced Profile</h2>
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Enhanced Profile</h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light font-medium">Level 2</span>
-              <p className="text-white/50 text-sm">Deeper questions for the most accurate voice match.</p>
+              <p className="text-text-muted text-sm">Deeper questions for the most accurate voice match.</p>
             </div>
           </div>
 
@@ -759,8 +759,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       {step === steps.length - 1 && (
         <div className="space-y-6">
           <div>
-            <h2 className="font-display text-lg font-semibold text-white mb-1">Review & Save</h2>
-            <p className="text-white/60 text-sm">
+            <h2 className="font-display text-lg font-semibold text-text-primary mb-1">Review & Save</h2>
+            <p className="text-text-secondary text-sm">
               {analyzing
                 ? "Analyzing your writing style..."
                 : "We'll analyze your writing samples and build a style fingerprint when you save."}
@@ -781,16 +781,16 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
           {/* Collapsible Profile Summary */}
           <button
             onClick={() => setReviewExpanded(!reviewExpanded)}
-            className="w-full flex items-center justify-between bg-white/[0.04] border border-white/[0.08] rounded-xl px-5 py-4 transition-colors hover:bg-white/[0.06]"
+            className="w-full flex items-center justify-between bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] rounded-xl px-5 py-4 transition-colors hover:bg-[rgba(168,152,128,0.08)]"
           >
             <div className="flex items-center gap-3">
-              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" />
               </svg>
-              <span className="text-sm text-white/70">Your responses</span>
-              <span className="text-xs text-white/30">{level === 2 ? "12 questions" : "8 questions"}</span>
+              <span className="text-sm text-text-secondary">Your responses</span>
+              <span className="text-xs text-text-muted">{level === 2 ? "12 questions" : "8 questions"}</span>
             </div>
-            <svg className={`w-4 h-4 text-white/40 transition-transform ${reviewExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className={`w-4 h-4 text-text-muted transition-transform ${reviewExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
             </svg>
           </button>
@@ -809,7 +809,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               <ReviewItem label="Habits" value={[...self.writingHabits, self.writingHabitsOther].filter(Boolean).join(", ")} />
               {level === 2 && (
                 <>
-                  <div className="border-t border-white/[0.08] pt-2 mt-2">
+                  <div className="border-t border-[rgba(168,152,128,0.15)] pt-2 mt-2">
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light font-medium">Level 2</span>
                   </div>
                   <ReviewItem label="Quote intros" value={[...(self.quoteIntroStyle ?? []), self.quoteIntroOther].filter(Boolean).join(", ")} />
@@ -824,10 +824,10 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between mt-8 pt-6 border-t border-white/[0.08]">
+      <div className="flex justify-between mt-8 pt-6 border-t border-[rgba(168,152,128,0.15)]">
         <button
           onClick={() => step === 0 ? router.back() : setStep(step - 1)}
-          className="text-sm text-white/40 hover:text-white transition-colors"
+          className="text-sm text-text-muted hover:text-text-primary transition-colors"
         >
           Back
         </button>
@@ -869,9 +869,9 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
 
 function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-white/[0.08] rounded-xl px-4 py-3">
-      <span className="text-white/40 text-xs">{label}</span>
-      <p className="text-white/80 text-sm mt-0.5">{value || "Not set"}</p>
+    <div className="border border-[rgba(168,152,128,0.15)] rounded-xl px-4 py-3">
+      <span className="text-text-muted text-xs">{label}</span>
+      <p className="text-text-primary text-sm mt-0.5">{value || "Not set"}</p>
     </div>
   );
 }
@@ -976,7 +976,7 @@ function WriterTypePrediction({
   const writerType = getWriterType(gradeRange, revision, evidence, conclusion, wordCount, habits);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-accent/10 via-white/[0.04] to-white/[0.02] p-6">
+    <div className="relative overflow-hidden rounded-2xl border border-[rgba(168,152,128,0.15)] bg-gradient-to-br from-accent/10 via-white/[0.04] to-white/[0.02] p-6">
       {/* Decorative glow */}
       <div className="absolute -top-12 -right-12 w-32 h-32 bg-accent/20 rounded-full blur-3xl" />
 
@@ -988,18 +988,18 @@ function WriterTypePrediction({
             </svg>
           </div>
           <div>
-            <p className="text-white/40 text-xs uppercase tracking-wider">Your writer type</p>
-            <h3 className="text-lg font-display font-semibold text-white">{writerType.title}</h3>
+            <p className="text-text-muted text-xs uppercase tracking-wider">Your writer type</p>
+            <h3 className="text-lg font-display font-semibold text-text-primary">{writerType.title}</h3>
           </div>
         </div>
 
-        <p className="text-sm text-white/60 leading-relaxed">{writerType.description}</p>
+        <p className="text-sm text-text-secondary leading-relaxed">{writerType.description}</p>
 
         <div className="flex flex-wrap gap-2">
           {writerType.traits.map((trait) => (
             <span
               key={trait}
-              className="text-xs px-3 py-1 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/50"
+              className="text-xs px-3 py-1 rounded-full bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] text-text-muted"
             >
               {trait}
             </span>

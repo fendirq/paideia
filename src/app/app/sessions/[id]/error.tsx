@@ -11,7 +11,7 @@ export default function SessionError({ reset }: { reset: () => void }) {
       </p>
       <button
         onClick={reset}
-        className="bg-accent hover:bg-accent-light text-white font-display text-sm font-medium rounded-xl px-5 py-2.5 transition-colors"
+        className="bg-accent hover:bg-accent-light text-[#281c14] font-display text-sm font-medium rounded-xl px-5 py-2.5 transition-colors"
       >
         Try again
       </button>

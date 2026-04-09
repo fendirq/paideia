@@ -7,7 +7,7 @@ interface StatCardProps {
 
 export function StatCard({ value, label, sublabel, trend }: StatCardProps) {
   return (
-    <div className="bg-bg-inner border border-white/[0.04] rounded-[14px] p-5">
+    <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[14px] p-5">
       <div className="flex items-start justify-between">
         <p className="font-display font-bold text-[32px] text-text-primary">
           {value}

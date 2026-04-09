@@ -21,8 +21,8 @@ export function HelpTypeSelect({ inquiryId, subject, onClose }: HelpTypeSelectPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-bg-surface border border-white/[0.06] rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,25,20,0.70)] backdrop-blur-sm">
+      <div className="bg-bg-surface border border-[rgba(168,152,128,0.15)] rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-1">
             <h2 className="font-display font-semibold text-lg">How can I help?</h2>
@@ -46,7 +46,7 @@ export function HelpTypeSelect({ inquiryId, subject, onClose }: HelpTypeSelectPr
               className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all ${
                 loading === ht.value
                   ? "border-accent bg-accent/10"
-                  : "border-white/[0.06] hover:border-accent/30 hover:bg-bg-elevated/50"
+                  : "border-[rgba(168,152,128,0.15)] hover:border-accent/30 hover:bg-bg-elevated/50"
               } disabled:opacity-60`}
             >
               <p className="text-sm font-medium text-text-primary">{ht.label}</p>

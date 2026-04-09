@@ -30,12 +30,33 @@ export default withAuth(
       authorized({ token, req }) {
         const { pathname } = req.nextUrl;
 
-        // Allow public pages for everyone
-        if (pathname === "/login" || pathname === "/signup") return true;
+        // Waitlist page is always public
+        if (pathname === "/waitlist") return true;
+
+        // Login/signup require waitlist access (if WAITLIST_CODE is configured)
+        if (pathname === "/login" || pathname === "/signup") {
+          if (process.env.WAITLIST_CODE) {
+            const waitlistCookie = req.cookies.get("waitlist_access");
+            if (waitlistCookie?.value !== "granted") {
+              return false; // redirects to pages.signIn ("/")
+            }
+          }
+          return true;
+        }
 
         // Admin routes require ADMIN role
         if (pathname.startsWith("/app/admin")) {
           return token?.role === "ADMIN";
+        }
+
+        // Teacher routes require TEACHER or ADMIN role
+        if (pathname.startsWith("/app/teacher")) {
+          return token?.role === "TEACHER" || token?.role === "ADMIN";
+        }
+
+        // Student routes require STUDENT role (or ADMIN)
+        if (pathname.startsWith("/app/classes")) {
+          return token?.role === "STUDENT" || token?.role === "ADMIN";
         }
 
         // Protect /app/*, /onboarding, and /portal/* routes
@@ -52,7 +73,7 @@ export default withAuth(
       },
     },
     pages: {
-      signIn: "/",
+      signIn: "/waitlist",
     },
   }
 );

@@ -93,7 +93,7 @@ export function PinInput() {
             onKeyDown={(e) => handleKeyDown(i, e)}
             disabled={loading}
             autoFocus={i === 0}
-            className="w-12 h-14 text-center text-xl font-mono bg-white/[0.06] border border-white/[0.1] rounded-xl text-text-primary focus:outline-none focus:border-accent/60 transition-colors disabled:opacity-50"
+            className="w-12 h-14 text-center text-xl font-mono bg-[rgba(168,152,128,0.06)] border border-[rgba(168,152,128,0.15)] rounded-xl text-text-primary focus:outline-none focus:border-accent/60 transition-colors disabled:opacity-50"
           />
         ))}
       </div>

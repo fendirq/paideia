@@ -76,13 +76,13 @@ export function FileCabinet({
         <div className="flex gap-6 min-h-[500px]">
           {/* Left: File list */}
           <div className="w-72 shrink-0">
-            <div className="bg-bg-surface/50 border border-white/[0.04] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.04]">
+            <div className="bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.12)] rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[rgba(168,152,128,0.12)]">
                 <h2 className="text-sm font-display font-semibold text-text-secondary">
                   Files ({files.length})
                 </h2>
               </div>
-              <div className="divide-y divide-white/[0.03]">
+              <div className="divide-y divide-[rgba(168,152,128,0.08)]">
                 {files.map((file) => (
                   <button
                     key={file.id}
@@ -121,15 +121,15 @@ export function FileCabinet({
           </div>
 
           {/* Right: File preview */}
-          <div className="flex-1 bg-bg-surface/50 border border-white/[0.04] rounded-xl overflow-hidden">
+          <div className="flex-1 bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.12)] rounded-xl overflow-hidden">
             {/* Start Session CTA */}
-            <div className="px-6 py-4 border-b border-white/[0.04] flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-[rgba(168,152,128,0.12)] flex items-center justify-between">
               <h2 className="text-sm font-display font-semibold text-text-secondary">
                 {selectedFile?.fileName ?? "Select a file"}
               </h2>
               <button
                 onClick={() => setShowHelpSelect(true)}
-                className="bg-accent border-2 border-accent-light rounded-full px-5 py-2 text-sm font-medium text-white shadow-[0_0_20px_rgba(74,157,91,0.3)] hover:bg-accent-light transition-colors"
+                className="bg-accent border-2 border-accent-light rounded-full px-5 py-2 text-sm font-medium text-[#281c14] shadow-[0_0_20px_rgba(168,152,128,0.25)] hover:bg-accent-light transition-colors"
               >
                 Start Session
               </button>
@@ -207,7 +207,7 @@ function NotesField({ inquiryId, defaultNotes }: { inquiryId: string; defaultNot
         maxLength={5000}
         rows={3}
         placeholder="Add notes about this student's progress..."
-        className="w-full max-w-lg bg-bg-surface border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none"
+        className="w-full max-w-lg bg-bg-surface border border-[rgba(168,152,128,0.15)] rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none"
       />
     </>
   );

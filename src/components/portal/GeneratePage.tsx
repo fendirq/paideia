@@ -141,7 +141,7 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="font-display text-2xl font-bold text-white mb-1">
+          <h1 className="font-display text-2xl font-bold text-text-primary mb-1">
             Generate — {subjectLabel}
           </h1>
         </div>
@@ -149,13 +149,13 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
         {/* Assignment input */}
         <div className="glass p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Assignment Prompt
             </label>
             {/* File upload drop zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-white/20 hover:border-white/40 rounded-xl p-6 text-center cursor-pointer transition-colors mb-3"
+              className="border-2 border-dashed border-[rgba(168,152,128,0.20)] hover:border-[rgba(168,152,128,0.40)] rounded-xl p-6 text-center cursor-pointer transition-colors mb-3"
             >
               <input
                 ref={fileInputRef}
@@ -168,13 +168,13 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
                 }}
                 className="hidden"
               />
-              <svg className="w-8 h-8 mx-auto mb-2 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="w-8 h-8 mx-auto mb-2 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
               </svg>
-              <p className="text-white text-sm font-medium">
+              <p className="text-text-primary text-sm font-medium">
                 {uploading ? "Extracting text..." : "Upload assignment file"}
               </p>
-              <p className="text-white/40 text-xs mt-1">PDF or DOCX</p>
+              <p className="text-text-muted text-xs mt-1">PDF or DOCX</p>
             </div>
             {assignment && (
               <div className="relative">
@@ -182,11 +182,11 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
                   value={assignment}
                   onChange={(e) => setAssignment(e.target.value)}
                   rows={4}
-                  className="input-field font-serif resize-y text-white"
+                  className="input-field font-serif resize-y text-text-primary"
                 />
                 <button
                   onClick={() => setAssignment("")}
-                  className="absolute top-2 right-2 text-white/30 hover:text-white/60 transition-colors"
+                  className="absolute top-2 right-2 text-text-muted hover:text-text-secondary transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -198,12 +198,12 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
 
           <div>
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-2">
+              <label className="block text-sm font-medium text-text-secondary mb-2">
                 Rubric / Requirements
               </label>
               <div
                 onClick={() => !requirements && rubricInputRef.current?.click()}
-                className={`border-2 border-dashed border-white/20 hover:border-white/40 rounded-xl p-3 text-center cursor-pointer transition-colors ${requirements ? "border-solid border-white/[0.06]" : ""}`}
+                className={`border-2 border-dashed border-[rgba(168,152,128,0.20)] hover:border-[rgba(168,152,128,0.40)] rounded-xl p-3 text-center cursor-pointer transition-colors ${requirements ? "border-solid border-[rgba(168,152,128,0.15)]" : ""}`}
               >
                 <input
                   ref={rubricInputRef}
@@ -238,12 +238,12 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
                       value={requirements}
                       onChange={(e) => setRequirements(e.target.value)}
                       rows={2}
-                      className="input-field font-serif resize-y text-white text-xs border-0 p-0 bg-transparent"
+                      className="input-field font-serif resize-y text-text-primary text-xs border-0 p-0 bg-transparent"
                       onClick={(e) => e.stopPropagation()}
                     />
                     <button
                       onClick={(e) => { e.stopPropagation(); setRequirements(""); }}
-                      className="absolute top-0 right-0 text-white/30 hover:text-white/60 transition-colors"
+                      className="absolute top-0 right-0 text-text-muted hover:text-text-secondary transition-colors"
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -252,10 +252,10 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
                   </div>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 mx-auto mb-1 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-5 h-5 mx-auto mb-1 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
                     </svg>
-                    <p className="text-white/40 text-xs">
+                    <p className="text-text-muted text-xs">
                       {uploadingRubric ? "Extracting..." : "Upload rubric"}
                     </p>
                   </>
@@ -274,10 +274,10 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-display font-semibold text-white">Level 1</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">Standard</span>
+              <span className="text-sm font-display font-semibold text-text-primary">Level 1</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted">Standard</span>
             </div>
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-text-muted">
               Single-pass generation using your profile and samples. Fast and reliable.
             </p>
           </button>
@@ -293,16 +293,16 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
           >
             <div className="flex items-center gap-2 mb-2">
               {!hasLevel2 && (
-                <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                 </svg>
               )}
-              <span className="text-sm font-display font-semibold text-white">Level 2</span>
+              <span className="text-sm font-display font-semibold text-text-primary">Level 2</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">
                 {hasLevel2 ? "Enhanced" : "Unlock"}
               </span>
             </div>
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-text-muted">
               {hasLevel2
                 ? "Two-pass: analyzes your style fingerprint first, then generates. More accurate but slower."
                 : "Unlock enhanced generation powered by Claude Sonnet 4."}
@@ -323,25 +323,25 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
         <div className="space-y-2">
           <Link
             href={`/portal/${subject}/history`}
-            className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-[rgba(168,152,128,0.15)] bg-[rgba(168,152,128,0.04)] hover:bg-[rgba(168,152,128,0.08)] transition-all"
           >
-            <svg className="w-4 h-4 text-white/30 group-hover:text-white/50 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-4 h-4 text-text-muted group-hover:text-text-muted transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-            <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors flex-1">Past Assignments</span>
-            <svg className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <span className="text-sm text-text-muted group-hover:text-text-secondary transition-colors flex-1">Past Assignments</span>
+            <svg className="w-4 h-4 text-text-muted/50 group-hover:text-text-muted group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
           </Link>
           <Link
             href="/portal/aggregate"
-            className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-[rgba(168,152,128,0.15)] bg-[rgba(168,152,128,0.04)] hover:bg-[rgba(168,152,128,0.08)] transition-all"
           >
-            <svg className="w-4 h-4 text-white/30 group-hover:text-white/50 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-4 h-4 text-text-muted group-hover:text-text-muted transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z" />
             </svg>
-            <span className="text-sm text-white/50 group-hover:text-white/70 transition-colors flex-1">Writing Profile</span>
-            <svg className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <span className="text-sm text-text-muted group-hover:text-text-secondary transition-colors flex-1">Writing Profile</span>
+            <svg className="w-4 h-4 text-text-muted/50 group-hover:text-text-muted group-hover:translate-x-0.5 transition-all shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
           </Link>

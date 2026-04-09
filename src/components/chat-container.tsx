@@ -6,6 +6,7 @@ import { ActionPanel } from "./action-panel";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { stripThinkingTags } from "@/lib/strip-thinking";
 import { parseActionsFromResponse, splitActions } from "@/lib/parse-actions";
+import { useHeartbeat } from "@/lib/use-heartbeat";
 
 interface Message {
   id?: string;
@@ -34,6 +35,8 @@ export function ChatContainer({
   inquiry,
   helpType,
 }: ChatContainerProps) {
+  useHeartbeat(sessionId);
+
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -349,7 +352,7 @@ export function ChatContainer({
       </div>
 
       {/* Action panel + Input area */}
-      <div className="border-t border-white/[0.04]">
+      <div className="border-t border-[rgba(168,152,128,0.12)]">
         <div className="max-w-3xl mx-auto px-6 py-4">
           {showWelcome && !isStreaming && (
             <ActionPanel
@@ -385,12 +388,12 @@ export function ChatContainer({
                 maxLength={2000}
                 rows={1}
                 disabled={isStreaming}
-                className="flex-1 bg-bg-base border border-white/[0.06] rounded-2xl px-5 py-3.5 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-serif"
+                className="flex-1 bg-bg-base border border-[rgba(168,152,128,0.15)] rounded-2xl px-5 py-3.5 text-[15px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 resize-none disabled:opacity-50 font-serif"
               />
               <button
                 type="submit"
                 disabled={isStreaming || !input.trim()}
-                className="bg-accent hover:bg-accent-light text-bg-base rounded-2xl px-4 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="bg-accent hover:bg-accent-light text-[#281c14] rounded-2xl px-4 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <svg
                   className="w-5 h-5"

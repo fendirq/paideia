@@ -11,7 +11,7 @@ export async function GET() {
 
   const all = await db.inquiry.findMany({
     where: { userId: session.user.id },
-    select: { id: true, unitName: true, teacherNotes: true },
+    select: { id: true, unitName: true, teacherName: true, subject: true, teacherNotes: true },
     orderBy: { updatedAt: "desc" },
   });
 

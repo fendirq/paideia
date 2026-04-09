@@ -11,7 +11,7 @@ interface ProblemBoxProps {
 
 export function ProblemBox({ label = "PROBLEM", content }: ProblemBoxProps) {
   return (
-    <div className="bg-bg-surface/70 border border-white/[0.06] border-l-[3px] border-l-accent rounded-xl px-5 py-4 my-4">
+    <div className="bg-bg-surface/70 border border-[rgba(168,152,128,0.15)] border-l-[3px] border-l-accent rounded-xl px-5 py-4 my-4">
       <p className="font-display font-semibold text-[11px] uppercase tracking-wider text-accent-light mb-3">
         {label}
       </p>

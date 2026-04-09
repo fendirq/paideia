@@ -277,7 +277,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
               className={`w-full text-left px-4 py-3 rounded-[12px] border transition-all ${
                 isSelected
                   ? "border-accent/40 bg-accent/[0.06]"
-                  : "border-white/[0.04] bg-bg-inner hover:border-white/[0.08]"
+                  : "border-[rgba(168,152,128,0.12)] bg-bg-inner hover:border-[rgba(168,152,128,0.20)]"
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
@@ -302,7 +302,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
           className={`w-full px-4 py-3 rounded-[12px] border-2 border-dashed transition-all text-center ${
             showNewForm && !selectedClassId
               ? "border-accent/40 text-accent"
-              : "border-white/[0.06] text-text-muted hover:border-white/[0.1] hover:text-text-secondary"
+              : "border-[rgba(168,152,128,0.15)] text-text-muted hover:border-[rgba(168,152,128,0.35)] hover:text-text-secondary"
           }`}
         >
           <span className="font-display text-[13px] font-medium">
@@ -314,7 +314,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
       {/* Right panel — form */}
       <div className="flex-1">
         {!showNewForm && !selectedClass ? (
-          <div className="bg-bg-inner border border-white/[0.04] rounded-[16px] p-12 text-center">
+          <div className="bg-bg-inner border border-[rgba(168,152,128,0.12)] rounded-[16px] p-12 text-center">
             <p className="text-text-muted text-[14px]">
               Select a class or add a new one to upload coursework.
             </p>
@@ -341,7 +341,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
                       value={teacherName}
                       onChange={(e) => setTeacherName(e.target.value)}
                       placeholder="e.g. Ms. Johnson"
-                      className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                      className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
                     />
                   </div>
                   <div>
@@ -353,7 +353,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
                       value={unitName}
                       onChange={(e) => setUnitName(e.target.value)}
                       placeholder="e.g. Integration by Parts"
-                      className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                      className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
                     />
                   </div>
                 </div>
@@ -396,7 +396,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
                     ? "Describe the course or class this material is for..."
                     : "Describe what you're having trouble with..."
                 }
-                className="w-full bg-bg-surface/50 border border-white/[0.06] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors resize-none"
+                className="w-full bg-[rgba(35,28,20,0.50)] border border-[rgba(168,152,128,0.15)] rounded-[12px] px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors resize-none"
               />
             </div>
 
@@ -416,7 +416,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
                 className={`border-2 border-dashed rounded-[12px] p-6 text-center cursor-pointer transition-colors ${
                   dragOver
                     ? "border-accent bg-accent/5"
-                    : "border-white/[0.06] hover:border-white/[0.1]"
+                    : "border-[rgba(168,152,128,0.15)] hover:border-[rgba(168,152,128,0.35)]"
                 }`}
               >
                 <svg
@@ -453,7 +453,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
                   {files.map((f, i) => (
                     <div
                       key={f.key}
-                      className="flex items-center justify-between bg-bg-surface/50 rounded-[10px] px-3 py-2 border border-white/[0.04]"
+                      className="flex items-center justify-between bg-[rgba(35,28,20,0.50)] rounded-[10px] px-3 py-2 border border-[rgba(168,152,128,0.12)]"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[13px] text-text-primary truncate">
@@ -510,7 +510,7 @@ export function UploadForm({ userRole, existingClasses, preselectedClassId }: Up
             <button
               type="submit"
               disabled={submitting || files.length === 0}
-              className="w-full bg-accent hover:bg-accent/90 text-white font-display text-[14px] font-semibold rounded-[12px] px-5 py-3.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-accent hover:bg-accent/90 text-[#281c14] font-display text-[14px] font-semibold rounded-[12px] px-5 py-3.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting
                 ? "Processing..."

@@ -88,7 +88,7 @@ export default async function AnalyticsPage() {
   // Donut data
   const subjectCounts = new Map<string, number>();
   for (const s of totalSessions) {
-    const subj = s.inquiry.subject;
+    const subj = s.inquiry?.subject ?? "Unknown";
     subjectCounts.set(subj, (subjectCounts.get(subj) ?? 0) + 1);
   }
   const donutSegments = Array.from(subjectCounts.entries()).map(
@@ -136,10 +136,10 @@ export default async function AnalyticsPage() {
     completed: item.status === "PRACTICED",
   }));
 
-  const uniqueSubjects = new Set(totalSessions.map((s) => s.inquiry.subject));
+  const uniqueSubjects = new Set(totalSessions.map((s) => s.inquiry?.subject ?? "Unknown"));
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 mt-4 mb-8 bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[20px]">
+    <div className="max-w-4xl mx-auto px-6 py-8 mt-4 mb-8 bg-[rgba(40,32,24,0.55)] backdrop-blur-2xl border border-[rgba(168,152,128,0.15)] rounded-[20px]">
       <BackButton href="/app" />
       <h1 className="font-serif text-[34px] text-text-primary mb-2">
         Analytics
