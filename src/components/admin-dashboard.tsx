@@ -2,7 +2,7 @@
 
 interface WaitlistEntry {
   id: string;
-  phone: string;
+  email: string;
   createdAt: string;
 }
 
@@ -74,7 +74,7 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
                 <thead>
                   <tr className="border-b border-[rgba(168,152,128,0.12)]">
                     <th className="text-left px-5 py-3 text-text-muted font-display text-xs uppercase tracking-wide">
-                      Phone
+                      Email
                     </th>
                     <th className="text-left px-5 py-3 text-text-muted font-display text-xs uppercase tracking-wide">
                       Joined
@@ -84,8 +84,8 @@ export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) 
                 <tbody>
                   {waitlistEntries.map((entry) => (
                     <tr key={entry.id} className="border-b border-[rgba(168,152,128,0.12)] last:border-0">
-                      <td className="px-5 py-3 text-sm text-text-secondary font-mono">
-                        {formatPhone(entry.phone)}
+                      <td className="px-5 py-3 text-sm text-text-secondary">
+                        {entry.email}
                       </td>
                       <td className="px-5 py-3 text-sm text-text-muted">
                         {formatDate(entry.createdAt)}
