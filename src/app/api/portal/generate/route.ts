@@ -7,17 +7,18 @@ import {
   buildLevel1Prompt,
   buildLevel2OutlinePrompt,
   buildLevel2GenerationPrompt,
+  buildRefinementPrompt,
   buildLegacyLevel1Prompt,
+  normalizeFingerprint,
 } from "@/lib/essay-generator";
 import type {
-  StyleFingerprint,
   TeacherProfile,
   SelfAssessment,
   GenerateOptions,
   LegacyGenerateOptions,
 } from "@/lib/essay-generator";
 
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 const LEVEL1_MODEL = "deepseek-ai/DeepSeek-V3";
@@ -42,8 +43,8 @@ export async function POST(req: Request) {
   if (!assignment?.trim()) {
     return NextResponse.json({ error: "Assignment is required" }, { status: 400 });
   }
-  if (typeof wordCount !== "number" || wordCount < 100 || wordCount > 5000) {
-    return NextResponse.json({ error: "Word count must be between 100 and 5000" }, { status: 400 });
+  if (typeof wordCount !== "number" || wordCount < 250 || wordCount > 2000) {
+    return NextResponse.json({ error: "Word count must be between 250 and 2000" }, { status: 400 });
   }
   if (typeof level !== "number" || (level !== 1 && level !== 2)) {
     return NextResponse.json({ error: "Invalid level" }, { status: 400 });
@@ -77,9 +78,13 @@ export async function POST(req: Request) {
   }
 
   const sampleData = samples.map((s) => ({ label: s.label, content: s.content }));
-  const fingerprint = profile.styleFingerprint as StyleFingerprint | null;
+  const rawFingerprint = profile.styleFingerprint as Record<string, unknown> | null;
 
-  if (fingerprint) {
+  if (rawFingerprint) {
+    if (!profile.teacherProfile || !profile.selfAssessment) {
+      return NextResponse.json({ error: "Incomplete profile. Please update your writing profile." }, { status: 400 });
+    }
+    const fingerprint = normalizeFingerprint(rawFingerprint);
     const tp = profile.teacherProfile as unknown as TeacherProfile;
     const sa = profile.selfAssessment as unknown as SelfAssessment;
 
@@ -222,23 +227,63 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
 
   const anthropic = new Anthropic({ apiKey });
 
-  // Step 1: Generate outline (non-streaming)
-  const outlinePrompt = buildLevel2OutlinePrompt(opts);
-  const outlineMsg = await anthropic.messages.create({
-    model: LEVEL2_MODEL,
-    max_tokens: 1024,
-    temperature: 0.4,
-    system: "You are an essay planning assistant. Create structured outlines that match a student's writing patterns.",
-    messages: [{ role: "user", content: outlinePrompt }],
-  });
+  let outline = "";
+  let rawEssay = "";
 
-  const outline = outlineMsg.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
+  try {
+    // Step 1: Generate outline (non-streaming, 45s timeout)
+    const outlinePrompt = buildLevel2OutlinePrompt(opts);
+    const outlineMsg = await anthropic.messages.create({
+      model: LEVEL2_MODEL,
+      max_tokens: 1024,
+      temperature: 0.4,
+      system: "You are an essay planning assistant. Create structured outlines that match a student's writing patterns.",
+      messages: [{ role: "user", content: outlinePrompt }],
+    }, { signal: AbortSignal.timeout(45_000) });
 
-  // Step 2: Generate essay from outline (streaming)
-  const generationPrompt = buildLevel2GenerationPrompt(opts, outline);
+    outline = outlineMsg.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+
+    // Step 2: Generate essay from outline (non-streaming, 75s timeout)
+    const generationPrompt = buildLevel2GenerationPrompt(opts, outline);
+    const essayMsg = await anthropic.messages.create({
+      model: LEVEL2_MODEL,
+      max_tokens: 4096,
+      temperature: 0.5,
+      system: generationPrompt,
+      messages: [{ role: "user", content: "Write the essay now, following the outline." }],
+    }, { signal: AbortSignal.timeout(75_000) });
+
+    rawEssay = essayMsg.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+  } catch (err) {
+    const isTimeout = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
+    return NextResponse.json(
+      { error: isTimeout
+          ? "Generation timed out. Please try again or use a shorter assignment."
+          : "Generation failed. Please try again." },
+      { status: isTimeout ? 504 : 502 },
+    );
+  }
+
+  if (!rawEssay) {
+    return NextResponse.json(
+      { error: "Essay generation returned empty content. Please try again." },
+      { status: 502 },
+    );
+  }
+
+  // Step 3: Refinement pass — compare against fingerprint + samples, fix voice mismatches
+  const refinementPrompt = buildRefinementPrompt(
+    rawEssay,
+    opts.fingerprint,
+    opts.samples,
+    opts.selfAssessment,
+  );
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -247,10 +292,10 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
         const messageStream = anthropic.messages.stream({
           model: LEVEL2_MODEL,
           max_tokens: 4096,
-          temperature: 0.5,
-          system: generationPrompt,
-          messages: [{ role: "user", content: "Write the essay now, following the outline." }],
-        });
+          temperature: 0.3,
+          system: "You are a quality control editor specializing in voice matching. Fix deviations from the student's real writing voice. Do not add polish or sophistication. Return only the corrected essay.",
+          messages: [{ role: "user", content: refinementPrompt }],
+        }, { signal: AbortSignal.timeout(55_000) });
 
         for await (const event of messageStream) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
@@ -262,7 +307,10 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
 
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       } catch (err) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
+        const msg = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")
+          ? "Refinement timed out. Please try again."
+          : "Refinement failed. Please try again.";
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       } finally {
         controller.close();

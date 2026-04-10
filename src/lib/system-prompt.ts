@@ -98,13 +98,19 @@ export function buildSystemPrompt(context: PromptContext): string {
   const safeTeacher = sanitize(context.teacherName, 100);
   const safeDescription = sanitize(context.description, 2000);
 
-  const ragContext =
-    context.ragChunks.length > 0
-      ? `\n\n## Uploaded Material Context\nThe student uploaded coursework about "${safeUnit}" in ${context.subject} (teacher: ${safeTeacher}). They described their struggle as: "${safeDescription}"\n\nRelevant excerpts from their uploaded materials:\n${context.ragChunks.map((c, i) => `[Excerpt ${i + 1}]: ${sanitize(c.content, 4000)}`).join("\n\n")}`
-      : "";
+  const hasFiles = context.ragChunks.length > 0;
+  const ragContext = hasFiles
+    ? `\n\n## Uploaded Material Context\nThe student uploaded coursework about "${safeUnit}" in ${context.subject} (teacher: ${safeTeacher}).${safeDescription ? ` They described their struggle as: "${safeDescription}"` : ""}\n\nRelevant excerpts from their uploaded materials:\n${context.ragChunks.map((c, i) => `[Excerpt ${i + 1}]: ${sanitize(c.content, 4000)}`).join("\n\n")}`
+    : "";
 
-  const helpTypeContext = context.helpType
-    ? `\nHelp type requested: ${context.helpType}`
+  const safeHelpType = context.helpType ? sanitize(context.helpType, 500) : "";
+
+  const helpTypeContext = safeHelpType
+    ? `\n\n## Student's Primary Goal\nThe student's stated goal is: "${safeHelpType}"\nYour FIRST response MUST directly address this goal. If uploaded material is available, immediately present relevant content from their files that relates to this goal. Do not ask them to restate their problem.`
+    : "";
+
+  const fileFirstResponse = hasFiles
+    ? `\n\n## First Response Rule\nWhen this is the first message in a conversation with uploaded files, you MUST:\n1. Quote or reference a specific passage from the uploaded excerpts\n2. Use it to frame your opening question or discussion point\n3. Show the student you've read their material — never give a generic greeting`
     : "";
 
   const subjectSections = buildSubjectSections(group);
@@ -133,8 +139,7 @@ ${subjectSections}
 ## Subject Context
 Subject: ${context.subject}
 Unit/Topic: ${safeUnit}
-Teacher: ${safeTeacher}
-Student's stated struggle: "${safeDescription}"${helpTypeContext}
+Teacher: ${safeTeacher}${helpTypeContext}${fileFirstResponse}
 ${ragContext}
 
 ## Response Format — ACTIONS (CRITICAL)
@@ -151,5 +156,7 @@ RULES:
 - Separator must be exactly: ---ACTIONS---
 - PLAIN TEXT only. NO $, NO backslashes, NO LaTeX in actions.
 - Use ^ for exponents and sqrt() for roots in action text.
-- ALWAYS exactly 3 choices.`;
+- ALWAYS exactly 3 choices.
+- Actions MUST reference specific content from the conversation (uploaded excerpts, topics discussed, student's answers). NEVER use generic filler like "Help me with: Fall 2026" or vague placeholders.
+- Each action should feel like a natural next step the student would actually want to take.`;
 }

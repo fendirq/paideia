@@ -4,11 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { buildStyleAnalysisPrompt } from "@/lib/essay-generator";
 import { Prisma } from "@/generated/prisma/client";
+import Anthropic from "@anthropic-ai/sdk";
 
-export const maxDuration = 60;
-
-const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
-const ANALYSIS_MODEL = "deepseek-ai/DeepSeek-R1";
+export const maxDuration = 90;
 
 interface SampleInput {
   label: string;
@@ -24,37 +22,23 @@ interface AggregateBody {
 }
 
 async function analyzeStyle(samples: { label: string; content: string }[]): Promise<Prisma.InputJsonValue | null> {
-  const apiKey = process.env.TOGETHER_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || !samples.length) return null;
 
   const prompt = buildStyleAnalysisPrompt(samples);
+  const anthropic = new Anthropic({ apiKey });
 
   try {
-    const res = await fetch(TOGETHER_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: ANALYSIS_MODEL,
-        messages: [
-          { role: "system", content: "You are a writing style analyst. Return only valid JSON, no markdown fencing." },
-          { role: "user", content: prompt },
-        ],
-        stream: false,
-        max_tokens: 16000,
-        temperature: 0.3,
-      }),
-    });
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 8000,
+      temperature: 0.2,
+      system: "You are a forensic writing analyst. Extract granular patterns from student writing samples. Every claim must cite specific words, phrases, or patterns directly from the text. Return only valid JSON.",
+      messages: [{ role: "user", content: prompt }],
+    }, { signal: AbortSignal.timeout(55_000) });
 
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    let content = data.choices?.[0]?.message?.content ?? "";
-
-    // DeepSeek-R1 wraps answers in <think>...</think> tags — strip them
-    content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    let content = response.content.length > 0 && response.content[0].type === "text"
+      ? response.content[0].text : "";
 
     // Strip markdown code fences if present
     content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
@@ -97,33 +81,44 @@ export async function POST(req: Request) {
   const userId = session.user.id;
 
   // Save profile + samples in a transaction
-  await db.$transaction(async (tx) => {
-    await tx.writingProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        level: profileLevel,
-        teacherProfile,
-        selfAssessment,
-      },
-      update: {
-        level: profileLevel,
-        teacherProfile,
-        selfAssessment,
-        writingStyle: Prisma.JsonNull, // clear legacy field
-      },
-    });
+  if (!teacherProfile || typeof teacherProfile !== "object" || Array.isArray(teacherProfile)) {
+    return NextResponse.json({ error: "Invalid teacher profile data" }, { status: 400 });
+  }
+  if (!selfAssessment || typeof selfAssessment !== "object" || Array.isArray(selfAssessment)) {
+    return NextResponse.json({ error: "Invalid self-assessment data" }, { status: 400 });
+  }
 
-    await tx.writingSample.deleteMany({ where: { userId } });
-    await tx.writingSample.createMany({
-      data: samples.map((s) => ({
-        userId,
-        label: s.label,
-        content: s.content,
-        wordCount: s.wordCount,
-      })),
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.writingProfile.upsert({
+        where: { userId },
+        create: {
+          userId,
+          level: profileLevel,
+          teacherProfile,
+          selfAssessment,
+        },
+        update: {
+          level: profileLevel,
+          teacherProfile,
+          selfAssessment,
+          writingStyle: Prisma.JsonNull, // clear legacy field
+        },
+      });
+
+      await tx.writingSample.deleteMany({ where: { userId } });
+      await tx.writingSample.createMany({
+        data: samples.map((s) => ({
+          userId,
+          label: s.label,
+          content: s.content,
+          wordCount: s.wordCount,
+        })),
+      });
     });
-  });
+  } catch {
+    return NextResponse.json({ error: "Failed to save profile. Please try again." }, { status: 500 });
+  }
 
   // Run style analysis in parallel (non-blocking for the save)
   // but we wait for it so the user sees "Analyzing..." state

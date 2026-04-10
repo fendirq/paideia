@@ -1,7 +1,7 @@
 export { parseActionsFromResponse } from "./parse-actions";
 
 const TOGETHER_CHAT_URL = "https://api.together.xyz/v1/chat/completions";
-const DEFAULT_MODEL = "deepseek-ai/DeepSeek-R1";
+const DEFAULT_MODEL = "moonshotai/Kimi-K2.5";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";

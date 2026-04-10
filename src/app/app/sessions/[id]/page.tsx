@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { ChatContainer } from "@/components/chat-container";
 import { SocraticBanner } from "@/components/socratic-banner";
+import { getTopicPreviews } from "@/lib/rag-retrieval";
 import Link from "next/link";
 
 export default async function SessionPage({
@@ -52,6 +53,11 @@ export default async function SessionPage({
   const teacherName = tutoringSession.inquiry?.teacherName ?? mat?.class?.teacher?.name ?? "Unknown";
   const description = tutoringSession.inquiry?.description ?? mat?.description ?? "";
 
+  // Fetch topic previews from uploaded file chunks (only for new sessions with an inquiry)
+  const topicPreviews = tutoringSession.inquiryId && initialMessages.length === 0
+    ? await getTopicPreviews(tutoringSession.inquiryId, 3).catch(() => [] as string[])
+    : [];
+
   const subjectLabel = subject.charAt(0) + subject.slice(1).toLowerCase();
 
   const backHref = tutoringSession.materialId && tutoringSession.classId
@@ -97,6 +103,7 @@ export default async function SessionPage({
             description,
           }}
           helpType={tutoringSession.helpType}
+          topicPreviews={topicPreviews}
         />
       </div>
     </div>

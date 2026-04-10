@@ -10,18 +10,25 @@ export default async function HomePage() {
   if (!session.user.role) redirect("/onboarding");
   if (session.user.role === "TEACHER") redirect("/app/teacher");
 
-  const enrollments = await db.classEnrollment.findMany({
-    where: { studentId: session.user.id },
-    include: {
-      class: {
-        include: {
-          teacher: { select: { name: true } },
-          _count: { select: { enrollments: true } },
+  const [enrollments, selfDirected] = await Promise.all([
+    db.classEnrollment.findMany({
+      where: { studentId: session.user.id },
+      include: {
+        class: {
+          include: {
+            teacher: { select: { name: true } },
+            _count: { select: { enrollments: true } },
+          },
         },
       },
-    },
-    orderBy: { joinedAt: "desc" },
-  });
+      orderBy: { joinedAt: "desc" },
+    }),
+    db.inquiry.findMany({
+      where: { userId: session.user.id, teacherNotes: "add-class" },
+      include: { _count: { select: { sessions: true } } },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
 
   const enrolledClasses = enrollments.map((e) => ({
     id: e.class.id,
@@ -32,5 +39,19 @@ export default async function HomePage() {
     studentCount: e.class._count.enrollments,
   }));
 
-  return <HomeContent userName={session.user.name} enrolledClasses={enrolledClasses} />;
+  const selfDirectedClasses = selfDirected.map((inq) => ({
+    id: inq.id,
+    unitName: inq.unitName,
+    subject: inq.subject,
+    teacherName: inq.teacherName,
+    sessionCount: inq._count.sessions,
+  }));
+
+  return (
+    <HomeContent
+      userName={session.user.name}
+      enrolledClasses={enrolledClasses}
+      selfDirectedClasses={selfDirectedClasses}
+    />
+  );
 }

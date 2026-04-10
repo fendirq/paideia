@@ -88,6 +88,35 @@ async function retrieveMaterialByIndex(
   }));
 }
 
+// ─── Topic Previews (for starter prompts) ───
+
+export async function getTopicPreviews(
+  inquiryId: string,
+  limit: number = 3
+): Promise<string[]> {
+  const chunks = await db.textChunk.findMany({
+    where: { inquiryId },
+    orderBy: { chunkIndex: "asc" },
+    take: limit,
+    select: { content: true },
+  });
+
+  return chunks
+    .map((c) => {
+      // Extract first meaningful sentence (up to 120 chars)
+      const normalized = c.content.replace(/\s+/g, " ").trim();
+      // Lookbehind keeps punctuation attached, splits after sentence-ending punctuation + space
+      const firstSentence = normalized.split(/(?<=[.!?])\s/)[0] ?? "";
+      if (firstSentence.length > 120) {
+        // Truncate at nearest word boundary
+        const truncated = firstSentence.slice(0, 117).replace(/\s+\S*$/, "");
+        return truncated + "...";
+      }
+      return firstSentence;
+    })
+    .filter((s) => s.trim().length > 0);
+}
+
 // ─── Public API ───
 
 export async function retrieveRelevantChunks(

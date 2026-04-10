@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { SUBJECT_LABELS } from "@/lib/subject-constants";
 
 const SEMESTERS = ["Fall 2026", "Spring 2026"];
@@ -19,28 +18,37 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
   const [teacher, setTeacher] = useState("");
   const [semester, setSemester] = useState(SEMESTERS[0]);
   const [subject, setSubject] = useState("OTHER");
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
 
-    const res = await fetch("/api/inquiries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        unitName: className,
-        teacherName: teacher,
-        description: semester,
-        subject,
-        files: [],
-        source: "add-class",
-      }),
-    });
+    try {
+      const res = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unitName: className,
+          teacherName: teacher,
+          description: semester,
+          subject,
+          files: [],
+          source: "add-class",
+        }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      router.push(`/app/start/${data.id}`);
-      return;
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/app/start/${data.id}`);
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      setError(data?.error || `Something went wrong (${res.status})`);
+    } catch {
+      setError("Network error. Please try again.");
     }
 
     setSaving(false);
@@ -106,6 +114,10 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
             </div>
           </div>
         </div>
+
+        {error && (
+          <p className="text-red-400 text-sm">{error}</p>
+        )}
 
         <div className="flex items-center gap-3 pt-2">
           <button

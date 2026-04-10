@@ -42,6 +42,17 @@ export interface StyleFingerprint {
     toneDescription: string;
     distinctiveTraits: string[];
   };
+  rhetoric: {
+    argumentStyle: "builds-gradually" | "states-then-defends" | "comparison-based" | "narrative";
+    counterArguments: "ignores" | "brief-mention" | "addresses-directly";
+    hedgingLanguage: string[];
+    assertiveness: "tentative" | "moderate" | "confident";
+  };
+  rhythm: {
+    sentenceOpeners: string[];
+    paragraphRhythm: "uniform" | "builds-long" | "starts-long-ends-short" | "varied";
+    listUsage: "never" | "occasionally" | "frequently";
+  };
   overallAssessment: string;
 }
 
@@ -129,9 +140,17 @@ export function buildStyleAnalysisPrompt(samples: Sample[]): string {
     .map((s, i) => `--- Sample ${i + 1}: ${s.label} ---\n${s.content}`)
     .join("\n\n");
 
-  return `Analyze these writing samples from a student. Extract a comprehensive style fingerprint. Be EXTREMELY specific — cite actual words, phrases, and patterns directly from the text. Do not generalize.
+  return `Analyze these writing samples from a student. Extract a comprehensive style fingerprint. Be EXTREMELY specific — every claim must cite specific words, phrases, or patterns directly from the text. Do not generalize or infer patterns that aren't clearly demonstrated.
 
 ${sampleTexts}
+
+EXTRACTION RULES:
+- For vocabulary.signatureWords: include at least 10-15 words they use repeatedly across samples
+- For vocabulary.avoidedWords: list sophisticated words common in academic writing that this student NEVER uses
+- For transitions.favorites: list EVERY transition phrase found in the samples, not just common ones
+- For rhetoric.hedgingLanguage: list EVERY hedging/qualifying phrase found in the samples verbatim (e.g., "I think", "it seems like", "maybe", "kind of")
+- For rhythm.sentenceOpeners: list the 6-8 most common sentence-starting patterns, cited directly from text (e.g., "The…", "This shows…", "In the text…")
+- For errors: only list patterns that appear more than once — single typos are not patterns
 
 Return JSON with this exact structure:
 {
@@ -142,12 +161,12 @@ Return JSON with this exact structure:
   },
   "vocabulary": {
     "tier": "basic" | "moderate" | "advanced" | "inconsistent",
-    "signatureWords": ["<words they use often>"],
+    "signatureWords": ["<10-15 words they use often, cited from text>"],
     "avoidedWords": ["<sophisticated words they never use>"],
     "wordChoicePattern": "<e.g., uses simple verbs, rarely uses adverbs>"
   },
   "transitions": {
-    "favorites": ["<exact transitions from samples>"],
+    "favorites": ["<every transition phrase found in samples>"],
     "neverUses": ["<common transitions absent from their writing>"],
     "paragraphOpeners": ["<how they typically start paragraphs>"]
   },
@@ -176,6 +195,17 @@ Return JSON with this exact structure:
     "toneDescription": "<1-2 sentences>",
     "distinctiveTraits": ["<what makes this writer recognizable>"]
   },
+  "rhetoric": {
+    "argumentStyle": "builds-gradually" | "states-then-defends" | "comparison-based" | "narrative",
+    "counterArguments": "ignores" | "brief-mention" | "addresses-directly",
+    "hedgingLanguage": ["<every hedging/qualifying phrase from samples verbatim>"],
+    "assertiveness": "tentative" | "moderate" | "confident"
+  },
+  "rhythm": {
+    "sentenceOpeners": ["<6-8 most common sentence-starting patterns, cited from text>"],
+    "paragraphRhythm": "uniform" | "builds-long" | "starts-long-ends-short" | "varied",
+    "listUsage": "never" | "occasionally" | "frequently"
+  },
   "overallAssessment": "<2-3 sentence summary of this writer's identity>"
 }
 
@@ -192,6 +222,84 @@ function resolveValue(val: string, other: string): string {
 function formatList(items: string[], other?: string): string {
   const all = [...items, ...(other ? [other] : [])].filter(Boolean);
   return all.length ? all.join(", ") : "None specified";
+}
+
+function selectDiverseSamples(samples: Sample[], maxChars = 8000): string {
+  if (!samples.length) return "";
+  const sorted = [...samples].sort((a, b) => a.content.length - b.content.length);
+  const candidates: Sample[] = [sorted[0]];
+  if (sorted.length > 1) candidates.push(sorted[sorted.length - 1]);
+  if (sorted.length > 2) candidates.push(sorted[Math.floor(sorted.length / 2)]);
+  const kept: Sample[] = [];
+  let total = 0;
+  for (const s of candidates) {
+    if (kept.length === 0 || total + s.content.length <= maxChars) {
+      kept.push(s);
+      total += s.content.length;
+    }
+  }
+  return kept
+    .map((s, i) => `--- Reference ${i + 1}: ${s.label} ---\n${s.content}`)
+    .join("\n\n");
+}
+
+export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerprint {
+  const f = raw as Partial<StyleFingerprint>;
+  return {
+    sentencePatterns: {
+      averageLength: f.sentencePatterns?.averageLength ?? 15,
+      variation: f.sentencePatterns?.variation ?? "medium",
+      tendency: f.sentencePatterns?.tendency ?? "",
+    },
+    vocabulary: {
+      tier: f.vocabulary?.tier ?? "moderate",
+      signatureWords: f.vocabulary?.signatureWords ?? [],
+      avoidedWords: f.vocabulary?.avoidedWords ?? [],
+      wordChoicePattern: f.vocabulary?.wordChoicePattern ?? "",
+    },
+    transitions: {
+      favorites: f.transitions?.favorites ?? [],
+      neverUses: f.transitions?.neverUses ?? [],
+      paragraphOpeners: f.transitions?.paragraphOpeners ?? [],
+    },
+    structure: {
+      introPattern: f.structure?.introPattern ?? "",
+      bodyParagraphPattern: f.structure?.bodyParagraphPattern ?? "",
+      conclusionPattern: f.structure?.conclusionPattern ?? "",
+      avgParagraphLength: f.structure?.avgParagraphLength ?? 5,
+      thesisPlacement: f.structure?.thesisPlacement ?? "",
+    },
+    evidenceStyle: {
+      method: f.evidenceStyle?.method ?? "",
+      citationHabits: f.evidenceStyle?.citationHabits ?? "",
+      analysisDepth: f.evidenceStyle?.analysisDepth ?? "moderate",
+      analysisPattern: f.evidenceStyle?.analysisPattern ?? "",
+    },
+    errors: {
+      grammarPatterns: f.errors?.grammarPatterns ?? [],
+      punctuationHabits: f.errors?.punctuationHabits ?? [],
+      spellingTendency: f.errors?.spellingTendency ?? "",
+    },
+    voice: {
+      formality: f.voice?.formality ?? "mixed",
+      perspective: f.voice?.perspective ?? "mixed",
+      contractions: f.voice?.contractions ?? true,
+      toneDescription: f.voice?.toneDescription ?? "",
+      distinctiveTraits: f.voice?.distinctiveTraits ?? [],
+    },
+    rhetoric: {
+      argumentStyle: f.rhetoric?.argumentStyle ?? "builds-gradually",
+      counterArguments: f.rhetoric?.counterArguments ?? "ignores",
+      hedgingLanguage: f.rhetoric?.hedgingLanguage ?? [],
+      assertiveness: f.rhetoric?.assertiveness ?? "moderate",
+    },
+    rhythm: {
+      sentenceOpeners: f.rhythm?.sentenceOpeners ?? [],
+      paragraphRhythm: f.rhythm?.paragraphRhythm ?? "varied",
+      listUsage: f.rhythm?.listUsage ?? "occasionally",
+    },
+    overallAssessment: f.overallAssessment ?? "",
+  };
 }
 
 // ─── Level 1 Prompt (fingerprint-first, uses base 8 questions) ───
@@ -266,8 +374,11 @@ export function buildLevel2OutlinePrompt(opts: GenerateOptions): string {
   const conclusion = resolveValue(sa.conclusionApproach, sa.conclusionOther);
   const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
   const losesPoints = formatList(tp.losesPointsFor, tp.losesPointsOther);
+  const quoteIntros = formatList(sa.quoteIntroStyle ?? [], sa.quoteIntroOther);
+  const overused = formatList(sa.overusedPhrases ?? [], sa.overusedPhrasesOther);
+  const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
 
-  return `Create a detailed outline for an essay that matches this student's writing patterns.
+  return `Create a detailed outline for an essay that matches this student's writing patterns. Plan voice markers INTO the outline — don't leave voice for later.
 
 ## Assignment
 ${assignment}
@@ -281,22 +392,32 @@ ${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
 - Thesis placement: ${fingerprint.structure.thesisPlacement}
 - Evidence method: ${fingerprint.evidenceStyle.method}
 - Analysis depth: ${fingerprint.evidenceStyle.analysisDepth}
+- Argument style: ${fingerprint.rhetoric.argumentStyle}
+- Counter-arguments: ${fingerprint.rhetoric.counterArguments}
 
 ## Student's Self-Reported Patterns
 - Evidence approach: ${evidence}
 - Conclusion approach: ${conclusion}
 - Weaknesses to avoid: ${losesPoints}
-${timeSpent ? `- They spend the most time on: ${timeSpent} — allocate quality accordingly` : ""}
+${timeSpent ? `- They spend the most time on: ${timeSpent} — that section gets the most polish` : ""}
+
+## Voice Placement Plan (embed these into the outline)
+- Plan where to use their quote intro patterns: ${quoteIntros}
+- Plan where to deploy their overused phrases (at least 2-3 times): ${overused}
+- Plan which hedging phrases to use in which paragraphs: ${fingerprint.rhetoric.hedgingLanguage.join(", ")}
+- Plan sentence openers for each paragraph from: ${fingerprint.rhythm.sentenceOpeners.join(", ")}
+${timeSpent ? `- Plan the polish gradient: "${timeSpent}" gets the most polish; other sections stay rougher` : ""}
+- Plan which known errors will appear where (they fix ${selfEdit} during self-editing — let other error types survive)
 
 ## Quality Target
 Grade level: ${gradeLevel}, typical grade: ${gradeRange}
 Target: ~${wordCount} words
 
 Return a structured outline with:
-1. A thesis statement that matches their voice
-2. Paragraph-by-paragraph plan (topic sentence idea, evidence to include, analysis approach)
+1. A thesis statement that matches their voice and assertiveness level (${fingerprint.rhetoric.assertiveness})
+2. Paragraph-by-paragraph plan: topic sentence idea, evidence to include, analysis approach, AND which voice markers go where
 3. Follow their typical structure — do NOT impose a structure they don't naturally use
-4. Note which sections should feel more polished vs rougher based on where they spend time
+4. Note which sections should feel more polished vs rougher
 
 Return ONLY the outline, no commentary.`;
 }
@@ -306,10 +427,7 @@ Return ONLY the outline, no commentary.`;
 export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: string): string {
   const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
 
-  const sortedSamples = [...samples].sort((a, b) => a.content.length - b.content.length);
-  const refSamples = sortedSamples.slice(0, 2)
-    .map((s, i) => `--- Reference ${i + 1}: ${s.label} ---\n${s.content}`)
-    .join("\n\n");
+  const refSamples = selectDiverseSamples(samples);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -318,7 +436,8 @@ export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: stri
   const conclusion = resolveValue(sa.conclusionApproach, sa.conclusionOther);
   const wordCountTendency = resolveValue(sa.wordCountTendency, sa.wordCountOther);
   const losesPoints = formatList(tp.losesPointsFor, tp.losesPointsOther);
-  const habits = formatList(sa.writingHabits, sa.writingHabitsOther);
+  const habits = sa.writingHabits ?? [];
+  const habitsOther = sa.writingHabitsOther ?? "";
 
   // Level 2 enhanced fields
   const quoteIntros = formatList(sa.quoteIntroStyle ?? [], sa.quoteIntroOther);
@@ -326,7 +445,10 @@ export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: stri
   const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
   const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
 
-  return `You are replicating a specific student's writing voice with extreme precision. Follow the outline below exactly. Each paragraph must use vocabulary, transitions, and sentence patterns from the fingerprint.
+  // Map each writing habit checkbox to a concrete instruction
+  const habitInstructions = mapHabitsToInstructions(habits, habitsOther);
+
+  return `You are replicating a specific student's writing voice with extreme precision. Follow the outline below exactly. Every rule in the VOICE ENFORCEMENT section is mandatory — violating any one means the essay fails to match.
 
 ## Outline (follow this structure)
 ${outline}
@@ -334,41 +456,103 @@ ${outline}
 ## Style Fingerprint
 ${JSON.stringify(fingerprint, null, 2)}
 
-## Reference Samples
+## Reference Samples (read these to internalize their voice — this is what they ACTUALLY sound like)
 ${refSamples}
-
-## Student Context (Base Profile)
-- Grade level: ${gradeLevel}, typically earns ${gradeRange}
-- Revision habit: ${revision}
-- Evidence approach: ${evidence}
-- Conclusion approach: ${conclusion}
-- Word count tendency: ${wordCountTendency}
-- Known weaknesses: ${losesPoints}
-- Writing habits to replicate: ${habits}
-
-## Enhanced Voice Profile (Level 2)
-- QUOTE INTRODUCTIONS: When integrating quotes, this student uses these exact patterns: ${quoteIntros}. You MUST use these phrasings — they are a strong voice marker.
-- OVERUSED WORDS/PHRASES: This student naturally overuses: ${overused}. Weave these in at a realistic frequency (not every paragraph, but noticeably present). These are part of their voice — don't eliminate them.
-- SELF-EDITING PATTERNS: When this student rereads, they fix: ${selfEdit}. This means OTHER types of errors survive into their final draft. Let those survive.
-${timeSpent ? `- TIME DISTRIBUTION: They spend the most effort on "${timeSpent}". That section should feel more polished. Other sections should feel comparatively rougher.` : ""}
 
 ## Assignment
 ${assignment}
 ${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
 
-## Critical Rules
-1. VOCABULARY: Use words from "signatureWords". NEVER use "avoidedWords". Stay in tier: ${fingerprint.vocabulary.tier}.
-2. SENTENCES: Average ~${fingerprint.sentencePatterns.averageLength} words. Variation: ${fingerprint.sentencePatterns.variation}. Tendency: ${fingerprint.sentencePatterns.tendency}.
-3. TRANSITIONS: ONLY from "favorites": ${fingerprint.transitions.favorites.join(", ")}. NEVER: ${fingerprint.transitions.neverUses.join(", ")}.
-4. EVIDENCE: Method: ${fingerprint.evidenceStyle.method}. Pattern: ${fingerprint.evidenceStyle.analysisPattern}. Self-reported: "${evidence}".
-5. QUOTE INTEGRATION: Use ONLY these intro patterns: ${quoteIntros}. This is critical for voice matching.
-6. ERRORS: Include naturally: ${fingerprint.errors.grammarPatterns.join(", ")}. Punctuation: ${fingerprint.errors.punctuationHabits.join(", ")}. The student fixes ${selfEdit} when self-editing — let other error types persist.
-7. VOICE: ${fingerprint.voice.toneDescription}. ${fingerprint.voice.contractions ? "Uses contractions." : "No contractions."} ${fingerprint.voice.perspective === "first-person" ? "First person." : fingerprint.voice.perspective === "third-person" ? "Third person." : "Mixed perspectives."}
-8. POLISH LEVEL: Revision style is "${revision}". Calibrate the draft feel accordingly.
-9. QUALITY CEILING: ${gradeRange} level. Not higher.
-10. TARGET: ~${wordCount} words. Student tendency: ${wordCountTendency}.
+## VOICE ENFORCEMENT — Each rule is mandatory
+
+FROM FINGERPRINT:
+1. VOCABULARY: Use ONLY words in tier "${fingerprint.vocabulary.tier}". Include these signature words at least once each: ${fingerprint.vocabulary.signatureWords.slice(0, 8).join(", ")}. NEVER use: ${fingerprint.vocabulary.avoidedWords.join(", ")}.
+2. SENTENCES: Average ${fingerprint.sentencePatterns.averageLength} words. Tendency: "${fingerprint.sentencePatterns.tendency}". Vary sentences ${fingerprint.sentencePatterns.variation}.
+3. TRANSITIONS: ALLOWED: ${fingerprint.transitions.favorites.join(", ")}. BANNED: ${fingerprint.transitions.neverUses.join(", ")}. Use paragraph openers from: ${fingerprint.transitions.paragraphOpeners.join(", ")}.
+4. STRUCTURE: Intro: "${fingerprint.structure.introPattern}". Body: "${fingerprint.structure.bodyParagraphPattern}". Conclusion: "${fingerprint.structure.conclusionPattern}". Paragraphs avg ${fingerprint.structure.avgParagraphLength} sentences.
+5. EVIDENCE: Method: ${fingerprint.evidenceStyle.method}. After quoting: "${fingerprint.evidenceStyle.analysisPattern}". Depth: ${fingerprint.evidenceStyle.analysisDepth}.
+6. ERRORS: Reproduce these grammar patterns: ${fingerprint.errors.grammarPatterns.join(", ")}. Punctuation habits: ${fingerprint.errors.punctuationHabits.join(", ")}. These feel natural to this student.
+7. VOICE: ${fingerprint.voice.toneDescription}. Contractions: ${fingerprint.voice.contractions ? "yes" : "no"}. Perspective: ${fingerprint.voice.perspective}. Distinctive: ${fingerprint.voice.distinctiveTraits.join(", ")}.
+8. RHETORIC: Argues by ${fingerprint.rhetoric.argumentStyle}. Counter-arguments: ${fingerprint.rhetoric.counterArguments}. Uses hedging: ${fingerprint.rhetoric.hedgingLanguage.join(", ")} — include at least 3 of these.
+9. RHYTHM: Starts sentences with: ${fingerprint.rhythm.sentenceOpeners.join(", ")} — use at least 5 of these. Paragraph rhythm: ${fingerprint.rhythm.paragraphRhythm}.
+
+FROM QUESTIONNAIRE:
+10. GRADE CEILING: This is a ${gradeRange} essay from a ${gradeLevel} student. Do NOT exceed this quality level.
+11. REVISION FEEL: Student's revision style is "${revision}". ${revision === "I submit my first draft as-is" ? "Essay should feel unpolished: rough transitions, occasional incomplete thoughts, uneven paragraph lengths." : revision === "I reread and fix obvious errors" ? "Essay should be mostly clean but with occasional awkward phrasing and underdeveloped analysis." : "Essay should feel more polished but still at their grade level."}
+12. WEAKNESSES: Student loses points for: ${losesPoints}. Include subtle traces of these weaknesses — the teacher expects to see them.
+${habitInstructions ? `13. WRITING HABITS:\n${habitInstructions}` : ""}
+14. WORD COUNT: Target ~${wordCount} words. Student ${wordCountTendency}.
+
+FROM LEVEL 2 ENHANCED:
+15. QUOTE PATTERNS: When introducing any quote, use ONLY these phrasings: ${quoteIntros}. Never use any other quote introduction pattern. This is a critical voice marker.
+16. OVERUSED PHRASES: Include these phrases: ${overused}. Place them where a student naturally would — in topic sentences, transitions, and analysis sentences. Include at least 3 across the essay.
+17. ERROR SURVIVAL: Student self-edits for: ${selfEdit}. This means those error types are FIXED in their writing. But errors OUTSIDE that list survive. Let non-self-edited error types persist naturally.
+${timeSpent ? `18. POLISH GRADIENT: Student spends the most effort on "${timeSpent}". That section should be noticeably more polished. Other sections should feel comparatively rougher — less refined transitions, simpler analysis, less careful word choice.` : ""}
 
 Write the essay now, following the outline.`;
+}
+
+// ─── Level 2 Refinement Prompt (pass 3 — self-correction) ───
+
+export function buildRefinementPrompt(
+  essay: string,
+  fingerprint: StyleFingerprint,
+  samples: Sample[],
+  selfAssessment: SelfAssessment,
+): string {
+  const refSamples = selectDiverseSamples(samples);
+
+  const revision = resolveValue(selfAssessment.revisionLevel, selfAssessment.revisionOther);
+  const gradeRange = resolveValue(selfAssessment.gradeRange, selfAssessment.gradeRangeOther);
+  const quoteIntros = formatList(selfAssessment.quoteIntroStyle ?? [], selfAssessment.quoteIntroOther);
+  const overused = formatList(selfAssessment.overusedPhrases ?? [], selfAssessment.overusedPhrasesOther);
+
+  return `You are a quality control editor. Compare this essay against the student's actual writing samples and style fingerprint. Your job is to find any places where the essay sounds like AI or deviates from the student's real voice, and fix them.
+
+## Generated Essay
+${essay}
+
+## Style Fingerprint
+${JSON.stringify(fingerprint, null, 2)}
+
+## Student's Actual Writing (compare against these)
+${refSamples}
+
+## Checklist — verify each one:
+- Vocabulary stays within ${fingerprint.vocabulary.tier} tier. No words from avoidedWords list: ${fingerprint.vocabulary.avoidedWords.join(", ")}
+- Transitions are ONLY from favorites list: ${fingerprint.transitions.favorites.join(", ")}
+- Sentence length averages ~${fingerprint.sentencePatterns.averageLength} words with ${fingerprint.sentencePatterns.variation} variation
+- Quote introductions use ONLY: ${quoteIntros}
+- Overused phrases appear 2-3 times: ${overused}
+- Hedging language present: ${fingerprint.rhetoric.hedgingLanguage.join(", ")}
+- Sentence openers match: ${fingerprint.rhythm.sentenceOpeners.join(", ")}
+- "${revision}" revision feel — polish level matches
+- Quality ceiling: reads like a ${gradeRange} essay, not higher
+- No AI-sounding phrases ("delve into", "it's important to note", "in today's society", "furthermore", "in conclusion", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance")
+
+Rewrite the essay fixing ONLY the deviations. Preserve everything that already matches. Do not add polish, sophistication, or improve quality — only fix voice mismatches. Return ONLY the corrected essay, no commentary.`;
+}
+
+function mapHabitsToInstructions(habits: string[], other: string): string {
+  const map: Record<string, string> = {
+    "I start essays with a question or hook quote": "Start the introduction with a question or hook quote.",
+    "I overuse certain transition words": "Use transition favorites with higher frequency than normal.",
+    "My introductions tend to be long/wordy": "Make the introduction 30%+ longer than body paragraphs.",
+    "I write in first person even when I probably shouldn't": "Use first person throughout, even in analytical sections.",
+    "I use rhetorical questions a lot": "Include at least 2 rhetorical questions in body paragraphs.",
+    "I repeat my thesis in different words throughout": "Rephrase the thesis at least twice in body paragraphs.",
+    "My paragraphs tend to be short": "Keep paragraphs to 3-4 sentences max.",
+    "I use informal language or slang sometimes": "Include 2-3 informal phrases or colloquialisms.",
+    "I have a go-to closing phrase or style": "Use conclusion pattern from fingerprint strictly.",
+    "I struggle with commas and punctuation": "Include comma splices and missing commas in 2-3 sentences.",
+  };
+
+  const lines: string[] = [];
+  for (const h of habits) {
+    if (map[h]) lines.push(`   - ${map[h]}`);
+  }
+  if (other) lines.push(`   - ${other}`);
+  return lines.join("\n");
 }
 
 // ─── Legacy Prompts (fallback when no fingerprint exists) ───
