@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SessionCard } from "@/components/session-card";
 import Link from "next/link";
 import { SUBJECT_COLORS, SUBJECT_LABELS } from "@/lib/subject-constants";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 interface SessionItem {
   id: string;
@@ -21,9 +23,52 @@ interface SessionsListProps {
 
 const RECENT_LIMIT = 2;
 
-export function SessionsList({ sessions }: SessionsListProps) {
+export function SessionsList({ sessions: initialSessions }: SessionsListProps) {
+  const router = useRouter();
+  const [sessions, setSessions] = useState(initialSessions);
   const [filter, setFilter] = useState("ALL");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState<string | null>(null);
+  const [confirmDeleteInquiry, setConfirmDeleteInquiry] = useState<string | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [deletingInquiry, setDeletingInquiry] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function handleDeleteSession(sessionId: string) {
+    setDeletingSession(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      if (res.ok) {
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        router.refresh();
+        setConfirmDeleteSession(null);
+      } else {
+        setDeleteError("Failed to remove session. Please try again.");
+      }
+    } catch {
+      setDeleteError("Network error. Please try again.");
+    }
+    setDeletingSession(false);
+  }
+
+  async function handleDeleteInquiry(inquiryId: string) {
+    setDeletingInquiry(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/inquiries/${inquiryId}`, { method: "DELETE" });
+      if (res.ok) {
+        setSessions((prev) => prev.filter((s) => s.inquiryId !== inquiryId));
+        router.refresh();
+        setConfirmDeleteInquiry(null);
+      } else {
+        setDeleteError("Failed to remove class. Please try again.");
+      }
+    } catch {
+      setDeleteError("Network error. Please try again.");
+    }
+    setDeletingInquiry(false);
+  }
 
   if (sessions.length === 0) {
     return (
@@ -120,7 +165,7 @@ export function SessionsList({ sessions }: SessionsListProps) {
           return (
             <section key={inquiryId}>
               {/* Group divider label */}
-              <div className="flex items-center gap-3 mb-3">
+              <div className="group/header flex items-center gap-3 mb-3">
                 <span className="font-display text-[11px] font-semibold tracking-[1.5px] uppercase text-text-muted">
                   {group.unitName}
                 </span>
@@ -131,19 +176,38 @@ export function SessionsList({ sessions }: SessionsListProps) {
                 <span className="text-[11px] text-text-muted">
                   {group.sessions.length}
                 </span>
+                <button
+                  onClick={() => setConfirmDeleteInquiry(inquiryId)}
+                  className="w-5 h-5 rounded-full bg-[rgba(40,32,24,0.60)] border border-[rgba(168,152,128,0.15)] flex items-center justify-center opacity-0 group-hover/header:opacity-100 transition-opacity text-text-muted hover:text-red-400"
+                  title="Remove class"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
               {/* Session rows */}
               <div className="space-y-0.5">
                 {visibleSessions.map((s) => (
-                  <SessionCard
-                    key={s.id}
-                    id={s.id}
-                    unitName={s.unitName}
-                    subject={s.subject}
-                    messageCount={s.messageCount}
-                    startedAt={s.startedAt}
-                  />
+                  <div key={s.id} className="group/session relative">
+                    <SessionCard
+                      id={s.id}
+                      unitName={s.unitName}
+                      subject={s.subject}
+                      messageCount={s.messageCount}
+                      startedAt={s.startedAt}
+                    />
+                    <button
+                      onClick={() => setConfirmDeleteSession(s.id)}
+                      className="absolute top-1/2 -translate-y-1/2 right-2 w-5 h-5 rounded-full bg-[rgba(40,32,24,0.60)] border border-[rgba(168,152,128,0.15)] flex items-center justify-center opacity-0 group-hover/session:opacity-100 transition-opacity text-text-muted hover:text-red-400 z-10"
+                      title="Remove session"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
 
@@ -162,6 +226,28 @@ export function SessionsList({ sessions }: SessionsListProps) {
           );
         })}
       </div>
+
+      {deleteError && (
+        <p className="text-red-400 text-xs text-center mt-4">{deleteError}</p>
+      )}
+
+      <ConfirmModal
+        open={!!confirmDeleteSession}
+        title="Remove this session?"
+        message="Chat history will be deleted."
+        onConfirm={() => confirmDeleteSession && handleDeleteSession(confirmDeleteSession)}
+        onCancel={() => setConfirmDeleteSession(null)}
+        loading={deletingSession}
+      />
+
+      <ConfirmModal
+        open={!!confirmDeleteInquiry}
+        title="Remove this class?"
+        message="All sessions, files, and chat history will be deleted."
+        onConfirm={() => confirmDeleteInquiry && handleDeleteInquiry(confirmDeleteInquiry)}
+        onCancel={() => setConfirmDeleteInquiry(null)}
+        loading={deletingInquiry}
+      />
     </div>
   );
 }

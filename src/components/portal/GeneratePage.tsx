@@ -11,7 +11,7 @@ interface GeneratePageProps {
 
 export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) {
   const [assignment, setAssignment] = useState("");
-  const wordCount = 500;
+  const [wordCount, setWordCount] = useState(500);
   const [requirements, setRequirements] = useState("");
   const [level, setLevel] = useState<1 | 2>(1);
   const [essay, setEssay] = useState("");
@@ -96,34 +96,38 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let fullText = "";
-
       let streamError = false;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        for (const line of lines) {
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.error) {
-              setError(parsed.error);
-              streamError = true;
-              break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+
+          for (const line of lines) {
+            const data = line.slice(6);
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) {
+                setError(parsed.error);
+                streamError = true;
+                break;
+              }
+              if (parsed.content) {
+                fullText += parsed.content;
+                setEssay(fullText);
+              }
+            } catch {
+              // skip malformed SSE chunks
             }
-            if (parsed.content) {
-              fullText += parsed.content;
-              setEssay(fullText);
-            }
-          } catch {
-            // skip
           }
+          if (streamError) break;
         }
-        if (streamError) break;
+      } finally {
+        reader.releaseLock();
       }
 
       if (!streamError && fullText) saveEssay(fullText);
@@ -261,6 +265,26 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
                   </>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Word count */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">
+              Target Word Count — <span className="text-accent">{wordCount}</span>
+            </label>
+            <input
+              type="range"
+              min={250}
+              max={2000}
+              step={50}
+              value={wordCount}
+              onChange={(e) => setWordCount(Number(e.target.value))}
+              className="w-full accent-accent"
+            />
+            <div className="flex justify-between text-[11px] text-text-muted mt-1">
+              <span>250</span>
+              <span>2000</span>
             </div>
           </div>
         </div>

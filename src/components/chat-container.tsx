@@ -27,6 +27,7 @@ interface ChatContainerProps {
   initialMessages: Message[];
   inquiry: InquiryContext;
   helpType?: string | null;
+  topicPreviews?: string[];
 }
 
 export function ChatContainer({
@@ -34,6 +35,7 @@ export function ChatContainer({
   initialMessages,
   inquiry,
   helpType,
+  topicPreviews = [],
 }: ChatContainerProps) {
   useHeartbeat(sessionId);
 
@@ -70,6 +72,29 @@ export function ChatContainer({
   }, []);
 
   const welcomeActions = useMemo(() => {
+    // When we have actual file content previews, build prompts from them
+    if (topicPreviews.length > 0) {
+      if (subjectGroup === "math-stem") {
+        return [
+          `Walk me through this: ${topicPreviews[0]}`,
+          topicPreviews[1] ? `Help me solve: ${topicPreviews[1]}` : `Quiz me on ${inquiry.unitName}`,
+          topicPreviews[2] ? `Explain this concept: ${topicPreviews[2]}` : `Start with the fundamentals`,
+        ];
+      }
+      if (subjectGroup === "history") {
+        return [
+          `Help me analyze: ${topicPreviews[0]}`,
+          topicPreviews[1] ? `What's the significance of: ${topicPreviews[1]}` : `Quiz me on the key events`,
+          topicPreviews[2] ? `Walk me through: ${topicPreviews[2]}` : `Give me the background context`,
+        ];
+      }
+      return [
+        `Help me with: ${topicPreviews[0]}`,
+        topicPreviews[1] ? `Give me feedback on: ${topicPreviews[1]}` : `Help me develop a thesis`,
+        topicPreviews[2] ? `Help me analyze: ${topicPreviews[2]}` : `Walk me through essay structure`,
+      ];
+    }
+
     // When helpType exists (from session setup form), tailor actions to the user's stated struggle
     if (helpType) {
       if (subjectGroup === "math-stem") {
@@ -93,7 +118,7 @@ export function ChatContainer({
       ];
     }
 
-    // Fallback: no helpType, use inquiry description or generic actions
+    // Fallback: no helpType or file content, use inquiry description or generic actions
     if (subjectGroup === "math-stem") {
       return inquiry.description
         ? [
@@ -134,7 +159,7 @@ export function ChatContainer({
           `Help me develop a thesis for ${inquiry.unitName}`,
           `Walk me through the structure of a strong essay`,
         ];
-  }, [subjectGroup, helpType, inquiry.description, inquiry.unitName]);
+  }, [subjectGroup, helpType, topicPreviews, inquiry.description, inquiry.unitName]);
 
   const getDefaultActions = useCallback((): string[] => {
     if (subjectGroup === "math-stem") {

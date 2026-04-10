@@ -63,6 +63,7 @@ model User {
   writingProfile   WritingProfile?
   writingSamples   WritingSample[]
   generatedEssays  GeneratedEssay[]
+  portalClasses    PortalClass[]
   createdAt        DateTime          @default(now())
 }
 
@@ -309,4 +310,14 @@ model GeneratedEssay {
   essay        String
   wordCount    Int
   createdAt    DateTime @default(now())
+}
+
+model PortalClass {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  subject   Subject
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

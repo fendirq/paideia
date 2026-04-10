@@ -8,14 +8,16 @@ export default async function PortalHomePage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
+  const userId = session.user.id;
+
   const [classes, profile] = await Promise.all([
-    db.inquiry.findMany({
-      where: { userId: session.user.id, teacherNotes: "add-class" },
-      orderBy: { updatedAt: "desc" },
-      select: { id: true, unitName: true, subject: true },
+    db.portalClass.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, subject: true },
     }),
     db.writingProfile.findUnique({
-      where: { userId: session.user.id },
+      where: { userId },
       select: { id: true },
     }),
   ]);
@@ -23,11 +25,7 @@ export default async function PortalHomePage() {
   return (
     <PortalHome
       userName={session.user.name}
-      classes={classes.map((c) => ({
-        id: c.id,
-        name: c.unitName,
-        subject: c.subject,
-      }))}
+      initialClasses={classes}
       hasProfile={!!profile}
     />
   );

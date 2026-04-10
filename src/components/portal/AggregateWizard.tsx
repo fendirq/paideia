@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 // ─── Types ───
 
 interface Sample {
+  _id: string;
   label: string;
   content: string;
   wordCount: number;
@@ -215,7 +216,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
   const [teacher, setTeacher] = useState<TeacherProfile>({ ...DEFAULT_TEACHER });
   const [self, setSelf] = useState<SelfAssessment>({ ...DEFAULT_SELF });
   const [dragOver, setDragOver] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const [reviewExpanded, setReviewExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +231,11 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
   const steps = level === 2
     ? ["Level", "Samples", "Class", "You", "Enhanced", "Review"]
     : ["Level", "Samples", "Class", "You", "Review"];
+
+  // Guard: clamp step if level switch reduces total steps
+  useEffect(() => {
+    if (step >= steps.length) setStep(steps.length - 1);
+  }, [level, step, steps.length]);
 
   // Load existing profile on mount
   useEffect(() => {
@@ -268,6 +274,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
         }
         if (data.samples?.length) {
           setSamples(data.samples.map((s: Sample) => ({
+            _id: crypto.randomUUID(),
             label: s.label,
             content: s.content,
             wordCount: s.wordCount,
@@ -292,7 +299,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
         const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
         if (!res.ok) continue;
         const { text, wordCount } = await res.json();
-        newSamples.push({ label: file.name, content: text, wordCount });
+        newSamples.push({ _id: crypto.randomUUID(), label: file.name, content: text, wordCount });
       } catch {
         // skip failed uploads
       }
@@ -302,8 +309,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
     setUploading(false);
   };
 
-  const removeSample = useCallback((index: number) => {
-    setSamples((prev) => prev.filter((_, i) => i !== index));
+  const removeSample = useCallback((id: string) => {
+    setSamples((prev) => prev.filter((s) => s._id !== id));
     setConfirmDelete(null);
   }, []);
 
@@ -316,6 +323,12 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
     if (step === samplesStep) return samples.length >= 1;
     if (step === classStep) return !!teacher.gradeLevel;
     if (step === youStep) return !!self.gradeRange;
+    // Level 2 Enhanced step requires at least the core fields
+    if (step === 4 && level === 2) {
+      return (self.quoteIntroStyle?.length ?? 0) > 0
+        && (self.selfEditFocus?.length ?? 0) > 0
+        && !!self.timeSpentOn;
+    }
     return true;
   };
 
@@ -397,7 +410,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
 
           <div className="grid grid-cols-1 gap-4">
             <button
-              onClick={() => { setLevel(1); setStep(0); }}
+              onClick={() => { setLevel(1); setStep(1); }}
               className={`text-left p-6 rounded-2xl transition-all ${
                 level === 1
                   ? "bg-accent/10 ring-2 ring-accent/60 border border-accent/30"
@@ -413,7 +426,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               </p>
             </button>
             <button
-              onClick={() => hasLevel2 ? (() => { setLevel(2); setStep(0); })() : (window.location.href = "/portal/upgrade")}
+              onClick={() => hasLevel2 ? (() => { setLevel(2); setStep(1); })() : (window.location.href = "/portal/upgrade")}
               className={`text-left p-6 rounded-2xl transition-all ${
                 !hasLevel2
                   ? "bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] opacity-50 hover:opacity-70"
@@ -494,9 +507,9 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
           {/* Uploaded files list */}
           {samples.length > 0 && (
             <div className="space-y-2">
-              {samples.map((sample, i) => (
+              {samples.map((sample) => (
                 <div
-                  key={i}
+                  key={sample._id}
                   className="flex items-center justify-between bg-[rgba(168,152,128,0.08)] border border-[rgba(168,152,128,0.15)] rounded-xl px-4 py-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -506,11 +519,11 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
                     <span className="text-text-primary text-sm truncate">{sample.label}</span>
                     <span className="text-text-muted text-xs shrink-0">{sample.wordCount} words</span>
                   </div>
-                  {confirmDelete === i ? (
+                  {confirmDelete === sample._id ? (
                     <div className="flex items-center gap-3 ml-3 shrink-0">
                       <span className="text-text-muted text-xs">Remove?</span>
                       <button
-                        onClick={(e) => { e.stopPropagation(); removeSample(i); }}
+                        onClick={(e) => { e.stopPropagation(); removeSample(sample._id); }}
                         className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
                       >
                         Yes
@@ -524,7 +537,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
                     </div>
                   ) : (
                     <button
-                      onClick={() => setConfirmDelete(i)}
+                      onClick={() => setConfirmDelete(sample._id)}
                       className="text-text-muted hover:text-text-secondary transition-colors ml-3 p-1 rounded-lg hover:bg-[rgba(168,152,128,0.08)]"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

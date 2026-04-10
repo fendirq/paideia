@@ -62,6 +62,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
       }
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
         setNavOpen(false);
+        setAvatarOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -71,6 +72,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
   useEffect(() => {
     setMobileOpen(false);
     setNavOpen(false);
+    setAvatarOpen(false);
   }, [pathname]);
 
   const initial = userName?.charAt(0)?.toUpperCase() ?? "?";
@@ -158,7 +160,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
 
             {/* Close button */}
             <button
-              onClick={() => setNavOpen(false)}
+              onClick={() => { setNavOpen(false); setAvatarOpen(false); }}
               className="px-2 py-1.5 rounded-full text-[rgba(240,230,216,0.45)] hover:text-[#f0e6d8] transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
