@@ -224,7 +224,7 @@ function formatList(items: string[], other?: string): string {
   return all.length ? all.join(", ") : "None specified";
 }
 
-function selectDiverseSamples(samples: Sample[], maxChars = 8000): string {
+function selectDiverseSamples(samples: Sample[], maxChars = 12000): string {
   if (!samples.length) return "";
   const sorted = [...samples].sort((a, b) => a.content.length - b.content.length);
   const candidates: Sample[] = [sorted[0]];
@@ -300,6 +300,93 @@ export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerp
     },
     overallAssessment: f.overallAssessment ?? "",
   };
+}
+
+// ─── Fingerprint Narrative Formatter ───
+
+export function formatFingerprintNarrative(
+  fp: StyleFingerprint,
+  sa: SelfAssessment,
+): string {
+  const lines: string[] = [];
+
+  lines.push(
+    `Sentences: Averages ~${fp.sentencePatterns.averageLength} words per sentence with ${fp.sentencePatterns.variation} variation. ${fp.sentencePatterns.tendency}`,
+  );
+
+  lines.push(
+    `Vocabulary: ${fp.vocabulary.tier} tier. ${fp.vocabulary.wordChoicePattern}`,
+  );
+  if (fp.vocabulary.signatureWords.length) {
+    lines.push(
+      `  Frequently uses: ${fp.vocabulary.signatureWords.join(", ")}`,
+    );
+  }
+  if (fp.vocabulary.avoidedWords.length) {
+    lines.push(`  Never uses: ${fp.vocabulary.avoidedWords.join(", ")}`);
+  }
+
+  if (fp.transitions.favorites.length) {
+    lines.push(
+      `Transitions: Favors ${fp.transitions.favorites.join(", ")}`,
+    );
+  }
+  if (fp.transitions.neverUses.length) {
+    lines.push(`  Avoids: ${fp.transitions.neverUses.join(", ")}`);
+  }
+
+  lines.push(
+    `Structure: ${fp.structure.introPattern} Paragraphs typically ${fp.structure.avgParagraphLength} sentences. ${fp.structure.bodyParagraphPattern} ${fp.structure.conclusionPattern}`,
+  );
+  lines.push(`  Thesis placement: ${fp.structure.thesisPlacement}`);
+
+  lines.push(
+    `Evidence style: ${fp.evidenceStyle.method}. ${fp.evidenceStyle.analysisPattern} Analysis depth: ${fp.evidenceStyle.analysisDepth}. ${fp.evidenceStyle.citationHabits}`,
+  );
+
+  if (fp.errors.grammarPatterns.length || fp.errors.punctuationHabits.length) {
+    const errorParts: string[] = [];
+    if (fp.errors.grammarPatterns.length)
+      errorParts.push(fp.errors.grammarPatterns.join(", "));
+    if (fp.errors.punctuationHabits.length)
+      errorParts.push(fp.errors.punctuationHabits.join(", "));
+    lines.push(
+      `Common errors: ${errorParts.join(". ")}${fp.errors.spellingTendency ? `. ${fp.errors.spellingTendency}` : ""}`,
+    );
+  }
+
+  lines.push(
+    `Voice: ${fp.voice.formality} formality, ${fp.voice.perspective} perspective. ${fp.voice.contractions ? "Uses contractions." : "Avoids contractions."} ${fp.voice.toneDescription}`,
+  );
+  if (fp.voice.distinctiveTraits.length) {
+    lines.push(
+      `  Distinctive traits: ${fp.voice.distinctiveTraits.join(", ")}`,
+    );
+  }
+
+  lines.push(
+    `Argumentation: ${fp.rhetoric.argumentStyle}. Counter-arguments: ${fp.rhetoric.counterArguments}. Assertiveness: ${fp.rhetoric.assertiveness}.`,
+  );
+  if (fp.rhetoric.hedgingLanguage.length) {
+    lines.push(
+      `  Hedging phrases: ${fp.rhetoric.hedgingLanguage.join(", ")}`,
+    );
+  }
+
+  if (fp.rhythm.sentenceOpeners.length) {
+    lines.push(
+      `Sentence openers: ${fp.rhythm.sentenceOpeners.join(", ")}`,
+    );
+  }
+  lines.push(
+    `Paragraph rhythm: ${fp.rhythm.paragraphRhythm}. List usage: ${fp.rhythm.listUsage}.`,
+  );
+
+  if (fp.overallAssessment) {
+    lines.push(`\nOverall: ${fp.overallAssessment}`);
+  }
+
+  return lines.join("\n");
 }
 
 // ─── Level 1 Prompt (fingerprint-first, uses base 8 questions) ───
