@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -13,7 +14,9 @@ export default async function AggregatePage() {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex items-start justify-center px-6 py-12">
       <div className="w-full max-w-2xl">
-        <AggregateWizard hasLevel2={hasLevel2} />
+        <Suspense fallback={null}>
+          <AggregateWizard hasLevel2={hasLevel2} />
+        </Suspense>
       </div>
     </div>
   );

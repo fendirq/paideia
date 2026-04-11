@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // ─── Types ───
 
@@ -205,6 +205,8 @@ function MultiSelect({
 
 export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next");
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -292,19 +294,24 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
     setUploading(true);
     const newSamples: Sample[] = [];
 
+    setSaveError("");
+    let failCount = 0;
     for (const file of fileArray) {
       const form = new FormData();
       form.append("file", file);
       try {
         const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
-        if (!res.ok) continue;
+        if (!res.ok) { failCount++; continue; }
         const { text, wordCount } = await res.json();
         newSamples.push({ _id: crypto.randomUUID(), label: file.name, content: text, wordCount });
       } catch {
-        // skip failed uploads
+        failCount++;
       }
     }
 
+    if (failCount > 0) {
+      setSaveError(`${failCount} file(s) could not be uploaded. Try again or use different files.`);
+    }
     setSamples((prev) => [...prev, ...newSamples].slice(0, 6));
     setUploading(false);
   };
@@ -355,7 +362,16 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
         }),
       });
       if (res.ok) {
-        router.push("/portal/home");
+        let dest = "/portal/home";
+        if (nextUrl) {
+          try {
+            const parsed = new URL(nextUrl, window.location.origin);
+            if (parsed.origin === window.location.origin && parsed.pathname.startsWith("/portal/")) {
+              dest = parsed.pathname + (parsed.search || "") + (parsed.hash || "");
+            }
+          } catch {}
+        }
+        router.push(dest);
       } else {
         const data = await res.json().catch(() => ({}));
         setSaveError(data.error || "Failed to save profile. Please try again.");
@@ -366,7 +382,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
       setSaving(false);
       setAnalyzing(false);
     }
-  }, [level, samples, teacher, self, router]);
+  }, [level, samples, teacher, self, router, nextUrl]);
 
   if (loading) {
     return <p className="text-text-muted text-center py-12">Loading...</p>;

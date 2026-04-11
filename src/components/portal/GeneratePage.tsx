@@ -76,7 +76,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
       }
       setAssignment(text);
     } catch {
-      // skip
+      setError("Failed to extract text from file. Try again or paste manually.");
     } finally {
       setUploading(false);
     }
@@ -139,7 +139,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
         reader.releaseLock();
       }
 
-      if (!streamError && fullText) saveEssay(fullText);
+      if (!streamError && fullText) await saveEssay(fullText);
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
@@ -238,7 +238,9 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
                         }
                         setRequirements(text);
                       }
-                    } catch {} finally {
+                    } catch {
+                      setError("Failed to extract rubric. Try again or paste manually.");
+                    } finally {
                       setUploadingRubric(false);
                     }
                     e.target.value = "";

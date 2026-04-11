@@ -141,7 +141,7 @@ export function PortalHome({ userName, initialClasses, hasProfile }: PortalHomeP
               {classes.map((cls) => {
                 const href = hasProfile
                   ? `/portal/class/${cls.id}`
-                  : "/portal/aggregate";
+                  : `/portal/aggregate?next=/portal/class/${cls.id}`;
 
                 return (
                   <div key={cls.id} className="relative group">

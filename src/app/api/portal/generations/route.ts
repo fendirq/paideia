@@ -20,8 +20,22 @@ export async function GET(req: Request) {
   const where: { userId: string; subject?: string; portalClassId?: string } = {
     userId: session.user.id,
   };
-  if (classId) where.portalClassId = classId;
-  else if (subject) where.subject = subject;
+  if (classId) {
+    const owned = await db.portalClass.findUnique({
+      where: { id: classId },
+      select: { userId: true },
+    });
+    if (!owned || owned.userId !== session.user.id) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    where.portalClassId = classId;
+  } else if (subject) {
+    const normalized = subject.toUpperCase();
+    if (!["HISTORY", "ENGLISH", "HUMANITIES"].includes(normalized)) {
+      return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
+    }
+    where.subject = normalized;
+  }
 
   const essays = await db.generatedEssay.findMany({
     where,
@@ -32,7 +46,6 @@ export async function GET(req: Request) {
       level: true,
       wordCount: true,
       createdAt: true,
-      portalClassId: true,
     },
     take: 20,
   });
@@ -49,12 +62,25 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { subject, assignment, requirements, level, essay, portalClassId } = body;
 
-  if (!subject || !assignment || !essay || ![1, 2].includes(level)) {
+  const VALID_SUBJECTS = new Set(["history", "english", "humanities", "HISTORY", "ENGLISH", "HUMANITIES"]);
+  if (!subject || !assignment || !essay || ![1, 2].includes(level) || !VALID_SUBJECTS.has(subject)) {
     return NextResponse.json({ error: "Invalid data" }, { status: 400 });
   }
 
+  const normalizedSubject = subject.toUpperCase();
+
   if (typeof essay !== "string" || essay.length > 50000) {
     return NextResponse.json({ error: "Essay too large" }, { status: 400 });
+  }
+
+  if (portalClassId) {
+    const owned = await db.portalClass.findUnique({
+      where: { id: portalClassId },
+      select: { userId: true },
+    });
+    if (!owned || owned.userId !== session.user.id) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
   }
 
   const wordCount = essay.split(/\s+/).filter(Boolean).length;
@@ -62,7 +88,7 @@ export async function POST(req: Request) {
   const saved = await db.generatedEssay.create({
     data: {
       userId: session.user.id,
-      subject,
+      subject: normalizedSubject,
       assignment: assignment.slice(0, 5000),
       requirements: requirements?.slice(0, 1000) || null,
       level,
