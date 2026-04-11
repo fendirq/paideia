@@ -300,24 +300,27 @@ model WaitlistEntry {
 }
 
 model GeneratedEssay {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject      String
-  assignment   String
-  requirements String?
-  level        Int
-  essay        String
-  wordCount    Int
-  createdAt    DateTime @default(now())
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portalClassId String?
+  portalClass   PortalClass? @relation(fields: [portalClassId], references: [id], onDelete: SetNull)
+  subject       String
+  assignment    String
+  requirements  String?
+  level         Int
+  essay         String
+  wordCount     Int
+  createdAt     DateTime     @default(now())
 }
 
 model PortalClass {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   subject   Subject
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  essays    GeneratedEssay[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 }

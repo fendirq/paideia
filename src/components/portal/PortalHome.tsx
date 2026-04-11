@@ -140,7 +140,7 @@ export function PortalHome({ userName, initialClasses, hasProfile }: PortalHomeP
             <div className="grid grid-cols-2 gap-3">
               {classes.map((cls) => {
                 const href = hasProfile
-                  ? `/portal/${cls.subject.toLowerCase()}/generate`
+                  ? `/portal/class/${cls.id}`
                   : "/portal/aggregate";
 
                 return (

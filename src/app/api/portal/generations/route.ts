@@ -11,13 +11,20 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const subject = searchParams.get("subject");
+  const classId = searchParams.get("classId");
 
-  if (!subject) {
-    return NextResponse.json({ error: "Subject is required" }, { status: 400 });
+  if (!subject && !classId) {
+    return NextResponse.json({ error: "Subject or classId is required" }, { status: 400 });
   }
 
+  const where: { userId: string; subject?: string; portalClassId?: string } = {
+    userId: session.user.id,
+  };
+  if (classId) where.portalClassId = classId;
+  else if (subject) where.subject = subject;
+
   const essays = await db.generatedEssay.findMany({
-    where: { userId: session.user.id, subject },
+    where,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -25,6 +32,7 @@ export async function GET(req: Request) {
       level: true,
       wordCount: true,
       createdAt: true,
+      portalClassId: true,
     },
     take: 20,
   });
@@ -39,7 +47,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { subject, assignment, requirements, level, essay } = body;
+  const { subject, assignment, requirements, level, essay, portalClassId } = body;
 
   if (!subject || !assignment || !essay || ![1, 2].includes(level)) {
     return NextResponse.json({ error: "Invalid data" }, { status: 400 });
@@ -60,6 +68,7 @@ export async function POST(req: Request) {
       level,
       essay,
       wordCount,
+      portalClassId: portalClassId || null,
     },
     select: { id: true },
   });
