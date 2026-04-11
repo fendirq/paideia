@@ -7,9 +7,10 @@ import { EssayOutput } from "./EssayOutput";
 interface GeneratePageProps {
   subject: string;
   hasLevel2?: boolean;
+  classId?: string;
 }
 
-export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) {
+export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePageProps) {
   const [assignment, setAssignment] = useState("");
   const [wordCount, setWordCount] = useState(500);
   const [requirements, setRequirements] = useState("");
@@ -19,6 +20,7 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingRubric, setUploadingRubric] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rubricInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,8 +38,9 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
   // Save essay after generation completes
   const saveEssay = useCallback(
     async (essayText: string) => {
+      setSaveError("");
       try {
-        await fetch("/api/portal/generations", {
+        const res = await fetch("/api/portal/generations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -46,11 +49,17 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
             requirements,
             level,
             essay: essayText,
+            portalClassId: classId || null,
           }),
         });
-      } catch {}
+        if (!res.ok) {
+          setSaveError("Essay generated but failed to save. Copy your text before leaving.");
+        }
+      } catch {
+        setSaveError("Essay generated but failed to save. Copy your text before leaving.");
+      }
     },
-    [subject, assignment, requirements, level]
+    [subject, assignment, requirements, level, classId]
   );
 
   const handleFileUpload = async (file: File) => {
@@ -382,6 +391,12 @@ export function GeneratePage({ subject, hasLevel2 = false }: GeneratePageProps) 
             generating={generating}
             onRegenerate={generate}
           />
+        )}
+
+        {saveError && (
+          <div className="mt-4 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-sm">
+            {saveError}
+          </div>
         )}
       </div>
     </div>

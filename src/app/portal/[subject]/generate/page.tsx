@@ -7,13 +7,15 @@ import { GeneratePage } from "@/components/portal/GeneratePage";
 
 export default async function GenerateRoute({
   params,
+  searchParams,
 }: {
   params: Promise<{ subject: string }>;
+  searchParams: Promise<{ classId?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const { subject } = await params;
+  const [{ subject }, query] = await Promise.all([params, searchParams]);
 
   const [profile, hasLevel2] = await Promise.all([
     db.writingProfile.findUnique({
@@ -25,5 +27,5 @@ export default async function GenerateRoute({
 
   if (!profile) redirect("/portal/aggregate");
 
-  return <GeneratePage subject={subject} hasLevel2={hasLevel2} />;
+  return <GeneratePage subject={subject} hasLevel2={hasLevel2} classId={query.classId} />;
 }
