@@ -2,8 +2,16 @@ import { describe, it, expect } from "vitest";
 import {
   formatFingerprintNarrative,
   normalizeFingerprint,
+  buildLevel2PlanPrompt,
+  buildLevel2WritingPrompt,
+  buildLevel2AuditPrompt,
 } from "@/lib/essay-generator";
-import type { SelfAssessment, StyleFingerprint } from "@/lib/essay-generator";
+import type {
+  SelfAssessment,
+  StyleFingerprint,
+  GenerateOptions,
+  TeacherProfile,
+} from "@/lib/essay-generator";
 
 function makeFingerprint(overrides: Partial<StyleFingerprint> = {}): StyleFingerprint {
   return normalizeFingerprint({
@@ -160,5 +168,172 @@ describe("formatFingerprintNarrative", () => {
 
     expect(result).toBeTruthy();
     expect(result).toContain("basic");
+  });
+});
+
+// ─── Helpers for prompt builder tests ───
+
+function makeTeacherProfile(): TeacherProfile {
+  return {
+    gradeLevel: "11th grade",
+    gradeOther: "",
+    losesPointsFor: ["weak thesis", "lack of evidence"],
+    losesPointsOther: "",
+  };
+}
+
+function makeOpts(overrides: Partial<GenerateOptions> = {}): GenerateOptions {
+  return {
+    teacherProfile: makeTeacherProfile(),
+    selfAssessment: makeSelfAssessment(),
+    fingerprint: makeFingerprint(),
+    samples: [
+      { label: "Essay 1", content: "This is a sample essay about history. The events of the war showed that..." },
+      { label: "Essay 2", content: "In the novel, the author shows how the character changes. This proves that..." },
+    ],
+    assignment: "Write a 500-word essay about symbolism in The Great Gatsby.",
+    wordCount: 500,
+    requirements: "Include at least 3 quotes.",
+    ...overrides,
+  };
+}
+
+// ─── Plan prompt tests ───
+
+describe("buildLevel2PlanPrompt", () => {
+  it("includes assignment and requirements", () => {
+    const result = buildLevel2PlanPrompt(makeOpts());
+    expect(result).toContain("symbolism in The Great Gatsby");
+    expect(result).toContain("3 quotes");
+  });
+
+  it("includes student context (grade level, grade range)", () => {
+    const result = buildLevel2PlanPrompt(makeOpts());
+    expect(result).toContain("11th grade");
+    expect(result).toContain("B-/C+");
+  });
+
+  it("does NOT include fingerprint JSON", () => {
+    const result = buildLevel2PlanPrompt(makeOpts());
+    expect(result).not.toContain('"sentencePatterns"');
+    expect(result).not.toContain("VOICE ENFORCEMENT");
+    expect(result).not.toContain("Voice Placement Plan");
+  });
+
+  it("does NOT include writing samples", () => {
+    const result = buildLevel2PlanPrompt(makeOpts());
+    expect(result).not.toContain("events of the war");
+    expect(result).not.toContain("Reference 1");
+  });
+
+  it("includes word count target", () => {
+    const result = buildLevel2PlanPrompt(makeOpts());
+    expect(result).toContain("500");
+  });
+});
+
+// ─── Writing prompt tests ───
+
+describe("buildLevel2WritingPrompt", () => {
+  const outline = "I. Intro with thesis\nII. Green light analysis\nIII. Valley of Ashes\nIV. Conclusion";
+
+  it("places samples BEFORE fingerprint", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    const samplesIdx = result.indexOf("THEIR ACTUAL WRITING");
+    const profileIdx = result.indexOf("WRITER'S PROFILE");
+    expect(samplesIdx).toBeGreaterThan(-1);
+    expect(profileIdx).toBeGreaterThan(-1);
+    expect(samplesIdx).toBeLessThan(profileIdx);
+  });
+
+  it("includes samples content", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).toContain("events of the war");
+    expect(result).toContain("author shows how the character");
+  });
+
+  it("uses narrative fingerprint, not JSON", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).not.toContain('"sentencePatterns"');
+    expect(result).not.toContain('"vocabulary"');
+    expect(result).toContain("Sentences:");
+    expect(result).toContain("Vocabulary:");
+  });
+
+  it("presents questionnaire data as context, not rules", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).not.toContain("VOICE ENFORCEMENT");
+    expect(result).not.toContain("Each rule is mandatory");
+    expect(result).toContain("WHAT THE STUDENT SAYS");
+  });
+
+  it("includes anti-checklist directive", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).toContain("Do NOT apply every stylistic trait in every paragraph");
+  });
+
+  it("includes AI red flag avoidance", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).toContain("delve into");
+    expect(result).toContain("multifaceted");
+  });
+
+  it("includes the outline", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).toContain("Green light analysis");
+  });
+
+  it("includes Level 2 enhanced fields as context", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).toContain("As [author] states");
+    expect(result).toContain("however");
+    expect(result).toContain("body paragraphs");
+  });
+});
+
+// ─── Audit prompt tests ───
+
+describe("buildLevel2AuditPrompt", () => {
+  const essay = "Gatsby believed in the green light. This shows that the American Dream is impossible.";
+
+  it("includes student samples as reference standard", () => {
+    const fp = makeFingerprint();
+    const sa = makeSelfAssessment();
+    const samples = [{ label: "Essay 1", content: "Sample content here" }];
+    const result = buildLevel2AuditPrompt(essay, fp, samples, sa);
+    expect(result).toContain("Sample content here");
+    expect(result).toContain("STUDENT'S REAL WRITING");
+  });
+
+  it("includes the generated essay to audit", () => {
+    const fp = makeFingerprint();
+    const sa = makeSelfAssessment();
+    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    expect(result).toContain("green light");
+    expect(result).toContain("GENERATED ESSAY TO AUDIT");
+  });
+
+  it("uses forensic comparison framing, not checklist", () => {
+    const fp = makeFingerprint();
+    const sa = makeSelfAssessment();
+    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    expect(result).not.toContain("Checklist");
+    expect(result).not.toContain("verify each one");
+    expect(result).toContain("would a teacher");
+  });
+
+  it("explicitly says do NOT remove imperfections", () => {
+    const fp = makeFingerprint();
+    const sa = makeSelfAssessment();
+    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    expect(result).toContain("Do NOT remove intentional imperfections");
+  });
+
+  it("includes AI detector phrases", () => {
+    const fp = makeFingerprint();
+    const sa = makeSelfAssessment();
+    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    expect(result).toContain("delve into");
+    expect(result).toContain("pivotal");
   });
 });
