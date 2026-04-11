@@ -450,71 +450,46 @@ ${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
 Write the essay now.`;
 }
 
-// ─── Level 2 Outline Prompt (uses all 12 fields) ───
+// ─── Level 2 Plan Prompt (simplified structural outline) ───
 
-export function buildLevel2OutlinePrompt(opts: GenerateOptions): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, assignment, wordCount, requirements } = opts;
+export function buildLevel2PlanPrompt(opts: GenerateOptions): string {
+  const { teacherProfile: tp, selfAssessment: sa, assignment, wordCount, requirements } = opts;
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
   const evidence = resolveValue(sa.evidenceApproach, sa.evidenceOther);
   const conclusion = resolveValue(sa.conclusionApproach, sa.conclusionOther);
-  const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
-  const losesPoints = formatList(tp.losesPointsFor, tp.losesPointsOther);
-  const quoteIntros = formatList(sa.quoteIntroStyle ?? [], sa.quoteIntroOther);
-  const overused = formatList(sa.overusedPhrases ?? [], sa.overusedPhrasesOther);
-  const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
 
-  return `Create a detailed outline for an essay that matches this student's writing patterns. Plan voice markers INTO the outline — don't leave voice for later.
+  return `Create a structural outline for this essay assignment.
 
-## Assignment
+ASSIGNMENT:
 ${assignment}
-${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
 
-## Student's Structural Patterns (from fingerprint)
-- Intro pattern: ${fingerprint.structure.introPattern}
-- Body paragraph pattern: ${fingerprint.structure.bodyParagraphPattern}
-- Conclusion pattern: ${fingerprint.structure.conclusionPattern}
-- Avg paragraph length: ${fingerprint.structure.avgParagraphLength} sentences
-- Thesis placement: ${fingerprint.structure.thesisPlacement}
-- Evidence method: ${fingerprint.evidenceStyle.method}
-- Analysis depth: ${fingerprint.evidenceStyle.analysisDepth}
-- Argument style: ${fingerprint.rhetoric.argumentStyle}
-- Counter-arguments: ${fingerprint.rhetoric.counterArguments}
+TARGET WORD COUNT: ${wordCount}
 
-## Student's Self-Reported Patterns
+STUDENT CONTEXT:
+- Grade level: ${gradeLevel}
+- Typical grade: ${gradeRange}
 - Evidence approach: ${evidence}
 - Conclusion approach: ${conclusion}
-- Weaknesses to avoid: ${losesPoints}
-${timeSpent ? `- They spend the most time on: ${timeSpent} — that section gets the most polish` : ""}
 
-## Voice Placement Plan (embed these into the outline)
-- Plan where to use their quote intro patterns: ${quoteIntros}
-- Plan where to deploy their overused phrases (at least 2-3 times): ${overused}
-- Plan which hedging phrases to use in which paragraphs: ${fingerprint.rhetoric.hedgingLanguage.join(", ")}
-- Plan sentence openers for each paragraph from: ${fingerprint.rhythm.sentenceOpeners.join(", ")}
-${timeSpent ? `- Plan the polish gradient: "${timeSpent}" gets the most polish; other sections stay rougher` : ""}
-- Plan which known errors will appear where (they fix ${selfEdit} during self-editing — let other error types survive)
+The outline should include:
+- A thesis direction (not the exact wording)
+- Number of body paragraphs and what each argues
+- Which evidence or quotes to use in each paragraph
+- A brief note on conclusion approach
 
-## Quality Target
-Grade level: ${gradeLevel}, typical grade: ${gradeRange}
-Target: ~${wordCount} words
-
-Return a structured outline with:
-1. A thesis statement that matches their voice and assertiveness level (${fingerprint.rhetoric.assertiveness})
-2. Paragraph-by-paragraph plan: topic sentence idea, evidence to include, analysis approach, AND which voice markers go where
-3. Follow their typical structure — do NOT impose a structure they don't naturally use
-4. Note which sections should feel more polished vs rougher
-
-Return ONLY the outline, no commentary.`;
+Keep it structural. Do NOT include voice instructions, style notes, phrase placements, or writing tips. Structure only.`;
 }
 
-// ─── Level 2 Generation Prompt (uses outline + all 12 fields) ───
+// ─── Level 2 Writing Prompt (sample-first generation) ───
 
-export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: string): string {
+export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
   const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
 
   const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint, sa);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -523,101 +498,138 @@ export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: stri
   const conclusion = resolveValue(sa.conclusionApproach, sa.conclusionOther);
   const wordCountTendency = resolveValue(sa.wordCountTendency, sa.wordCountOther);
   const losesPoints = formatList(tp.losesPointsFor, tp.losesPointsOther);
-  const habits = sa.writingHabits ?? [];
-  const habitsOther = sa.writingHabitsOther ?? "";
+  const habits = formatList(sa.writingHabits, sa.writingHabitsOther);
 
-  // Level 2 enhanced fields
   const quoteIntros = formatList(sa.quoteIntroStyle ?? [], sa.quoteIntroOther);
   const overused = formatList(sa.overusedPhrases ?? [], sa.overusedPhrasesOther);
   const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
   const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
 
-  // Map each writing habit checkbox to a concrete instruction
-  const habitInstructions = mapHabitsToInstructions(habits, habitsOther);
+  let revisionDescription = "";
+  if (revision === "I submit my first draft as-is") {
+    revisionDescription = "Essay should feel unpolished: rough transitions, occasional incomplete thoughts, uneven paragraph lengths.";
+  } else if (revision === "I reread and fix obvious errors") {
+    revisionDescription = "Essay should be mostly clean but with occasional awkward phrasing and underdeveloped analysis.";
+  } else {
+    revisionDescription = "Essay should feel more polished but still at their grade level.";
+  }
 
-  return `You are replicating a specific student's writing voice with extreme precision. Follow the outline below exactly. Every rule in the VOICE ENFORCEMENT section is mandatory — violating any one means the essay fails to match.
+  const selfReportedLines: string[] = [
+    `- Grade level: ${gradeLevel}, typically earns ${gradeRange}`,
+    `- Revision style: ${revision} — ${revisionDescription}`,
+    `- Evidence approach: ${evidence}`,
+    `- Conclusion approach: ${conclusion}`,
+    `- Word count tendency: ${wordCountTendency}`,
+    `- Known weaknesses (loses points for): ${losesPoints}`,
+    `- Writing habits: ${habits}`,
+  ];
+  if (sa.quoteIntroStyle?.length || sa.quoteIntroOther) {
+    selfReportedLines.push(`- They typically introduce quotes like: ${quoteIntros}`);
+  }
+  if (sa.overusedPhrases?.length || sa.overusedPhrasesOther) {
+    selfReportedLines.push(`- They know they overuse these phrases: ${overused}`);
+  }
+  if (sa.selfEditFocus?.length || sa.selfEditOther) {
+    selfReportedLines.push(`- When self-editing, they focus on fixing: ${selfEdit}`);
+  }
+  if (timeSpent) {
+    selfReportedLines.push(`- They spend the most time polishing: ${timeSpent}`);
+  }
 
-## Outline (follow this structure)
-${outline}
+  return `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
 
-## Style Fingerprint
-${JSON.stringify(fingerprint, null, 2)}
-
-## Reference Samples (read these to internalize their voice — this is what they ACTUALLY sound like)
 ${refSamples}
 
-## Assignment
+Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.
+
+---
+
+WRITER'S PROFILE (analyst's notes on this student's patterns):
+
+${narrative}
+
+---
+
+WHAT THE STUDENT SAYS ABOUT THEMSELVES:
+
+${selfReportedLines.join("\n")}
+
+---
+
+ASSIGNMENT:
 ${assignment}
-${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
 
-## VOICE ENFORCEMENT — Each rule is mandatory
+OUTLINE TO FOLLOW:
+${outline}
 
-FROM FINGERPRINT:
-1. VOCABULARY: Use ONLY words in tier "${fingerprint.vocabulary.tier}". Include these signature words at least once each: ${fingerprint.vocabulary.signatureWords.slice(0, 8).join(", ")}. NEVER use: ${fingerprint.vocabulary.avoidedWords.join(", ")}.
-2. SENTENCES: Average ${fingerprint.sentencePatterns.averageLength} words. Tendency: "${fingerprint.sentencePatterns.tendency}". Vary sentences ${fingerprint.sentencePatterns.variation}.
-3. TRANSITIONS: ALLOWED: ${fingerprint.transitions.favorites.join(", ")}. BANNED: ${fingerprint.transitions.neverUses.join(", ")}. Use paragraph openers from: ${fingerprint.transitions.paragraphOpeners.join(", ")}.
-4. STRUCTURE: Intro: "${fingerprint.structure.introPattern}". Body: "${fingerprint.structure.bodyParagraphPattern}". Conclusion: "${fingerprint.structure.conclusionPattern}". Paragraphs avg ${fingerprint.structure.avgParagraphLength} sentences.
-5. EVIDENCE: Method: ${fingerprint.evidenceStyle.method}. After quoting: "${fingerprint.evidenceStyle.analysisPattern}". Depth: ${fingerprint.evidenceStyle.analysisDepth}.
-6. ERRORS: Reproduce these grammar patterns: ${fingerprint.errors.grammarPatterns.join(", ")}. Punctuation habits: ${fingerprint.errors.punctuationHabits.join(", ")}. These feel natural to this student.
-7. VOICE: ${fingerprint.voice.toneDescription}. Contractions: ${fingerprint.voice.contractions ? "yes" : "no"}. Perspective: ${fingerprint.voice.perspective}. Distinctive: ${fingerprint.voice.distinctiveTraits.join(", ")}.
-8. RHETORIC: Argues by ${fingerprint.rhetoric.argumentStyle}. Counter-arguments: ${fingerprint.rhetoric.counterArguments}. Uses hedging: ${fingerprint.rhetoric.hedgingLanguage.join(", ")} — include at least 3 of these.
-9. RHYTHM: Starts sentences with: ${fingerprint.rhythm.sentenceOpeners.join(", ")} — use at least 5 of these. Paragraph rhythm: ${fingerprint.rhythm.paragraphRhythm}.
+---
 
-FROM QUESTIONNAIRE:
-10. GRADE CEILING: This is a ${gradeRange} essay from a ${gradeLevel} student. Do NOT exceed this quality level.
-11. REVISION FEEL: Student's revision style is "${revision}". ${revision === "I submit my first draft as-is" ? "Essay should feel unpolished: rough transitions, occasional incomplete thoughts, uneven paragraph lengths." : revision === "I reread and fix obvious errors" ? "Essay should be mostly clean but with occasional awkward phrasing and underdeveloped analysis." : "Essay should feel more polished but still at their grade level."}
-12. WEAKNESSES: Student loses points for: ${losesPoints}. Include subtle traces of these weaknesses — the teacher expects to see them.
-${habitInstructions ? `13. WRITING HABITS:\n${habitInstructions}` : ""}
-14. WORD COUNT: Target ~${wordCount} words. Student ${wordCountTendency}.
+CRITICAL GUIDELINES:
 
-FROM LEVEL 2 ENHANCED:
-15. QUOTE PATTERNS: When introducing any quote, use ONLY these phrasings: ${quoteIntros}. Never use any other quote introduction pattern. This is a critical voice marker.
-16. OVERUSED PHRASES: Include these phrases: ${overused}. Place them where a student naturally would — in topic sentences, transitions, and analysis sentences. Include at least 3 across the essay.
-17. ERROR SURVIVAL: Student self-edits for: ${selfEdit}. This means those error types are FIXED in their writing. But errors OUTSIDE that list survive. Let non-self-edited error types persist naturally.
-${timeSpent ? `18. POLISH GRADIENT: Student spends the most effort on "${timeSpent}". That section should be noticeably more polished. Other sections should feel comparatively rougher — less refined transitions, simpler analysis, less careful word choice.` : ""}
+- The writing samples above are your ground truth. When in doubt, match what you see in the samples.
+- Do NOT apply every stylistic trait in every paragraph. Real writers are inconsistent — their habits appear naturally, sometimes more, sometimes less. If they overuse "however," it should appear a few times, not in every paragraph.
+- If they make errors in their samples (comma splices, run-ons, informal language), include similar errors. Do NOT write a flawless essay for a flawed writer. Match their actual error rate from the samples.
+- Match their paragraph length from the samples. If their paragraphs are typically 4-6 sentences with variation, write 4-6 sentence paragraphs with variation. Do not write uniform single-sentence paragraphs.
+- Match their vocabulary level exactly. If they use simple, direct words in their samples, do not reach for impressive synonyms or academic phrasing.
+- The essay should earn a grade consistent with ${gradeRange} — not higher. A B student's essay should read like a B essay.
+- Target ~${wordCount} words.
 
-Write the essay now, following the outline.`;
+AVOID THESE AI-DETECTOR RED FLAGS:
+"delve into", "it's important to note", "in today's society", "furthermore", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament"
+
+Write the essay now. Return ONLY the essay text, no commentary or headers.`;
 }
 
-// ─── Level 2 Refinement Prompt (pass 3 — self-correction) ───
+// ─── Level 2 Audit Prompt (pass 3 — forensic sample comparison) ───
 
-export function buildRefinementPrompt(
+export function buildLevel2AuditPrompt(
   essay: string,
   fingerprint: StyleFingerprint,
   samples: Sample[],
   selfAssessment: SelfAssessment,
 ): string {
   const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint, selfAssessment);
 
-  const revision = resolveValue(selfAssessment.revisionLevel, selfAssessment.revisionOther);
-  const gradeRange = resolveValue(selfAssessment.gradeRange, selfAssessment.gradeRangeOther);
-  const quoteIntros = formatList(selfAssessment.quoteIntroStyle ?? [], selfAssessment.quoteIntroOther);
-  const overused = formatList(selfAssessment.overusedPhrases ?? [], selfAssessment.overusedPhrasesOther);
+  return `STUDENT'S REAL WRITING — this is the reference standard:
 
-  return `You are a quality control editor. Compare this essay against the student's actual writing samples and style fingerprint. Your job is to find any places where the essay sounds like AI or deviates from the student's real voice, and fix them.
-
-## Generated Essay
-${essay}
-
-## Style Fingerprint
-${JSON.stringify(fingerprint, null, 2)}
-
-## Student's Actual Writing (compare against these)
 ${refSamples}
 
-## Checklist — verify each one:
-- Vocabulary stays within ${fingerprint.vocabulary.tier} tier. No words from avoidedWords list: ${fingerprint.vocabulary.avoidedWords.join(", ")}
-- Transitions are ONLY from favorites list: ${fingerprint.transitions.favorites.join(", ")}
-- Sentence length averages ~${fingerprint.sentencePatterns.averageLength} words with ${fingerprint.sentencePatterns.variation} variation
-- Quote introductions use ONLY: ${quoteIntros}
-- Overused phrases appear 2-3 times: ${overused}
-- Hedging language present: ${fingerprint.rhetoric.hedgingLanguage.join(", ")}
-- Sentence openers match: ${fingerprint.rhythm.sentenceOpeners.join(", ")}
-- "${revision}" revision feel — polish level matches
-- Quality ceiling: reads like a ${gradeRange} essay, not higher
-- No AI-sounding phrases ("delve into", "it's important to note", "in today's society", "furthermore", "in conclusion", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance")
+---
 
-Rewrite the essay fixing ONLY the deviations. Preserve everything that already matches. Do not add polish, sophistication, or improve quality — only fix voice mismatches. Return ONLY the corrected essay, no commentary.`;
+GENERATED ESSAY TO AUDIT:
+
+${essay}
+
+---
+
+WRITER'S PROFILE (for reference):
+
+${narrative}
+
+---
+
+YOUR TASK:
+
+Read the student's real writing samples carefully. Then read the generated essay. Ask yourself: would a teacher who has read dozens of this student's essays believe they wrote this one?
+
+Fix any passage where the answer is no. Specifically look for:
+
+- Vocabulary that is more sophisticated than what appears in their samples
+- Sentences that are more polished or complex than their typical writing
+- Paragraph structures that don't match their natural patterns (if they write multi-sentence paragraphs in their samples, the essay should too)
+- Missing natural errors — if they make comma splices, run-ons, or informal phrasings in their samples, the essay should include similar imperfections
+- Transitions or connective phrases they never use in their samples
+- AI-detector phrases: "delve into", "it's important to note", "in today's society", "furthermore", "in conclusion", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament"
+- Any passage that reads as "too perfect" compared to their actual writing level
+
+IMPORTANT:
+- Do NOT add polish, sophistication, or improve the essay's quality
+- Do NOT remove intentional imperfections — they are there because the student writes that way
+- Do NOT make the essay better. Make it more authentic.
+- Preserve everything that already sounds like the student
+- Return ONLY the corrected essay, no commentary`;
 }
 
 function mapHabitsToInstructions(habits: string[], other: string): string {
