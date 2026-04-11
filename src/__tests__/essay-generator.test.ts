@@ -98,7 +98,7 @@ describe("formatFingerprintNarrative", () => {
   it("produces readable text, not JSON", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = formatFingerprintNarrative(fp, sa);
+    const result = formatFingerprintNarrative(fp);
 
     expect(result).not.toContain("{");
     expect(result).not.toContain("}");
@@ -112,7 +112,7 @@ describe("formatFingerprintNarrative", () => {
   it("includes vocabulary signature words and avoided words", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = formatFingerprintNarrative(fp, sa);
+    const result = formatFingerprintNarrative(fp);
 
     expect(result).toContain("shows");
     expect(result).toContain("proves");
@@ -122,7 +122,7 @@ describe("formatFingerprintNarrative", () => {
   it("includes transition favorites and avoids", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = formatFingerprintNarrative(fp, sa);
+    const result = formatFingerprintNarrative(fp);
 
     expect(result).toContain("However");
     expect(result).toContain("Furthermore");
@@ -131,7 +131,7 @@ describe("formatFingerprintNarrative", () => {
   it("includes error patterns", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = formatFingerprintNarrative(fp, sa);
+    const result = formatFingerprintNarrative(fp);
 
     expect(result).toContain("comma splices");
     expect(result).toContain("semicolons");
@@ -140,7 +140,7 @@ describe("formatFingerprintNarrative", () => {
   it("includes overall assessment", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = formatFingerprintNarrative(fp, sa);
+    const result = formatFingerprintNarrative(fp);
 
     expect(result).toContain("competent but developing");
   });
@@ -164,7 +164,7 @@ describe("formatFingerprintNarrative", () => {
       rhythm: { sentenceOpeners: [], paragraphRhythm: "varied", listUsage: "never" },
     });
     const sa = makeSelfAssessment();
-    const result = formatFingerprintNarrative(fp, sa);
+    const result = formatFingerprintNarrative(fp);
 
     expect(result).toBeTruthy();
     expect(result).toContain("basic");
@@ -296,27 +296,35 @@ describe("buildLevel2WritingPrompt", () => {
 describe("buildLevel2AuditPrompt", () => {
   const essay = "Gatsby believed in the green light. This shows that the American Dream is impossible.";
 
-  it("includes student samples as reference standard", () => {
+  it("places samples before essay in correct sections", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const samples = [{ label: "Essay 1", content: "Sample content here" }];
+    const samples = [
+      { label: "Essay 1", content: "Sample content here about the war" },
+      { label: "Essay 2", content: "Another sample about literature" },
+    ];
     const result = buildLevel2AuditPrompt(essay, fp, samples, sa);
-    expect(result).toContain("Sample content here");
-    expect(result).toContain("STUDENT'S REAL WRITING");
-  });
 
-  it("includes the generated essay to audit", () => {
-    const fp = makeFingerprint();
-    const sa = makeSelfAssessment();
-    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    // Samples appear in the reference section
+    expect(result).toContain("Sample content here about the war");
+    expect(result).toContain("Another sample about literature");
+    expect(result).toContain("STUDENT'S REAL WRITING");
+
+    // Essay appears in the audit section
     expect(result).toContain("green light");
     expect(result).toContain("GENERATED ESSAY TO AUDIT");
+
+    // Samples come BEFORE the essay (forensic comparison order)
+    const samplesIdx = result.indexOf("STUDENT'S REAL WRITING");
+    const essayIdx = result.indexOf("GENERATED ESSAY TO AUDIT");
+    expect(samplesIdx).toBeLessThan(essayIdx);
   });
 
   it("uses forensic comparison framing, not checklist", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    const samples = [{ label: "Essay 1", content: "Sample writing" }];
+    const result = buildLevel2AuditPrompt(essay, fp, samples, sa);
     expect(result).not.toContain("Checklist");
     expect(result).not.toContain("verify each one");
     expect(result).toContain("would a teacher");
@@ -325,14 +333,16 @@ describe("buildLevel2AuditPrompt", () => {
   it("explicitly says do NOT remove imperfections", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    const samples = [{ label: "Essay 1", content: "Sample writing" }];
+    const result = buildLevel2AuditPrompt(essay, fp, samples, sa);
     expect(result).toContain("Do NOT remove intentional imperfections");
   });
 
   it("includes AI detector phrases", () => {
     const fp = makeFingerprint();
     const sa = makeSelfAssessment();
-    const result = buildLevel2AuditPrompt(essay, fp, [], sa);
+    const samples = [{ label: "Essay 1", content: "Sample writing" }];
+    const result = buildLevel2AuditPrompt(essay, fp, samples, sa);
     expect(result).toContain("delve into");
     expect(result).toContain("pivotal");
   });

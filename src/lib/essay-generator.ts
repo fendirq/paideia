@@ -306,7 +306,6 @@ export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerp
 
 export function formatFingerprintNarrative(
   fp: StyleFingerprint,
-  sa: SelfAssessment,
 ): string {
   const lines: string[] = [];
 
@@ -489,7 +488,7 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
   const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
 
   const refSamples = selectDiverseSamples(samples);
-  const narrative = formatFingerprintNarrative(fingerprint, sa);
+  const narrative = formatFingerprintNarrative(fingerprint);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -590,7 +589,7 @@ export function buildLevel2AuditPrompt(
   selfAssessment: SelfAssessment,
 ): string {
   const refSamples = selectDiverseSamples(samples);
-  const narrative = formatFingerprintNarrative(fingerprint, selfAssessment);
+  const narrative = formatFingerprintNarrative(fingerprint);
 
   return `STUDENT'S REAL WRITING — this is the reference standard:
 
