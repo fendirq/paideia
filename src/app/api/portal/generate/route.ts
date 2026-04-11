@@ -5,9 +5,9 @@ import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   buildLevel1Prompt,
-  buildLevel2OutlinePrompt,
-  buildLevel2GenerationPrompt,
-  buildRefinementPrompt,
+  buildLevel2PlanPrompt,
+  buildLevel2WritingPrompt,
+  buildLevel2AuditPrompt,
   buildLegacyLevel1Prompt,
   normalizeFingerprint,
 } from "@/lib/essay-generator";
@@ -231,14 +231,14 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   let rawEssay = "";
 
   try {
-    // Step 1: Generate outline (non-streaming, 45s timeout)
-    const outlinePrompt = buildLevel2OutlinePrompt(opts);
+    // Step 1: Structural plan (non-streaming, 45s timeout)
+    const planPrompt = buildLevel2PlanPrompt(opts);
     const outlineMsg = await anthropic.messages.create({
       model: LEVEL2_MODEL,
       max_tokens: 1024,
       temperature: 0.4,
-      system: "You are an essay planning assistant. Create structured outlines that match a student's writing patterns.",
-      messages: [{ role: "user", content: outlinePrompt }],
+      system: "You are an essay planning assistant. Create a concise structural outline for the assignment.",
+      messages: [{ role: "user", content: planPrompt }],
     }, { signal: AbortSignal.timeout(45_000) });
 
     outline = outlineMsg.content
@@ -246,14 +246,14 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       .map((block) => block.text)
       .join("");
 
-    // Step 2: Generate essay from outline (non-streaming, 75s timeout)
-    const generationPrompt = buildLevel2GenerationPrompt(opts, outline);
+    // Step 2: Sample-first essay generation (non-streaming, 75s timeout)
+    const writingPrompt = buildLevel2WritingPrompt(opts, outline);
     const essayMsg = await anthropic.messages.create({
       model: LEVEL2_MODEL,
       max_tokens: 4096,
-      temperature: 0.5,
-      system: generationPrompt,
-      messages: [{ role: "user", content: "Write the essay now, following the outline." }],
+      temperature: 0.6,
+      system: "You are ghostwriting an essay as a specific student. Your only goal is to produce writing that is indistinguishable from their own. Study their writing samples carefully — they are your primary guide. Write exactly as they would. Not better. Not worse.",
+      messages: [{ role: "user", content: writingPrompt }],
     }, { signal: AbortSignal.timeout(75_000) });
 
     rawEssay = essayMsg.content
@@ -277,8 +277,8 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     );
   }
 
-  // Step 3: Refinement pass — compare against fingerprint + samples, fix voice mismatches
-  const refinementPrompt = buildRefinementPrompt(
+  // Step 3: Forensic audit — compare against student's real samples, fix voice mismatches
+  const auditPrompt = buildLevel2AuditPrompt(
     rawEssay,
     opts.fingerprint,
     opts.samples,
@@ -293,8 +293,8 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
           model: LEVEL2_MODEL,
           max_tokens: 4096,
           temperature: 0.3,
-          system: "You are a quality control editor specializing in voice matching. Fix deviations from the student's real writing voice. Do not add polish or sophistication. Return only the corrected essay.",
-          messages: [{ role: "user", content: refinementPrompt }],
+          system: "You are a writing forensics expert. Your job is to compare a generated essay against a student's real writing samples and determine if it sounds like the same person wrote both. Fix anything that doesn't match.",
+          messages: [{ role: "user", content: auditPrompt }],
         }, { signal: AbortSignal.timeout(55_000) });
 
         for await (const event of messageStream) {

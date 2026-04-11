@@ -632,28 +632,6 @@ IMPORTANT:
 - Return ONLY the corrected essay, no commentary`;
 }
 
-function mapHabitsToInstructions(habits: string[], other: string): string {
-  const map: Record<string, string> = {
-    "I start essays with a question or hook quote": "Start the introduction with a question or hook quote.",
-    "I overuse certain transition words": "Use transition favorites with higher frequency than normal.",
-    "My introductions tend to be long/wordy": "Make the introduction 30%+ longer than body paragraphs.",
-    "I write in first person even when I probably shouldn't": "Use first person throughout, even in analytical sections.",
-    "I use rhetorical questions a lot": "Include at least 2 rhetorical questions in body paragraphs.",
-    "I repeat my thesis in different words throughout": "Rephrase the thesis at least twice in body paragraphs.",
-    "My paragraphs tend to be short": "Keep paragraphs to 3-4 sentences max.",
-    "I use informal language or slang sometimes": "Include 2-3 informal phrases or colloquialisms.",
-    "I have a go-to closing phrase or style": "Use conclusion pattern from fingerprint strictly.",
-    "I struggle with commas and punctuation": "Include comma splices and missing commas in 2-3 sentences.",
-  };
-
-  const lines: string[] = [];
-  for (const h of habits) {
-    if (map[h]) lines.push(`   - ${map[h]}`);
-  }
-  if (other) lines.push(`   - ${other}`);
-  return lines.join("\n");
-}
-
 // ─── Legacy Prompts (fallback when no fingerprint exists) ───
 
 export function buildLegacyLevel1Prompt(opts: LegacyGenerateOptions): string {
