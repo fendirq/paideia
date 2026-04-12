@@ -90,7 +90,7 @@ export async function POST(req: Request) {
       userId: session.user.id,
       subject: normalizedSubject,
       assignment: assignment.slice(0, 5000),
-      requirements: requirements?.slice(0, 1000) || null,
+      requirements: requirements?.slice(0, 5000) || null,
       level,
       essay,
       wordCount,

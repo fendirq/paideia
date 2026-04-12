@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
+import { fetchSourceContext, formatSourceContextForPrompt, normalizeSourceLinks } from "@/lib/source-context";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,
@@ -45,6 +46,8 @@ interface GenerateBody {
   wordCount: number;
   requirements?: string;
   level: 1 | 2;
+  sourceLinks?: string[];
+  sourceText?: string;
 }
 
 function resolveSelectedValue(value: string | null | undefined, other: string | null | undefined): string {
@@ -159,7 +162,7 @@ export async function POST(req: Request) {
   }
 
   const body: GenerateBody = await req.json();
-  const { assignment, wordCount, requirements, level } = body;
+  const { assignment, wordCount, requirements, level, sourceLinks, sourceText } = body;
 
   if (!assignment?.trim()) {
     return NextResponse.json({ error: "Assignment is required" }, { status: 400 });
@@ -170,8 +173,24 @@ export async function POST(req: Request) {
   if (typeof level !== "number" || (level !== 1 && level !== 2)) {
     return NextResponse.json({ error: "Invalid level" }, { status: 400 });
   }
-  if (assignment.length > 5000 || (requirements && requirements.length > 5000)) {
+  if (assignment.length > 5000 || (requirements && requirements.length > 5000) || (sourceText && sourceText.length > 4000)) {
     return NextResponse.json({ error: "Input too long" }, { status: 400 });
+  }
+
+  const normalizedSourceLinks = normalizeSourceLinks(sourceLinks);
+  let sourceContext = "";
+  if (normalizedSourceLinks.length > 0 || sourceText?.trim()) {
+    try {
+      const fetchedSources = normalizedSourceLinks.length > 0
+        ? await fetchSourceContext(normalizedSourceLinks)
+        : [];
+      sourceContext = formatSourceContextForPrompt(fetchedSources, sourceText);
+      if (!sourceContext.trim()) {
+        return NextResponse.json({ error: "Unable to read the provided source links. Try a different link or paste source notes manually." }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Unable to fetch one of the provided source links. Try again or paste the source text manually." }, { status: 400 });
+    }
   }
 
   const userId = session.user.id;
@@ -248,6 +267,7 @@ export async function POST(req: Request) {
       assignment,
       wordCount,
       requirements,
+      sourceContext,
     };
 
     if (level === 1) {
@@ -277,6 +297,7 @@ export async function POST(req: Request) {
       assignment,
       wordCount,
       requirements,
+      sourceContext,
     };
 
     return streamLegacy(legacyOpts);
@@ -409,6 +430,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       rawEssay,
       opts.fingerprint,
       opts.samples,
+      opts.sourceContext,
     );
     const critiqueMsg = await createLevel2Message(anthropic, {
       prompt: critiquePrompt,
@@ -431,6 +453,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     opts.fingerprint,
     opts.samples,
     critiqueNotes,
+    opts.sourceContext,
   );
 
   let auditedEssay = "";

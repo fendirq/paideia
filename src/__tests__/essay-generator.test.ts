@@ -302,6 +302,15 @@ describe("buildLevel2WritingPrompt", () => {
     const result = buildLevel2WritingPrompt(makeOpts(), outline);
     expect(result).toContain('Do NOT hide behind placeholders like "in class we talked about"');
   });
+
+  it("includes approved source material when provided", () => {
+    const result = buildLevel2WritingPrompt(
+      makeOpts({ sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nBattle of the Zab happened in 750." }),
+      outline,
+    );
+    expect(result).toContain("APPROVED SOURCE MATERIAL");
+    expect(result).toContain("Battle of the Zab happened in 750");
+  });
 });
 
 // ─── Audit prompt tests ───
@@ -333,6 +342,19 @@ describe("buildLevel2CritiquePrompt", () => {
 
     expect(result).toContain("Do NOT rewrite the essay");
     expect(result).toContain("ruthless writing-forensics reviewer");
+  });
+
+  it("includes source material when provided", () => {
+    const fp = makeFingerprint();
+    const samples = [{ label: "Essay 1", content: "Sample writing" }];
+    const result = buildLevel2CritiquePrompt(
+      essay,
+      fp,
+      samples,
+      "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nPrimary source excerpt.",
+    );
+
+    expect(result).toContain("Primary source excerpt.");
   });
 });
 
@@ -395,6 +417,20 @@ describe("buildLevel2AuditPrompt", () => {
     expect(result).toContain("FORENSIC NOTES FROM A PRIOR REVIEW PASS");
     expect(result).toContain("Sentence rhythm is too uniform");
     expect(result).toContain("Treat every item in PRIORITY FIXES as binding");
+  });
+
+  it("includes source material when provided", () => {
+    const fp = makeFingerprint();
+    const samples = [{ label: "Essay 1", content: "Sample writing" }];
+    const result = buildLevel2AuditPrompt(
+      essay,
+      fp,
+      samples,
+      undefined,
+      "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nBattle of the Zab in 750 mattered.",
+    );
+
+    expect(result).toContain("Battle of the Zab in 750 mattered.");
   });
 });
 

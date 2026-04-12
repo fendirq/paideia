@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { EssayOutput } from "./EssayOutput";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
+import { buildPersistedRequirements, inferTargetWordCount, normalizeSourceLinks } from "@/lib/source-context";
 
 interface GeneratePageProps {
   subject: string;
@@ -15,15 +16,20 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
   const [assignment, setAssignment] = useState("");
   const [wordCount, setWordCount] = useState(500);
   const [requirements, setRequirements] = useState("");
+  const [sourceLinksInput, setSourceLinksInput] = useState("");
+  const [sourceText, setSourceText] = useState("");
   const [level, setLevel] = useState<1 | 2>(1);
   const [essay, setEssay] = useState("");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingRubric, setUploadingRubric] = useState(false);
+  const [uploadingSources, setUploadingSources] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [wordCountTouched, setWordCountTouched] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rubricInputRef = useRef<HTMLInputElement>(null);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch user's profile level on mount to pre-select (only if they have Level 2 access)
   useEffect(() => {
@@ -47,7 +53,11 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
           body: JSON.stringify({
             subject,
             assignment,
-            requirements,
+            requirements: buildPersistedRequirements(
+              requirements,
+              normalizeSourceLinks(sourceLinksInput),
+              sourceText,
+            ),
             level,
             essay: essayText,
             portalClassId: classId || null,
@@ -60,7 +70,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
         setSaveError("Essay generated but failed to save. Copy your text before leaving.");
       }
     },
-    [subject, assignment, requirements, level, classId]
+    [subject, assignment, requirements, sourceLinksInput, sourceText, level, classId]
   );
 
   const handleFileUpload = async (file: File) => {
@@ -76,6 +86,10 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
         return;
       }
       setAssignment(text);
+      if (!wordCountTouched) {
+        const inferred = inferTargetWordCount(text);
+        if (inferred) setWordCount(inferred);
+      }
     } catch {
       setError("Failed to extract text from file. Try again or paste manually.");
     } finally {
@@ -93,7 +107,14 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
       const res = await fetch("/api/portal/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignment, wordCount, requirements, level }),
+        body: JSON.stringify({
+          assignment,
+          wordCount,
+          requirements,
+          level,
+          sourceLinks: normalizeSourceLinks(sourceLinksInput),
+          sourceText,
+        }),
       });
 
       if (!res.ok) {
@@ -164,7 +185,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
     } finally {
       setGenerating(false);
     }
-  }, [assignment, wordCount, requirements, level, generating, saveEssay]);
+  }, [assignment, wordCount, requirements, sourceLinksInput, sourceText, level, generating, saveEssay]);
 
   const subjectLabel = subject.charAt(0).toUpperCase() + subject.slice(1);
 
@@ -256,6 +277,10 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
                           return;
                         }
                         setRequirements(text);
+                        if (!wordCountTouched) {
+                          const inferred = inferTargetWordCount(text);
+                          if (inferred) setWordCount(inferred);
+                        }
                       }
                     } catch {
                       setError("Failed to extract rubric. Try again or paste manually.");
@@ -309,12 +334,86 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
               max={2000}
               step={50}
               value={wordCount}
-              onChange={(e) => setWordCount(Number(e.target.value))}
+              onChange={(e) => {
+                setWordCountTouched(true);
+                setWordCount(Number(e.target.value));
+              }}
               className="w-full accent-accent"
             />
             <div className="flex justify-between text-[11px] text-text-muted mt-1">
               <span>250</span>
               <span>2000</span>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Source Links
+              </label>
+              <textarea
+                value={sourceLinksInput}
+                onChange={(e) => setSourceLinksInput(e.target.value)}
+                rows={4}
+                placeholder={"Paste up to 3 source URLs, one per line\nhttps://example.com/primary-source"}
+                className="input-field font-serif resize-y text-text-primary"
+              />
+              <p className="text-[11px] text-text-muted mt-2">
+                Level 2 will fetch these and use them as approved evidence.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Source Notes / Excerpts
+              </label>
+              <div
+                onClick={() => sourceInputRef.current?.click()}
+                className="border border-dashed border-[rgba(168,152,128,0.20)] hover:border-[rgba(168,152,128,0.40)] rounded-xl px-4 py-3 text-center cursor-pointer transition-colors mb-3"
+              >
+                <input
+                  ref={sourceInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.doc"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setUploadingSources(true);
+                    try {
+                      const form = new FormData();
+                      form.append("file", f);
+                      const res = await fetch("/api/portal/upload-sample", { method: "POST", body: form });
+                      if (res.ok) {
+                        const { text } = await res.json();
+                        setSourceText((prev) =>
+                          [prev.trim(), text.slice(0, 4000).trim()].filter(Boolean).join("\n\n---\n\n")
+                        );
+                      } else {
+                        setError("Failed to extract source article. Try again or paste the excerpt manually.");
+                      }
+                    } catch {
+                      setError("Failed to extract source article. Try again or paste the excerpt manually.");
+                    } finally {
+                      setUploadingSources(false);
+                    }
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+                <p className="text-text-primary text-sm font-medium">
+                  {uploadingSources ? "Extracting source article..." : "Upload source article"}
+                </p>
+                <p className="text-text-muted text-xs mt-1">PDF or DOCX</p>
+              </div>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                rows={4}
+                placeholder="Paste key quotations, article excerpts, or teacher-selected facts to force into the evidence pool."
+                className="input-field font-serif resize-y text-text-primary"
+              />
+              <p className="text-[11px] text-text-muted mt-2">
+                Use this if a source link is paywalled, messy, or you only want specific excerpts included.
+              </p>
             </div>
           </div>
         </div>
