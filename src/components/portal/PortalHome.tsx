@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { VideoHero } from "@/components/video-hero";
 import { ConfirmModal } from "@/components/confirm-modal";
 
@@ -43,7 +42,6 @@ const SUBJECT_ICONS: Record<string, React.ReactNode> = {
 };
 
 export function PortalHome({ userName, initialClasses, hasProfile }: PortalHomeProps) {
-  const router = useRouter();
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");

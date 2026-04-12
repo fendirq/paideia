@@ -93,6 +93,7 @@ export function StudyQueue({ items: initialItems }: StudyQueueProps) {
               >
                 <button
                   onClick={() => toggleComplete(item.id)}
+                  aria-label={item.completed ? `Mark ${item.topic} as not completed` : `Mark ${item.topic} as completed`}
                   className={`w-[20px] h-[20px] rounded-[6px] border-2 shrink-0 flex items-center justify-center transition-colors ${
                     item.completed
                       ? "bg-accent border-accent"

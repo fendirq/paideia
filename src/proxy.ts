@@ -2,7 +2,7 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
-  function middleware(req) {
+  function proxy(req) {
     const { pathname } = req.nextUrl;
 
     // If user is authenticated but on login page, redirect to app
@@ -59,7 +59,7 @@ export default withAuth(
           return token?.role === "STUDENT" || token?.role === "ADMIN";
         }
 
-        // Portal routes use their own PIN-based access system (cookie checked in middleware above)
+        // Portal routes use their own PIN-based access system (cookie checked above)
         if (pathname.startsWith("/portal") || pathname.startsWith("/api/portal")) {
           return true;
         }

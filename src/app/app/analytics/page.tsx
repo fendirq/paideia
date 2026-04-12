@@ -22,7 +22,6 @@ export default async function AnalyticsPage() {
     sessionsThisWeek,
     sessionsLastWeek,
     totalSessions,
-    inquiries,
     exams,
     studyItems,
   ] = await Promise.all([
@@ -36,7 +35,6 @@ export default async function AnalyticsPage() {
       where: { userId },
       select: { startedAt: true, inquiry: { select: { subject: true, unitName: true } } },
     }),
-    db.inquiry.count({ where: { userId } }),
     db.exam.findMany({
       where: {
         inquiry: { userId },

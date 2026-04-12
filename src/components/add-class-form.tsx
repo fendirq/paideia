@@ -63,8 +63,11 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-text-secondary mb-1.5">Class Name</label>
+            <label className="block text-sm text-text-secondary mb-1.5" htmlFor="add-class-name">
+              Class Name
+            </label>
             <input
+              id="add-class-name"
               type="text"
               value={className}
               onChange={(e) => setClassName(e.target.value)}
@@ -75,8 +78,11 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm text-text-secondary mb-1.5">Teacher</label>
+            <label className="block text-sm text-text-secondary mb-1.5" htmlFor="add-class-teacher">
+              Teacher
+            </label>
             <input
+              id="add-class-teacher"
               type="text"
               value={teacher}
               onChange={(e) => setTeacher(e.target.value)}
@@ -88,8 +94,11 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-text-secondary mb-1.5">Subject</label>
+              <label className="block text-sm text-text-secondary mb-1.5" htmlFor="add-class-subject">
+                Subject
+              </label>
               <select
+                id="add-class-subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 className={selectClass}
@@ -101,8 +110,11 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
             </div>
 
             <div>
-              <label className="block text-sm text-text-secondary mb-1.5">Semester</label>
+              <label className="block text-sm text-text-secondary mb-1.5" htmlFor="add-class-semester">
+                Semester
+              </label>
               <select
+                id="add-class-semester"
                 value={semester}
                 onChange={(e) => setSemester(e.target.value)}
                 className={selectClass}

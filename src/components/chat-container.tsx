@@ -6,6 +6,7 @@ import { ActionPanel } from "./action-panel";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { stripThinkingTags } from "@/lib/strip-thinking";
 import { parseActionsFromResponse, splitActions } from "@/lib/parse-actions";
+import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
 import { useHeartbeat } from "@/lib/use-heartbeat";
 
 interface Message {
@@ -234,6 +235,7 @@ export function ChatContainer({
 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
+      const sseState = createSseParserState();
       let fullText = "";
       let thinkingCleared = false;
 
@@ -242,10 +244,9 @@ export function ChatContainer({
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+        const messages = extractSseDataMessages(sseState, chunk);
 
-        for (const line of lines) {
-          const data = line.slice(6);
+        for (const data of messages) {
           if (data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data);
@@ -254,7 +255,7 @@ export function ChatContainer({
               fullText += delta;
 
               // Strip <think>...</think> tags and fix R1 sentence fragments
-              let visible = stripThinkingTags(fullText);
+              const visible = stripThinkingTags(fullText);
 
               // Don't show anything while model is still thinking
               if (!visible) continue;
@@ -281,6 +282,19 @@ export function ChatContainer({
           } catch {
             // skip parse errors
           }
+        }
+      }
+
+      for (const data of flushSseDataMessages(sseState)) {
+        if (data === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullText += delta;
+          }
+        } catch {
+          // skip malformed trailing SSE chunks
         }
       }
 

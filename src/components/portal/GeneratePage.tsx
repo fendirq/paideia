@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { EssayOutput } from "./EssayOutput";
+import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
 
 interface GeneratePageProps {
   subject: string;
@@ -104,6 +105,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
+      const sseState = createSseParserState();
       let fullText = "";
       let streamError = false;
 
@@ -113,10 +115,9 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+          const messages = extractSseDataMessages(sseState, chunk);
 
-          for (const line of lines) {
-            const data = line.slice(6);
+          for (const data of messages) {
             if (data === "[DONE]") continue;
             try {
               const parsed = JSON.parse(data);
@@ -134,6 +135,24 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
             }
           }
           if (streamError) break;
+        }
+
+        for (const data of flushSseDataMessages(sseState)) {
+          if (data === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) {
+              setError(parsed.error);
+              streamError = true;
+              break;
+            }
+            if (parsed.content) {
+              fullText += parsed.content;
+              setEssay(fullText);
+            }
+          } catch {
+            // skip malformed trailing SSE chunks
+          }
         }
       } finally {
         reader.releaseLock();
