@@ -224,23 +224,128 @@ function formatList(items: string[], other?: string): string {
   return all.length ? all.join(", ") : "None specified";
 }
 
-function selectDiverseSamples(samples: Sample[], maxChars = 8000): string {
+function excerptSampleContent(content: string, maxChars = 3200): string {
+  const normalized = content.trim().replace(/\r\n/g, "\n");
+  if (normalized.length <= maxChars) return normalized;
+
+  const headChars = Math.floor(maxChars * 0.65);
+  const tailChars = maxChars - headChars - 12;
+  return `${normalized.slice(0, headChars).trimEnd()}\n\n[...]\n\n${normalized.slice(-tailChars).trimStart()}`;
+}
+
+function selectDiverseSamples(samples: Sample[], maxChars = 12000): string {
   if (!samples.length) return "";
-  const sorted = [...samples].sort((a, b) => a.content.length - b.content.length);
-  const candidates: Sample[] = [sorted[0]];
-  if (sorted.length > 1) candidates.push(sorted[sorted.length - 1]);
-  if (sorted.length > 2) candidates.push(sorted[Math.floor(sorted.length / 2)]);
+
+  const normalizedSamples = samples.map((sample) => ({
+    ...sample,
+    excerpt: excerptSampleContent(sample.content),
+    length: sample.content.length,
+  }));
+  const sorted = [...normalizedSamples].sort((a, b) => a.length - b.length);
+  const chosen = new Set<number>();
+
+  if (sorted.length > 0) chosen.add(0);
+  if (sorted.length > 1) chosen.add(sorted.length - 1);
+  if (sorted.length > 2) chosen.add(Math.floor(sorted.length / 2));
+
+  while (chosen.size < sorted.length) {
+    let bestIdx = -1;
+    let bestDistance = -1;
+
+    for (let i = 0; i < sorted.length; i++) {
+      if (chosen.has(i)) continue;
+      const distance = Array.from(chosen).reduce((min, idx) => {
+        return Math.min(min, Math.abs(sorted[i].length - sorted[idx].length));
+      }, Number.POSITIVE_INFINITY);
+
+      if (distance > bestDistance) {
+        bestDistance = distance;
+        bestIdx = i;
+      }
+    }
+
+    if (bestIdx === -1) break;
+    chosen.add(bestIdx);
+  }
+
+  const candidates = Array.from(chosen)
+    .sort((a, b) => sorted[a].length - sorted[b].length)
+    .map((idx) => sorted[idx]);
+
   const kept: Sample[] = [];
   let total = 0;
-  for (const s of candidates) {
-    if (kept.length === 0 || total + s.content.length <= maxChars) {
-      kept.push(s);
-      total += s.content.length;
+  for (const sample of candidates) {
+    const excerptLength = sample.excerpt.length;
+    if (kept.length === 0 || total + excerptLength <= maxChars) {
+      kept.push({ label: sample.label, content: sample.excerpt });
+      total += excerptLength;
     }
   }
+
   return kept
     .map((s, i) => `--- Reference ${i + 1}: ${s.label} ---\n${s.content}`)
     .join("\n\n");
+}
+
+export function sanitizeEssayOutput(text: string): string {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/^```(?:\w+)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  if (!normalized) return "";
+
+  const lines = normalized.split("\n");
+  const cleanedLines = [...lines];
+
+  const leadingMetaPatterns = [
+    /^#{1,6}\s*(final|revised|generated)?\s*essay\b[:\- ]*$/i,
+    /^(final|revised|generated)?\s*essay\b[:\- ]*$/i,
+    /^here(?:'s| is)\s+(?:the\s+)?(?:final\s+|revised\s+|generated\s+)?essay[:\- ]*$/i,
+    /^certainly[.!]?\s*(?:here(?:'s| is)\s+(?:the\s+)?essay[:\- ]*)?$/i,
+    /^below is\s+(?:the\s+)?(?:final\s+|revised\s+|generated\s+)?essay[:\- ]*$/i,
+  ];
+
+  while (cleanedLines.length > 0) {
+    const line = cleanedLines[0].trim();
+    if (!line) {
+      cleanedLines.shift();
+      continue;
+    }
+    if (leadingMetaPatterns.some((pattern) => pattern.test(line))) {
+      cleanedLines.shift();
+      continue;
+    }
+    break;
+  }
+
+  const trailingMetaPatterns = [
+    /^word count\s*:\s*\d+\s*$/i,
+    /^let me know if you'd like/i,
+    /^let me know if you want/i,
+    /^i can revise/i,
+    /^i can also revise/i,
+    /^hope this helps[.!]*$/i,
+  ];
+
+  while (cleanedLines.length > 0) {
+    const line = cleanedLines[cleanedLines.length - 1].trim();
+    if (!line) {
+      cleanedLines.pop();
+      continue;
+    }
+    if (trailingMetaPatterns.some((pattern) => pattern.test(line))) {
+      cleanedLines.pop();
+      continue;
+    }
+    break;
+  }
+
+  return cleanedLines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerprint {
@@ -300,6 +405,92 @@ export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerp
     },
     overallAssessment: f.overallAssessment ?? "",
   };
+}
+
+// ─── Fingerprint Narrative Formatter ───
+
+export function formatFingerprintNarrative(
+  fp: StyleFingerprint,
+): string {
+  const lines: string[] = [];
+
+  lines.push(
+    `Sentences: Averages ~${fp.sentencePatterns.averageLength} words per sentence with ${fp.sentencePatterns.variation} variation. ${fp.sentencePatterns.tendency}`,
+  );
+
+  lines.push(
+    `Vocabulary: ${fp.vocabulary.tier} tier. ${fp.vocabulary.wordChoicePattern}`,
+  );
+  if (fp.vocabulary.signatureWords.length) {
+    lines.push(
+      `  Frequently uses: ${fp.vocabulary.signatureWords.join(", ")}`,
+    );
+  }
+  if (fp.vocabulary.avoidedWords.length) {
+    lines.push(`  Never uses: ${fp.vocabulary.avoidedWords.join(", ")}`);
+  }
+
+  if (fp.transitions.favorites.length) {
+    lines.push(
+      `Transitions: Favors ${fp.transitions.favorites.join(", ")}`,
+    );
+  }
+  if (fp.transitions.neverUses.length) {
+    lines.push(`  Avoids: ${fp.transitions.neverUses.join(", ")}`);
+  }
+
+  lines.push(
+    `Structure: ${fp.structure.introPattern} Paragraphs typically ${fp.structure.avgParagraphLength} sentences. ${fp.structure.bodyParagraphPattern} ${fp.structure.conclusionPattern}`,
+  );
+  lines.push(`  Thesis placement: ${fp.structure.thesisPlacement}`);
+
+  lines.push(
+    `Evidence style: ${fp.evidenceStyle.method}. ${fp.evidenceStyle.analysisPattern} Analysis depth: ${fp.evidenceStyle.analysisDepth}. ${fp.evidenceStyle.citationHabits}`,
+  );
+
+  if (fp.errors.grammarPatterns.length || fp.errors.punctuationHabits.length) {
+    const errorParts: string[] = [];
+    if (fp.errors.grammarPatterns.length)
+      errorParts.push(fp.errors.grammarPatterns.join(", "));
+    if (fp.errors.punctuationHabits.length)
+      errorParts.push(fp.errors.punctuationHabits.join(", "));
+    lines.push(
+      `Common errors: ${errorParts.join(". ")}${fp.errors.spellingTendency ? `. ${fp.errors.spellingTendency}` : ""}`,
+    );
+  }
+
+  lines.push(
+    `Voice: ${fp.voice.formality} formality, ${fp.voice.perspective} perspective. ${fp.voice.contractions ? "Uses contractions." : "Avoids contractions."} ${fp.voice.toneDescription}`,
+  );
+  if (fp.voice.distinctiveTraits.length) {
+    lines.push(
+      `  Distinctive traits: ${fp.voice.distinctiveTraits.join(", ")}`,
+    );
+  }
+
+  lines.push(
+    `Argumentation: ${fp.rhetoric.argumentStyle}. Counter-arguments: ${fp.rhetoric.counterArguments}. Assertiveness: ${fp.rhetoric.assertiveness}.`,
+  );
+  if (fp.rhetoric.hedgingLanguage.length) {
+    lines.push(
+      `  Hedging phrases: ${fp.rhetoric.hedgingLanguage.join(", ")}`,
+    );
+  }
+
+  if (fp.rhythm.sentenceOpeners.length) {
+    lines.push(
+      `Sentence openers: ${fp.rhythm.sentenceOpeners.join(", ")}`,
+    );
+  }
+  lines.push(
+    `Paragraph rhythm: ${fp.rhythm.paragraphRhythm}. List usage: ${fp.rhythm.listUsage}.`,
+  );
+
+  if (fp.overallAssessment) {
+    lines.push(`\nOverall: ${fp.overallAssessment}`);
+  }
+
+  return lines.join("\n");
 }
 
 // ─── Level 1 Prompt (fingerprint-first, uses base 8 questions) ───
@@ -363,71 +554,46 @@ ${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
 Write the essay now.`;
 }
 
-// ─── Level 2 Outline Prompt (uses all 12 fields) ───
+// ─── Level 2 Plan Prompt (simplified structural outline) ───
 
-export function buildLevel2OutlinePrompt(opts: GenerateOptions): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, assignment, wordCount, requirements } = opts;
+export function buildLevel2PlanPrompt(opts: GenerateOptions): string {
+  const { teacherProfile: tp, selfAssessment: sa, assignment, wordCount, requirements } = opts;
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
   const evidence = resolveValue(sa.evidenceApproach, sa.evidenceOther);
   const conclusion = resolveValue(sa.conclusionApproach, sa.conclusionOther);
-  const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
-  const losesPoints = formatList(tp.losesPointsFor, tp.losesPointsOther);
-  const quoteIntros = formatList(sa.quoteIntroStyle ?? [], sa.quoteIntroOther);
-  const overused = formatList(sa.overusedPhrases ?? [], sa.overusedPhrasesOther);
-  const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
 
-  return `Create a detailed outline for an essay that matches this student's writing patterns. Plan voice markers INTO the outline — don't leave voice for later.
+  return `Create a structural outline for this essay assignment.
 
-## Assignment
+ASSIGNMENT:
 ${assignment}
-${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
 
-## Student's Structural Patterns (from fingerprint)
-- Intro pattern: ${fingerprint.structure.introPattern}
-- Body paragraph pattern: ${fingerprint.structure.bodyParagraphPattern}
-- Conclusion pattern: ${fingerprint.structure.conclusionPattern}
-- Avg paragraph length: ${fingerprint.structure.avgParagraphLength} sentences
-- Thesis placement: ${fingerprint.structure.thesisPlacement}
-- Evidence method: ${fingerprint.evidenceStyle.method}
-- Analysis depth: ${fingerprint.evidenceStyle.analysisDepth}
-- Argument style: ${fingerprint.rhetoric.argumentStyle}
-- Counter-arguments: ${fingerprint.rhetoric.counterArguments}
+TARGET WORD COUNT: ${wordCount}
 
-## Student's Self-Reported Patterns
+STUDENT CONTEXT:
+- Grade level: ${gradeLevel}
+- Typical grade: ${gradeRange}
 - Evidence approach: ${evidence}
 - Conclusion approach: ${conclusion}
-- Weaknesses to avoid: ${losesPoints}
-${timeSpent ? `- They spend the most time on: ${timeSpent} — that section gets the most polish` : ""}
 
-## Voice Placement Plan (embed these into the outline)
-- Plan where to use their quote intro patterns: ${quoteIntros}
-- Plan where to deploy their overused phrases (at least 2-3 times): ${overused}
-- Plan which hedging phrases to use in which paragraphs: ${fingerprint.rhetoric.hedgingLanguage.join(", ")}
-- Plan sentence openers for each paragraph from: ${fingerprint.rhythm.sentenceOpeners.join(", ")}
-${timeSpent ? `- Plan the polish gradient: "${timeSpent}" gets the most polish; other sections stay rougher` : ""}
-- Plan which known errors will appear where (they fix ${selfEdit} during self-editing — let other error types survive)
+The outline should include:
+- A thesis direction (not the exact wording)
+- Number of body paragraphs and what each argues
+- Which evidence or quotes to use in each paragraph
+- A brief note on conclusion approach
 
-## Quality Target
-Grade level: ${gradeLevel}, typical grade: ${gradeRange}
-Target: ~${wordCount} words
-
-Return a structured outline with:
-1. A thesis statement that matches their voice and assertiveness level (${fingerprint.rhetoric.assertiveness})
-2. Paragraph-by-paragraph plan: topic sentence idea, evidence to include, analysis approach, AND which voice markers go where
-3. Follow their typical structure — do NOT impose a structure they don't naturally use
-4. Note which sections should feel more polished vs rougher
-
-Return ONLY the outline, no commentary.`;
+Keep it structural. Do NOT include voice instructions, style notes, phrase placements, or writing tips. Structure only.`;
 }
 
-// ─── Level 2 Generation Prompt (uses outline + all 12 fields) ───
+// ─── Level 2 Writing Prompt (sample-first generation) ───
 
-export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: string): string {
+export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
   const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
 
   const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -436,123 +602,897 @@ export function buildLevel2GenerationPrompt(opts: GenerateOptions, outline: stri
   const conclusion = resolveValue(sa.conclusionApproach, sa.conclusionOther);
   const wordCountTendency = resolveValue(sa.wordCountTendency, sa.wordCountOther);
   const losesPoints = formatList(tp.losesPointsFor, tp.losesPointsOther);
-  const habits = sa.writingHabits ?? [];
-  const habitsOther = sa.writingHabitsOther ?? "";
+  const habits = formatList(sa.writingHabits, sa.writingHabitsOther);
 
-  // Level 2 enhanced fields
   const quoteIntros = formatList(sa.quoteIntroStyle ?? [], sa.quoteIntroOther);
   const overused = formatList(sa.overusedPhrases ?? [], sa.overusedPhrasesOther);
   const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
   const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
 
-  // Map each writing habit checkbox to a concrete instruction
-  const habitInstructions = mapHabitsToInstructions(habits, habitsOther);
+  let revisionDescription = "";
+  if (revision === "I submit my first draft as-is") {
+    revisionDescription = "Essay should feel unpolished: rough transitions, occasional incomplete thoughts, uneven paragraph lengths.";
+  } else if (revision === "I reread and fix obvious errors") {
+    revisionDescription = "Essay should be mostly clean but with occasional awkward phrasing and underdeveloped analysis.";
+  } else {
+    revisionDescription = "Essay should feel more polished but still at their grade level.";
+  }
 
-  return `You are replicating a specific student's writing voice with extreme precision. Follow the outline below exactly. Every rule in the VOICE ENFORCEMENT section is mandatory — violating any one means the essay fails to match.
+  const selfReportedLines: string[] = [
+    `- Grade level: ${gradeLevel}, typically earns ${gradeRange}`,
+    `- Revision style: ${revision} — ${revisionDescription}`,
+    `- Evidence approach: ${evidence}`,
+    `- Conclusion approach: ${conclusion}`,
+    `- Word count tendency: ${wordCountTendency}`,
+    `- Known weaknesses (loses points for): ${losesPoints}`,
+    `- Writing habits: ${habits}`,
+  ];
+  if (sa.quoteIntroStyle?.length || sa.quoteIntroOther) {
+    selfReportedLines.push(`- They typically introduce quotes like: ${quoteIntros}`);
+  }
+  if (sa.overusedPhrases?.length || sa.overusedPhrasesOther) {
+    selfReportedLines.push(`- They know they overuse these phrases: ${overused}`);
+  }
+  if (sa.selfEditFocus?.length || sa.selfEditOther) {
+    selfReportedLines.push(`- When self-editing, they focus on fixing: ${selfEdit}`);
+  }
+  if (timeSpent) {
+    selfReportedLines.push(`- They spend the most time polishing: ${timeSpent}`);
+  }
 
-## Outline (follow this structure)
-${outline}
+  return `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
 
-## Style Fingerprint
-${JSON.stringify(fingerprint, null, 2)}
-
-## Reference Samples (read these to internalize their voice — this is what they ACTUALLY sound like)
 ${refSamples}
 
-## Assignment
+Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.
+
+---
+
+WRITER'S PROFILE (analyst's notes on this student's patterns):
+
+${narrative}
+
+---
+
+WHAT THE STUDENT SAYS ABOUT THEMSELVES:
+
+${selfReportedLines.join("\n")}
+
+---
+
+ASSIGNMENT:
 ${assignment}
-${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
 
-## VOICE ENFORCEMENT — Each rule is mandatory
+OUTLINE TO FOLLOW:
+${outline}
 
-FROM FINGERPRINT:
-1. VOCABULARY: Use ONLY words in tier "${fingerprint.vocabulary.tier}". Include these signature words at least once each: ${fingerprint.vocabulary.signatureWords.slice(0, 8).join(", ")}. NEVER use: ${fingerprint.vocabulary.avoidedWords.join(", ")}.
-2. SENTENCES: Average ${fingerprint.sentencePatterns.averageLength} words. Tendency: "${fingerprint.sentencePatterns.tendency}". Vary sentences ${fingerprint.sentencePatterns.variation}.
-3. TRANSITIONS: ALLOWED: ${fingerprint.transitions.favorites.join(", ")}. BANNED: ${fingerprint.transitions.neverUses.join(", ")}. Use paragraph openers from: ${fingerprint.transitions.paragraphOpeners.join(", ")}.
-4. STRUCTURE: Intro: "${fingerprint.structure.introPattern}". Body: "${fingerprint.structure.bodyParagraphPattern}". Conclusion: "${fingerprint.structure.conclusionPattern}". Paragraphs avg ${fingerprint.structure.avgParagraphLength} sentences.
-5. EVIDENCE: Method: ${fingerprint.evidenceStyle.method}. After quoting: "${fingerprint.evidenceStyle.analysisPattern}". Depth: ${fingerprint.evidenceStyle.analysisDepth}.
-6. ERRORS: Reproduce these grammar patterns: ${fingerprint.errors.grammarPatterns.join(", ")}. Punctuation habits: ${fingerprint.errors.punctuationHabits.join(", ")}. These feel natural to this student.
-7. VOICE: ${fingerprint.voice.toneDescription}. Contractions: ${fingerprint.voice.contractions ? "yes" : "no"}. Perspective: ${fingerprint.voice.perspective}. Distinctive: ${fingerprint.voice.distinctiveTraits.join(", ")}.
-8. RHETORIC: Argues by ${fingerprint.rhetoric.argumentStyle}. Counter-arguments: ${fingerprint.rhetoric.counterArguments}. Uses hedging: ${fingerprint.rhetoric.hedgingLanguage.join(", ")} — include at least 3 of these.
-9. RHYTHM: Starts sentences with: ${fingerprint.rhythm.sentenceOpeners.join(", ")} — use at least 5 of these. Paragraph rhythm: ${fingerprint.rhythm.paragraphRhythm}.
+---
 
-FROM QUESTIONNAIRE:
-10. GRADE CEILING: This is a ${gradeRange} essay from a ${gradeLevel} student. Do NOT exceed this quality level.
-11. REVISION FEEL: Student's revision style is "${revision}". ${revision === "I submit my first draft as-is" ? "Essay should feel unpolished: rough transitions, occasional incomplete thoughts, uneven paragraph lengths." : revision === "I reread and fix obvious errors" ? "Essay should be mostly clean but with occasional awkward phrasing and underdeveloped analysis." : "Essay should feel more polished but still at their grade level."}
-12. WEAKNESSES: Student loses points for: ${losesPoints}. Include subtle traces of these weaknesses — the teacher expects to see them.
-${habitInstructions ? `13. WRITING HABITS:\n${habitInstructions}` : ""}
-14. WORD COUNT: Target ~${wordCount} words. Student ${wordCountTendency}.
+CRITICAL GUIDELINES — follow these in order of priority:
 
-FROM LEVEL 2 ENHANCED:
-15. QUOTE PATTERNS: When introducing any quote, use ONLY these phrasings: ${quoteIntros}. Never use any other quote introduction pattern. This is a critical voice marker.
-16. OVERUSED PHRASES: Include these phrases: ${overused}. Place them where a student naturally would — in topic sentences, transitions, and analysis sentences. Include at least 3 across the essay.
-17. ERROR SURVIVAL: Student self-edits for: ${selfEdit}. This means those error types are FIXED in their writing. But errors OUTSIDE that list survive. Let non-self-edited error types persist naturally.
-${timeSpent ? `18. POLISH GRADIENT: Student spends the most effort on "${timeSpent}". That section should be noticeably more polished. Other sections should feel comparatively rougher — less refined transitions, simpler analysis, less careful word choice.` : ""}
+1. PARAGRAPH STRUCTURE (MANDATORY):
+Each body paragraph MUST contain ${fingerprint.structure.avgParagraphLength} sentences (±1). Follow: "${fingerprint.structure.bodyParagraphPattern}". A ~${wordCount}-word essay should have 4-5 total paragraphs (intro + 2-3 body + conclusion), NOT 10+ short blocks. Count your sentences per paragraph before finishing.
 
-Write the essay now, following the outline.`;
+2. SENTENCE VARIETY / BURSTINESS (MANDATORY — this is how AI detectors work):
+AI detectors measure sentence-length standard deviation ("burstiness"). You MUST score above 7.0 or the essay WILL be flagged.
+How to achieve this — every body paragraph must contain ALL of these:
+- One SHORT sentence (4-8 words): "This matters." / "The dream fails." / "Gatsby never recovers." / "That changes everything."
+- One LONG sentence (28-40 words): compound or complex, with clauses joined by commas, dashes, or conjunctions
+- Several MEDIUM sentences (12-22 words) in between
+Real students write in bursts: a clumsy short sentence, then a rambling long one, then something average. NEVER write 3+ consecutive sentences of similar length. If you notice a run of 15-20 word sentences, break the pattern immediately with a very short or very long one.
+
+3. NATURAL ERRORS (MANDATORY — a flawless essay from a ${gradeRange} student is an instant AI flag):
+${fingerprint.errors.grammarPatterns.length ? `- Grammar patterns to include: ${fingerprint.errors.grammarPatterns.join(", ")} (e.g., "The green light symbolizes hope, and it also shows that Gatsby..." — comma splice before "and")` : ""}
+${fingerprint.errors.punctuationHabits.length ? `- Punctuation: ${fingerprint.errors.punctuationHabits.join(", ")}` : ""}
+${fingerprint.errors.spellingTendency ? `- Spelling: ${fingerprint.errors.spellingTendency}` : ""}
+${fingerprint.voice.contractions ? "- Contractions: They USE contractions regularly (don't, isn't, can't, doesn't, it's). An essay with zero contractions from this student is a red flag. Include 4-6 contractions spread throughout." : ""}
+${fingerprint.voice.toneDescription ? `- Tone: ${fingerprint.voice.toneDescription}. Include 1-2 moments where the register slips (e.g., "which is kind of the whole point" or "Gatsby basically can't accept that...").` : ""}
+Include at least 3-5 total imperfections. Scatter them naturally — don't cluster them.
+
+4. VOCABULARY CEILING (MANDATORY):
+This student's vocabulary tier is "${fingerprint.vocabulary.tier}". Their go-to words: ${fingerprint.vocabulary.signatureWords.join(", ")}.
+BANNED vocabulary (too advanced for this student): "elusive", "unbridgeable", "multifaceted", "spiritually bankrupt", "pervasive", "profound", "encompasses", "transcends", "illuminates", "underscores", "epitomizes", "juxtaposition"
+Instead of fancy words, use the simple ones real students use: "shows", "proves", "is about", "means that", "is important because", "represents". When in doubt, pick the simpler word.
+
+5. EVIDENCE SPECIFICITY (MANDATORY):
+Do NOT hide behind placeholders like "in class we talked about", "in the sources you can see", "history shows", or "the text says" unless you immediately name the actual evidence. Use concrete details whenever the topic allows it: people, cities, groups, policies, events, regions, dates, or direct source claims. A real student may be simple, but they still mention the actual thing they are talking about.
+
+6. QUALITY CEILING:
+This should read like a ${gradeRange} essay. That means:
+- Analysis is present but sometimes shallow or repetitive
+- Some points are underdeveloped or stated without full explanation
+- The conclusion may feel slightly rushed or repetitive
+- Not every quote is perfectly integrated or analyzed
+- Do NOT apply every stylistic trait in every paragraph — real writers are inconsistent.
+
+7. TARGET: ~${wordCount} words.
+
+AVOID THESE AI-DETECTOR RED FLAGS:
+"delve into", "it's important to note", "in today's society", "furthermore", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament", "serves as a powerful", "devastating portrait", "compelling narrative"
+
+Write the essay now. Return ONLY the essay text, no commentary or headers.`;
 }
 
-// ─── Level 2 Refinement Prompt (pass 3 — self-correction) ───
+// ─── Level 2 Critique Prompt (pass 3 — mismatch diagnosis) ───
 
-export function buildRefinementPrompt(
+export function buildLevel2CritiquePrompt(
   essay: string,
   fingerprint: StyleFingerprint,
   samples: Sample[],
-  selfAssessment: SelfAssessment,
 ): string {
   const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
 
-  const revision = resolveValue(selfAssessment.revisionLevel, selfAssessment.revisionOther);
-  const gradeRange = resolveValue(selfAssessment.gradeRange, selfAssessment.gradeRangeOther);
-  const quoteIntros = formatList(selfAssessment.quoteIntroStyle ?? [], selfAssessment.quoteIntroOther);
-  const overused = formatList(selfAssessment.overusedPhrases ?? [], selfAssessment.overusedPhrasesOther);
+  return `STUDENT'S REAL WRITING — this is the ground truth:
 
-  return `You are a quality control editor. Compare this essay against the student's actual writing samples and style fingerprint. Your job is to find any places where the essay sounds like AI or deviates from the student's real voice, and fix them.
-
-## Generated Essay
-${essay}
-
-## Style Fingerprint
-${JSON.stringify(fingerprint, null, 2)}
-
-## Student's Actual Writing (compare against these)
 ${refSamples}
 
-## Checklist — verify each one:
-- Vocabulary stays within ${fingerprint.vocabulary.tier} tier. No words from avoidedWords list: ${fingerprint.vocabulary.avoidedWords.join(", ")}
-- Transitions are ONLY from favorites list: ${fingerprint.transitions.favorites.join(", ")}
-- Sentence length averages ~${fingerprint.sentencePatterns.averageLength} words with ${fingerprint.sentencePatterns.variation} variation
-- Quote introductions use ONLY: ${quoteIntros}
-- Overused phrases appear 2-3 times: ${overused}
-- Hedging language present: ${fingerprint.rhetoric.hedgingLanguage.join(", ")}
-- Sentence openers match: ${fingerprint.rhythm.sentenceOpeners.join(", ")}
-- "${revision}" revision feel — polish level matches
-- Quality ceiling: reads like a ${gradeRange} essay, not higher
-- No AI-sounding phrases ("delve into", "it's important to note", "in today's society", "furthermore", "in conclusion", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance")
+---
 
-Rewrite the essay fixing ONLY the deviations. Preserve everything that already matches. Do not add polish, sophistication, or improve quality — only fix voice mismatches. Return ONLY the corrected essay, no commentary.`;
+GENERATED ESSAY TO EVALUATE:
+
+${essay}
+
+---
+
+WRITER'S PROFILE (for reference):
+
+${narrative}
+
+---
+
+YOUR TASK:
+
+You are a ruthless writing-forensics reviewer. Compare the generated essay against the student's real samples and identify the strongest signs that the essay does NOT fully sound like them yet.
+
+Prioritize:
+- sentence rhythm / burstiness
+- paragraph size and structure
+- vocabulary ceiling
+- evidence integration habits
+- transition habits and sentence openers
+- natural imperfection rate
+- tone / register slips
+- places where the essay sounds smarter, smoother, or more polished than the samples
+
+RULES:
+- Ground every fix in the samples or profile. Do not invent traits.
+- Be specific. Quote or describe exact phrases and patterns that feel off.
+- Focus on the highest-suspicion mismatches only.
+- Do NOT rewrite the essay.
+
+OUTPUT FORMAT:
+VERDICT: <one sentence>
+
+PRIORITY FIXES:
+- <most important mismatch to fix first>
+- <next mismatch>
+- <next mismatch>
+- <4-8 bullets total>
+
+KEEP:
+- <1-3 things that already sound like the student and should be preserved>
+
+Return ONLY the critique in that format.`;
 }
 
-function mapHabitsToInstructions(habits: string[], other: string): string {
-  const map: Record<string, string> = {
-    "I start essays with a question or hook quote": "Start the introduction with a question or hook quote.",
-    "I overuse certain transition words": "Use transition favorites with higher frequency than normal.",
-    "My introductions tend to be long/wordy": "Make the introduction 30%+ longer than body paragraphs.",
-    "I write in first person even when I probably shouldn't": "Use first person throughout, even in analytical sections.",
-    "I use rhetorical questions a lot": "Include at least 2 rhetorical questions in body paragraphs.",
-    "I repeat my thesis in different words throughout": "Rephrase the thesis at least twice in body paragraphs.",
-    "My paragraphs tend to be short": "Keep paragraphs to 3-4 sentences max.",
-    "I use informal language or slang sometimes": "Include 2-3 informal phrases or colloquialisms.",
-    "I have a go-to closing phrase or style": "Use conclusion pattern from fingerprint strictly.",
-    "I struggle with commas and punctuation": "Include comma splices and missing commas in 2-3 sentences.",
+// ─── Level 2 Audit Prompt (pass 4 — forensic sample comparison + rewrite) ───
+
+export function buildLevel2AuditPrompt(
+  essay: string,
+  fingerprint: StyleFingerprint,
+  samples: Sample[],
+  critiqueNotes?: string,
+): string {
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — this is the reference standard:
+
+${refSamples}
+
+---
+
+GENERATED ESSAY TO AUDIT:
+
+${essay}
+
+---
+
+WRITER'S PROFILE (for reference):
+
+${narrative}
+
+${critiqueNotes ? `---
+
+FORENSIC NOTES FROM A PRIOR REVIEW PASS:
+
+${critiqueNotes}
+
+Treat every item in PRIORITY FIXES as binding unless it directly contradicts the samples.
+Preserve anything listed under KEEP if it already sounds authentic.
+` : ""}
+
+---
+
+YOUR TASK:
+
+Read the student's real writing samples carefully. Then read the generated essay. Ask yourself: would a teacher who has read dozens of this student's essays believe they wrote this one? Would an AI detector flag this?
+
+Run these checks IN ORDER. The first three are the most critical — they are what AI detectors measure:
+
+1. BURSTINESS CHECK (AI detectors measure this directly — MOST IMPORTANT CHECK):
+   Count the word count of every sentence. Write the numbers down mentally. If more than 3 consecutive sentences are within 5 words of each other (e.g., 18, 20, 19, 17), you MUST break the pattern. The standard deviation of sentence lengths must be above 7.0 or the essay WILL be flagged as AI.
+   Fix by:
+   - ADDING 2-3 very short sentences (3-7 words) scattered across the essay: "This matters." "The dream dies here." "Nothing changes." "Gatsby fails." These are what real students write between analytical sentences.
+   - COMBINING 1-2 pairs of medium sentences into single long ones (30+ words) using dashes, semicolons, or "and"/"but"
+   - Every body paragraph needs at LEAST one sentence under 8 words AND one sentence over 28 words
+   - If you see a paragraph where all sentences are 12-25 words, it needs surgery
+
+2. PARAGRAPH STRUCTURE:
+   Count the sentences in each body paragraph. This student writes ~${fingerprint.structure.avgParagraphLength} sentences per paragraph. If there are single-sentence paragraphs, MERGE them. The essay should have 4-6 total paragraphs, NOT 10+ tiny blocks.
+
+3. NATURAL ERRORS — COUNT THEM:
+   Count every grammar/punctuation error in the essay. This student's patterns: ${fingerprint.errors.grammarPatterns.join(", ")}; ${fingerprint.errors.punctuationHabits.join(", ")}. ${fingerprint.errors.spellingTendency || ""}
+   ${fingerprint.voice.contractions ? "This student uses contractions. Count them — if fewer than 4, convert some formal phrases: \"does not\" → \"doesn't\", \"cannot\" → \"can't\", \"it is\" → \"it's\"." : ""}
+   ${fingerprint.voice.toneDescription ? `Their tone: "${fingerprint.voice.toneDescription}". If the essay is uniformly formal, add 1-2 casual slips like "kind of", "basically", "a lot", or "the whole point of".` : ""}
+   If the total error/imperfection count is below 3, you MUST add more until there are at least 3-5 scattered naturally throughout.
+
+4. VOCABULARY DOWNGRADE:
+   Flag every word that is more sophisticated than what appears in their samples. Their tier: "${fingerprint.vocabulary.tier}". Replace advanced words with simpler alternatives:
+   "elusive" → "impossible to reach", "fundamental" → "main/basic", "pervasive" → "everywhere", "illuminates" → "shows", "transcends" → "goes beyond", "epitomizes" → "shows", "devastating" → "really bad/harsh", "comprehensive" → "full/complete"
+   Use their signature words where possible: ${fingerprint.vocabulary.signatureWords.join(", ")}
+
+5. AI-PHRASE SCAN:
+   Remove: "delve into", "it's important to note", "in today's society", "furthermore", "in conclusion", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament", "serves as a powerful", "devastating portrait"
+
+6. WORD COUNT CHECK:
+   If the essay feels short or underdeveloped, expand body paragraphs — add another sentence of analysis after quotes, extend a point that was stated but not explained, or add a specific example. Do NOT add new arguments or new paragraphs — just develop existing ones more fully.
+
+7. EVIDENCE SPECIFICITY CHECK:
+   Hunt for vague evidence placeholders: "in class", "in the sources", "we learned that", "history shows", "the text says". Replace them with the actual evidence whenever the topic allows it: a named person, group, city, event, policy, source claim, or concrete example. The goal is not sophistication. The goal is sounding like a real student who remembers the actual material instead of padding with generic school-language.
+
+8. Any passage that reads as "too polished" compared to their actual writing level.
+
+${fingerprint.voice.contractions ? `CONTRACTION ENFORCEMENT (do this last as a final pass):
+Scan the entire essay for these formal phrases and convert them to contractions:
+- "does not" → "doesn't"
+- "do not" → "don't"
+- "cannot" → "can't"
+- "is not" → "isn't"
+- "it is" → "it's" (when meaning "it is")
+- "that is" → "that's"
+- "would not" → "wouldn't"
+- "they are" → "they're"
+The essay should have at least 4 contractions when finished. If you can't find formal phrases to convert, rewrite 2-3 sentences to naturally include contractions (e.g., "The dream is impossible" → "The dream isn't something anyone can actually reach").` : ""}
+
+9. TRANSITION & OPENER CHECK (count carefully):
+   Go through every sentence and write down its first word. Count how many start with "The".
+   RULES:
+   - If more than 40% of sentences start with "The", you MUST rewrite 3-4 of them. Use: "Fitzgerald's...", "This...", "Here,...", "In the novel,...", "What emerges is..."
+   - NEVER have 3+ consecutive sentences starting with the same word. If you see "The X... The Y... The Z...", rewrite the middle one.
+   - Vary openers across the essay — no single word should dominate.
+   ${fingerprint.transitions.favorites.length ? `This student overuses these transitions: ${fingerprint.transitions.favorites.join(", ")}. Make sure at least 2-3 of them appear in the essay — their absence is suspicious.` : ""}
+   ${fingerprint.transitions.neverUses.length ? `They NEVER use: ${fingerprint.transitions.neverUses.join(", ")}. Remove any instances.` : ""}
+
+IMPORTANT:
+- Do NOT add polish, sophistication, or improve the essay's quality
+- Do NOT remove intentional imperfections — they are there because the student writes that way
+- Do NOT make the essay better. Make it more authentic.
+- Preserve everything that already sounds like the student
+- Return ONLY the corrected essay, no commentary`;
+}
+
+// ─── Level 2 Expansion Prompt (pass 5 — recover length + specificity without changing voice) ───
+
+export function buildLevel2ExpansionPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  critiqueNotes?: string,
+): string {
+  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+  const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
+  const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
+
+  return `STUDENT'S REAL WRITING — keep this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY DRAFT:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+
+${critiqueNotes ? `---
+
+CRITIQUE NOTES TO HONOR:
+
+${critiqueNotes}` : ""}
+
+---
+
+YOUR TASK:
+
+Keep the same thesis, argument order, and overall student voice, but expand this essay so it feels like a complete ${gradeLevel} essay from a student who typically earns ${gradeRange}.
+
+MANDATORY RULES:
+- Target about ${wordCount} words. Do not stay far under.
+- Expand EXISTING body paragraphs first. Do not turn this into a brand-new essay.
+- Add concrete evidence instead of placeholders. Replace vague lines like "in class", "in the sources", "we learned that", or "history shows" with actual details whenever the topic allows it: named people, groups, cities, policies, events, dates, or direct source claims.
+- Keep the student's natural simplicity, repetition, and imperfections. Do not suddenly sound smarter than their samples.
+- Keep paragraph sizes believable for this student.
+- Do not add headers, commentary, or bullet points.
+
+GOOD EXPANSION MOVES:
+- Add one more sentence of explanation after evidence that is already there
+- Add a concrete historical example that supports the point already being made
+- Clarify a consequence with one more specific result
+- Make quotes or references less generic by naming the actual thing being referenced
+
+BAD MOVES:
+- Adding new arguments that were not already present
+- Writing like a textbook or historian
+- Turning the essay into polished model prose
+
+Return ONLY the revised essay.`;
+}
+
+// ─── Post-processing: deterministic humanization ───
+
+/**
+ * Deterministic post-processing applied AFTER the LLM audit pass.
+ * Injects contractions and comma splices that the model refuses to write,
+ * driven by the student's fingerprint.
+ */
+export function humanizeEssay(essay: string, fingerprint: StyleFingerprint): string {
+  let result = essay;
+
+  // 0. Normalize curly/smart quotes to ASCII for reliable processing
+  result = normalizeQuotes(result);
+
+  // 1. Contraction injection (only if fingerprint says student uses them)
+  if (fingerprint.voice.contractions) {
+    result = injectContractions(result, 4, 7);
+  }
+
+  // 2. Comma splice injection (only if fingerprint lists it as an error pattern)
+  const hasCommaSplices = fingerprint.errors.grammarPatterns.some(
+    (p) => /comma\s*splice/i.test(p)
+  );
+  if (hasCommaSplices) {
+    result = injectCommaSplices(result, 1, 2);
+  }
+
+  // 3. Sentence opener diversity — break runs of 3+ sentences starting with "The"
+  result = diversifyOpeners(result);
+
+  // 4. Missing comma after introductory clause (if fingerprint lists it)
+  const hasMissingCommas = fingerprint.errors.grammarPatterns.some(
+    (p) => /missing comma|comma after/i.test(p)
+  ) || fingerprint.errors.punctuationHabits.some(
+    (p) => /comma/i.test(p)
+  );
+  if (hasMissingCommas) {
+    result = removeSomeIntroCommas(result, 1, 2);
+  }
+
+  // 5. Inject 1-2 short sentences by splitting trailing clauses off long sentences
+  result = injectShortSentences(result);
+
+  // 6. Burstiness — target 7.5–10.5 range
+  result = boostBurstiness(result);
+
+  // 7. Remove em dashes — students rarely use them, strong AI tell
+  result = stripEmDashes(result);
+
+  // 8. Clean up double-period artifacts
+  result = result.replace(/\.{2,}/g, ".");
+
+  return result;
+}
+
+/**
+ * Inject 1-2 short sentences (≤8 words) by detaching trailing clauses
+ * from long sentences. This breaks the AI pattern of uniformly long sentences.
+ * Targets patterns like ", which shows X." → ". This shows X."
+ */
+function injectShortSentences(essay: string): string {
+  // Track total injections across paragraphs
+  let totalInjected = 0;
+  const maxTotal = 2;
+
+  const trailPatterns = [
+    { re: /,\s+which (shows|proves|means|demonstrates|reveals|suggests)\b/i, replace: (v: string) => `This ${v}` },
+    { re: /,\s+and this (is|shows|proves|means|matters|represents)\b/i, replace: (v: string) => `This ${v}` },
+    { re: /,\s+which is (basically|kind of|really|essentially|pretty much)\b/i, replace: (v: string) => `This is ${v}` },
+    { re: /,\s+making it (clear|obvious|impossible|evident)\b/i, replace: (v: string) => `This makes it ${v}` },
+    { re: /,\s+leaving (them|him|her|society|everyone|the)\b/i, replace: (v: string) => `This leaves ${v}` },
+  ];
+
+  const paragraphs = essay.split(/\n{2,}/);
+  const processed = paragraphs.map((paragraph) => {
+    const p = paragraph.trim();
+    if (!p || totalInjected >= maxTotal) return p;
+
+    const sentences = splitSentences(p);
+    if (sentences.length < 3) return p;
+
+    const result = [...sentences];
+    let injected = 0;
+
+    const indices = sentences
+      .map((s, i) => ({ i, len: s.split(/\s+/).length }))
+      .filter((x) => x.len > 22)
+      .sort((a, b) => b.len - a.len);
+
+    for (const { i } of indices) {
+      if (injected >= 1 || totalInjected >= maxTotal) break;
+      const sent = result[i];
+
+      for (const { re, replace } of trailPatterns) {
+        const match = re.exec(sent);
+        if (match && match.index > 0) {
+          const beforeWords = sent.slice(0, match.index).split(/\s+/).length;
+          if (beforeWords < 10) continue;
+
+          const firstPart = sent.slice(0, match.index) + ".";
+          const verb = match[1];
+          const afterClause = replace(verb) + sent.slice(match.index + match[0].length);
+          const shortSent = afterClause.charAt(0).toUpperCase() + afterClause.slice(1);
+
+          if (shortSent.split(/\s+/).length <= 10) {
+            result[i] = firstPart;
+            result.splice(i + 1, 0, shortSent);
+            injected++;
+            totalInjected++;
+            break;
+          }
+        }
+      }
+    }
+
+    return result.join(" ");
+  });
+
+  return processed.filter((p) => p.length > 0).join("\n\n");
+}
+
+/**
+ * Replace em dashes with student-appropriate punctuation.
+ * Students rarely use em dashes — AI models love them.
+ * " — " mid-sentence → ", " or ". " depending on what follows.
+ */
+function stripEmDashes(text: string): string {
+  // " — fragment" where fragment starts lowercase → replace with comma
+  // " — Fragment" where Fragment starts uppercase → replace with period + new sentence
+  return text.replace(/\s*—\s*/g, (match, offset) => {
+    const after = text[offset + match.length];
+    if (after && after === after.toUpperCase() && after !== after.toLowerCase()) {
+      // Uppercase follows — make it a new sentence
+      return ". ";
+    }
+    // Lowercase follows — use comma
+    return ", ";
+  });
+}
+
+/** Normalize curly/smart quotes to ASCII so isInsideQuotes works reliably */
+function normalizeQuotes(text: string): string {
+  return text
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')  // curly double quotes → ASCII
+    .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'"); // curly single quotes → ASCII
+}
+
+/** Seeded-random helper using essay length as seed for determinism */
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+}
+
+/**
+ * Find formal phrases and convert a random subset to contractions.
+ * Skips anything inside quotation marks (preserving cited text).
+ */
+function injectContractions(essay: string, min: number, max: number): string {
+  const contractionMap: [RegExp, string][] = [
+    [/\bdoes not\b/g, "doesn't"],
+    [/\bdo not\b/g, "don't"],
+    [/\bcannot\b/g, "can't"],
+    [/\bcan not\b/g, "can't"],
+    [/\bis not\b/g, "isn't"],
+    [/\bwould not\b/g, "wouldn't"],
+    [/\bcould not\b/g, "couldn't"],
+    [/\bshould not\b/g, "shouldn't"],
+    [/\bthey are\b/g, "they're"],
+    [/\bwill not\b/g, "won't"],
+    [/\bit is\b/g, "it's"],
+    [/\bthat is\b/g, "that's"],
+    [/\bwas not\b/g, "wasn't"],
+    [/\bwere not\b/g, "weren't"],
+    [/\bdid not\b/g, "didn't"],
+    [/\bhas not\b/g, "hasn't"],
+    [/\bhave not\b/g, "haven't"],
+  ];
+
+  // Find all candidate positions (not inside quotes)
+  interface Match { index: number; length: number; replacement: string }
+  const candidates: Match[] = [];
+
+  for (const [pattern, replacement] of contractionMap) {
+    let m: RegExpExecArray | null;
+    const re = new RegExp(pattern.source, "gi");
+    while ((m = re.exec(essay)) !== null) {
+      if (!isInsideQuotes(essay, m.index)) {
+        candidates.push({ index: m.index, length: m[0].length, replacement });
+      }
+    }
+  }
+
+  if (candidates.length === 0) return essay;
+
+  // Sort by position descending so replacements don't shift indices
+  candidates.sort((a, b) => b.index - a.index);
+
+  const rand = seededRandom(essay.length);
+  const count = Math.min(
+    candidates.length,
+    min + Math.floor(rand() * (max - min + 1))
+  );
+
+  // Shuffle using Fisher-Yates with seeded random, then take first `count`
+  const shuffled = [...candidates];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Take the selected ones, re-sort descending by index for safe replacement
+  const selected = shuffled.slice(0, count).sort((a, b) => b.index - a.index);
+
+  let result = essay;
+  for (const { index, length, replacement } of selected) {
+    result = result.slice(0, index) + replacement + result.slice(index + length);
+  }
+
+  return result;
+}
+
+/**
+ * Convert 1-2 period-separated clauses into comma splices.
+ * Targets patterns like ". This shows" or ". It also" mid-paragraph.
+ */
+function injectCommaSplices(essay: string, min: number, max: number): string {
+  // Target common student continuation patterns after a period
+  const splicePattern = /\.\s+(This shows|This proves|It also|It is|This is|It was|He also|She also|They also|The eyes|The light|The valley)/g;
+
+  interface SpliceMatch { index: number; fullLength: number; continuation: string }
+  const candidates: SpliceMatch[] = [];
+
+  let m: RegExpExecArray | null;
+  while ((m = splicePattern.exec(essay)) !== null) {
+    if (!isInsideQuotes(essay, m.index)) {
+      const continuation = m[1];
+      candidates.push({
+        index: m.index,
+        fullLength: m[0].length,
+        continuation: continuation.charAt(0).toLowerCase() + continuation.slice(1),
+      });
+    }
+  }
+
+  if (candidates.length === 0) return essay;
+
+  const rand = seededRandom(essay.length + 7);
+  const count = Math.min(
+    candidates.length,
+    min + Math.floor(rand() * (max - min + 1))
+  );
+
+  const shuffled = [...candidates];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  const selected = shuffled.slice(0, count).sort((a, b) => b.index - a.index);
+
+  let result = essay;
+  for (const { index, fullLength, continuation } of selected) {
+    result = result.slice(0, index) + ", " + continuation + result.slice(index + fullLength);
+  }
+
+  return result;
+}
+
+/**
+ * Split a single paragraph into sentences, handling abbreviations like T.J., Dr., Mr., St., etc.
+ * Returns array of sentence strings.
+ */
+function splitSentences(text: string): string[] {
+  // Protect common abbreviations by temporarily replacing their periods
+  const PLACEHOLDER = "\x00";
+  let safe = text;
+  // Two-letter initials (T.J., U.S., F., etc.)
+  safe = safe.replace(/\b([A-Z])\.([A-Z])\./g, `$1${PLACEHOLDER}$2${PLACEHOLDER}`);
+  safe = safe.replace(/\b([A-Z])\.\s(?=[A-Z][a-z])/g, `$1${PLACEHOLDER} `);
+  // Common titles and abbreviations
+  safe = safe.replace(/\b(Dr|Mr|Mrs|Ms|St|Jr|Sr|Prof|etc|vs|Vol|Ch)\./gi, `$1${PLACEHOLDER}`);
+
+  const parts = safe.split(/(?<=[.!?])\s+/);
+
+  // Restore placeholders
+  return parts.map((s) => s.replace(new RegExp(PLACEHOLDER, "g"), "."));
+}
+
+/**
+ * Apply a paragraph-level function to each paragraph independently,
+ * preserving paragraph break boundaries (\n\n).
+ */
+function perParagraph(essay: string, fn: (paragraph: string) => string): string {
+  const paragraphs = essay.split(/\n{2,}/);
+  return paragraphs.map((p) => p.trim()).filter((p) => p.length > 0).map(fn).join("\n\n");
+}
+
+/**
+ * Break runs of 3+ consecutive sentences that start with the same word.
+ * AI tends to produce "The X... The Y... The Z..." patterns that feel robotic.
+ */
+function diversifyOpeners(essay: string): string {
+  // Process each paragraph independently to preserve paragraph breaks
+  return perParagraph(essay, (paragraph) => {
+    const sentences = splitSentences(paragraph);
+    if (sentences.length < 3) return paragraph;
+
+    const getOpener = (s: string) => (s.match(/^\s*(\w+)/) || ["", ""])[1].toLowerCase();
+
+    for (let i = 0; i < sentences.length - 2; i++) {
+      const a = getOpener(sentences[i]);
+      const b = getOpener(sentences[i + 1]);
+      const c = getOpener(sentences[i + 2]);
+
+      if (a && a === b && b === c) {
+        const sent = sentences[i + 1];
+        const firstWord = (sent.match(/^\s*(\w+)/) || ["", ""])[1];
+        const rest = sent.slice(firstWord.length);
+
+        const replacements: Record<string, string[]> = {
+          the: ["This", "Fitzgerald's", "Here,", "In this scene,"],
+          this: ["Such", "That", "Here,", "Fitzgerald's"],
+          these: ["Such", "All of these", "Together,"],
+          it: ["The symbol", "This image", "What emerges"],
+          he: ["Gatsby", "The character", "Fitzgerald's protagonist"],
+        };
+
+        const options = replacements[firstWord.toLowerCase()] || ["Additionally,", "Here,"];
+        const pick = options[sentences.length % options.length];
+        sentences[i + 1] = pick + rest;
+      }
+    }
+
+    return sentences.join(" ");
+  });
+}
+
+/**
+ * Remove commas after 1-2 introductory clauses to simulate a common student error.
+ * Targets patterns like "In the novel, " → "In the novel "
+ */
+function removeSomeIntroCommas(essay: string, min: number, max: number): string {
+  const introPattern = /\b(In the novel|In this scene|In the text|Throughout the novel|At this point|During this time|In the end|At the beginning|By the end),\s/g;
+
+  interface IntroMatch { index: number; fullLength: number; replacement: string }
+  const candidates: IntroMatch[] = [];
+
+  let m: RegExpExecArray | null;
+  while ((m = introPattern.exec(essay)) !== null) {
+    if (!isInsideQuotes(essay, m.index)) {
+      candidates.push({
+        index: m.index,
+        fullLength: m[0].length,
+        replacement: m[1] + " ", // drop the comma
+      });
+    }
+  }
+
+  if (candidates.length === 0) return essay;
+
+  const rand = seededRandom(essay.length + 13);
+  const count = Math.min(candidates.length, min + Math.floor(rand() * (max - min + 1)));
+
+  const shuffled = [...candidates];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  const selected = shuffled.slice(0, count).sort((a, b) => b.index - a.index);
+
+  let result = essay;
+  for (const { index, fullLength, replacement } of selected) {
+    result = result.slice(0, index) + replacement + result.slice(index + fullLength);
+  }
+
+  return result;
+}
+
+/**
+ * Target burstiness (sentence-length stddev) in the 7.5–13.0 range.
+ * Below 7.5: split long sentences + merge short pairs to increase variance.
+ * Above 13.0: merge very short fragments back into neighbors to reduce extreme variance.
+ */
+function boostBurstiness(essay: string): string {
+  // Process each paragraph independently to preserve paragraph breaks
+  return perParagraph(essay, boostBurstinessParagraph);
+}
+
+function boostBurstinessParagraph(paragraph: string): string {
+  let sentences = splitSentences(paragraph);
+  if (sentences.length < 4) return paragraph;
+
+  const calcStddev = (lens: number[]) => {
+    const a = lens.reduce((x, y) => x + y, 0) / lens.length;
+    return Math.sqrt(lens.map((l) => (l - a) ** 2).reduce((x, y) => x + y, 0) / lens.length);
   };
 
-  const lines: string[] = [];
-  for (const h of habits) {
-    if (map[h]) lines.push(`   - ${map[h]}`);
+  let lengths = sentences.map((s) => s.split(/\s+/).length);
+  let sd = calcStddev(lengths);
+
+  // ─── Too LOW: push variance up ───
+  if (sd < 7.5) {
+    // Split longest sentences (>20 words) at breakpoints
+    const splitTargets: { idx: number; len: number }[] = [];
+    for (let i = 0; i < sentences.length; i++) {
+      if (lengths[i] > 20) splitTargets.push({ idx: i, len: lengths[i] });
+    }
+    splitTargets.sort((a, b) => b.len - a.len);
+    const toSplit = splitTargets.slice(0, 3);
+    toSplit.sort((a, b) => b.idx - a.idx);
+
+    const result = [...sentences];
+    for (const { idx } of toSplit) {
+      const split = splitSentenceAtBreakpoint(result[idx]);
+      if (split) result.splice(idx, 1, split[0], split[1]);
+    }
+    sentences = result;
+    lengths = sentences.map((s) => s.split(/\s+/).length);
+    sd = calcStddev(lengths);
+
+    // If still too low, merge pairs of short adjacent sentences
+    if (sd < 7.5) {
+      for (let i = 0; i < sentences.length - 1; i++) {
+        if (lengths[i] < 14 && lengths[i + 1] < 14 && lengths[i] > 3 && lengths[i + 1] > 3) {
+          const first = sentences[i].replace(/\.\s*$/, "");
+          const second = sentences[i + 1];
+          sentences[i] = first + ", and " + second.charAt(0).toLowerCase() + second.slice(1);
+          sentences.splice(i + 1, 1);
+          break;
+        }
+      }
+    }
   }
-  if (other) lines.push(`   - ${other}`);
-  return lines.join("\n");
+
+  // ─── Too HIGH: pull variance down ───
+  lengths = sentences.map((s) => s.split(/\s+/).length);
+  sd = calcStddev(lengths);
+
+  if (sd > 13.0) {
+    // Merge very short fragments (≤4 words) into the previous sentence
+    for (let i = sentences.length - 1; i > 0; i--) {
+      if (lengths[i] <= 4 && lengths[i - 1] > 6) {
+        const fragment = sentences[i].replace(/\.\s*$/, "");
+        const prev = sentences[i - 1].replace(/\.\s*$/, "");
+        sentences[i - 1] = prev + ", and " + fragment.charAt(0).toLowerCase() + fragment.slice(1) + ".";
+        sentences.splice(i, 1);
+        lengths = sentences.map((s) => s.split(/\s+/).length);
+        sd = calcStddev(lengths);
+        if (sd <= 13.0) break;
+      }
+    }
+  }
+
+  // If still too high, iteratively split the longest sentences to bring variance down
+  for (let attempt = 0; attempt < 3 && sd > 10.5; attempt++) {
+    lengths = sentences.map((s) => s.split(/\s+/).length);
+    const maxIdx = lengths.indexOf(Math.max(...lengths));
+    if (lengths[maxIdx] > 25) {
+      const split = splitSentenceAtBreakpoint(sentences[maxIdx]);
+      if (split) {
+        sentences.splice(maxIdx, 1, split[0], split[1]);
+        lengths = sentences.map((s) => s.split(/\s+/).length);
+        sd = calcStddev(lengths);
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return sentences.join(" ");
+}
+
+/**
+ * Split a long sentence into two at a natural breakpoint.
+ * Returns [shortPart, remainder] or null if no good split found.
+ */
+function splitSentenceAtBreakpoint(sentence: string): [string, string] | null {
+  const breakPatterns = [
+    /,\s+(which\s)/i,
+    /,\s+(and this\s)/i,
+    /,\s+(and the\s)/i,
+    /,\s+(and it\s)/i,
+    /,\s+(and when\s)/i,
+    /,\s+(and their\s)/i,
+    /,\s+(and her\s)/i,
+    /,\s+(and his\s)/i,
+    /,\s+(but\s)/i,
+    /,\s+(however\s)/i,
+    /,\s+(yet\s)/i,
+    /,\s+(while\s)/i,
+    /,\s+(where\s)/i,
+    /,\s+(leaving\s)/i,
+    /,\s+(making\s)/i,
+    /,\s+(creating\s)/i,
+    /,\s+(suggesting\s)/i,
+    /,\s+(demonstrating\s)/i,
+    /,\s+(revealing\s)/i,
+    /,\s+(showing\s)/i,
+    /,\s+(reflecting\s)/i,
+    /,\s+(symbolizing\s)/i,
+    /,\s+(indicating\s)/i,
+    /,\s+(meaning\s)/i,
+    /,\s+(also\s)/i,
+    /,\s+(as\s)/i,
+  ];
+
+  for (const pattern of breakPatterns) {
+    const match = pattern.exec(sentence);
+    if (match && match.index > 0) {
+      const splitPos = match.index;
+      const words = sentence.slice(0, splitPos).split(/\s+/);
+      // Only split if the first part has at least 6 words
+      if (words.length < 6) continue;
+
+      const firstPart = sentence.slice(0, splitPos) + ".";
+      const conjunction = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+      const remainder = conjunction + sentence.slice(match.index + match[0].length);
+      return [firstPart, remainder];
+    }
+  }
+
+  return null;
+}
+
+/** Check whether position idx falls inside a quoted passage */
+function isInsideQuotes(text: string, idx: number): boolean {
+  let inDouble = false;
+  let inSingle = false;
+  for (let i = 0; i < idx; i++) {
+    if (text[i] === '"' && !inSingle) inDouble = !inDouble;
+    if (text[i] === "'" && !inDouble && i > 0 && /[a-zA-Z]/.test(text[i - 1]) === false) {
+      inSingle = !inSingle;
+    }
+  }
+  return inDouble || inSingle;
 }
 
 // ─── Legacy Prompts (fallback when no fingerprint exists) ───

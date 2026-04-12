@@ -51,6 +51,12 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
   const avatarRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLDivElement>(null);
 
+  const closeMenus = useCallback(() => {
+    setMobileOpen(false);
+    setNavOpen(false);
+    setAvatarOpen(false);
+  }, []);
+
   const handleSignOut = useCallback(() => {
     signOut({ callbackUrl: "/api/auth/signout-cleanup" });
   }, []);
@@ -61,19 +67,17 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
         setAvatarOpen(false);
       }
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setNavOpen(false);
-        setAvatarOpen(false);
+        closeMenus();
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  }, [closeMenus]);
 
   useEffect(() => {
-    setMobileOpen(false);
-    setNavOpen(false);
-    setAvatarOpen(false);
-  }, [pathname]);
+    const closeTimer = window.setTimeout(closeMenus, 0);
+    return () => window.clearTimeout(closeTimer);
+  }, [pathname, closeMenus]);
 
   const initial = userName?.charAt(0)?.toUpperCase() ?? "?";
 
@@ -82,13 +86,10 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
       className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3 h-14 ${isSessionPage ? "bg-bg-inner" : "bg-transparent"}`}
     >
       {/* Left: Logo */}
-      <TripleClickWrapper>
-        <Link
-          href={logoHref}
-          className="font-display font-bold text-2xl tracking-[0.12em] text-text-primary"
-        >
+      <TripleClickWrapper href={logoHref}>
+        <span className="font-display font-bold text-2xl tracking-[0.12em] text-text-primary">
           PAIDEIA
-        </Link>
+        </span>
       </TripleClickWrapper>
 
       {/* Right: Desktop */}
@@ -105,6 +106,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={closeMenus}
                   className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
                     isActive
                       ? "bg-[rgba(168,152,128,0.14)] text-[#f0e6d8]"
@@ -136,6 +138,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
                   <hr className="my-1 border-[rgba(168,152,128,0.12)]" />
                   <Link
                     href={isPortal ? "/portal/aggregate" : "/app/profile"}
+                    onClick={closeMenus}
                     className="block px-4 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-bg-elevated/50 transition-colors"
                   >
                     {isPortal ? "Writing Profile" : "Profile"}
@@ -143,6 +146,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
                   {!isPortal && userRole === "ADMIN" && (
                     <Link
                       href="/app/admin"
+                      onClick={closeMenus}
                       className="block px-4 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-bg-elevated/50 transition-colors"
                     >
                       Admin Dashboard
@@ -160,7 +164,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
 
             {/* Close button */}
             <button
-              onClick={() => { setNavOpen(false); setAvatarOpen(false); }}
+              onClick={closeMenus}
               className="px-2 py-1.5 rounded-full text-[rgba(240,230,216,0.45)] hover:text-[#f0e6d8] transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -210,6 +214,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={closeMenus}
                   className={`block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-[rgba(168,152,128,0.14)] text-text-primary"
@@ -223,6 +228,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
             <hr className="border-[rgba(168,152,128,0.12)]" />
             <Link
               href={isPortal ? "/portal/aggregate" : "/app/profile"}
+              onClick={closeMenus}
               className="block px-4 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text-secondary hover:bg-[rgba(168,152,128,0.08)] transition-colors"
             >
               {isPortal ? "Writing Profile" : "Profile"}
@@ -230,6 +236,7 @@ export function Navbar({ userName, userImage, userRole }: NavbarProps) {
             {!isPortal && userRole === "ADMIN" && (
               <Link
                 href="/app/admin"
+                onClick={closeMenus}
                 className="block px-4 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text-secondary hover:bg-[rgba(168,152,128,0.08)] transition-colors"
               >
                 Admin Dashboard

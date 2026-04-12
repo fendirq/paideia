@@ -100,6 +100,7 @@ export function LoginForm() {
         <form onSubmit={handleLogin} className="space-y-7">
           <div className="relative">
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -108,17 +109,21 @@ export function LoginForm() {
               className="w-full bg-transparent border-b border-[rgba(168,152,128,0.20)] px-0 pt-5 pb-2 text-[14px] text-text-primary focus:outline-none focus:border-accent transition-colors"
               autoComplete="email"
             />
-            <label className={`absolute left-0 transition-all duration-200 pointer-events-none font-display ${
+            <label
+              htmlFor="login-email"
+              className={`absolute left-0 transition-all duration-200 pointer-events-none font-display ${
               emailFocused || email
                 ? "top-0 text-[10px] tracking-[0.15em] text-accent uppercase"
                 : "top-5 text-[14px] text-text-primary"
-            }`}>
+            }`}
+            >
               Email
             </label>
           </div>
 
           <div className="relative">
             <input
+              id="login-password"
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -127,11 +132,14 @@ export function LoginForm() {
               className="w-full bg-transparent border-b border-[rgba(168,152,128,0.20)] px-0 pt-5 pb-2 pr-12 text-[14px] text-text-primary focus:outline-none focus:border-accent transition-colors"
               autoComplete="current-password"
             />
-            <label className={`absolute left-0 transition-all duration-200 pointer-events-none font-display ${
+            <label
+              htmlFor="login-password"
+              className={`absolute left-0 transition-all duration-200 pointer-events-none font-display ${
               passFocused || password
                 ? "top-0 text-[10px] tracking-[0.15em] text-accent uppercase"
                 : "top-5 text-[14px] text-text-primary"
-            }`}>
+            }`}
+            >
               Password
             </label>
             {password && (

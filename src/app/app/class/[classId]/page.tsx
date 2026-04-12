@@ -39,11 +39,6 @@ export default async function ClassDetailPage({
     0
   );
 
-  // Find common struggles from helpType field
-  const helpTopics = inquiry.sessions
-    .map((s) => s.helpType)
-    .filter((h): h is string => !!h);
-
   // Calculate time spent (rough: ~2 min per message exchange)
   const estimatedMinutes = totalMessages * 1;
 

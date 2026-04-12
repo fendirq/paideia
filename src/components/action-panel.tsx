@@ -54,6 +54,7 @@ export function ActionPanel({ actions, onSelect, onDismiss, label }: ActionPanel
         </p>
         <button
           onClick={onDismiss}
+          aria-label="Dismiss suggested actions"
           className="text-text-muted hover:text-text-primary transition-colors p-0.5"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -103,6 +104,7 @@ export function ActionPanel({ actions, onSelect, onDismiss, label }: ActionPanel
             >
               <input
                 type="text"
+                aria-label="Custom question"
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
                 placeholder="Type your question..."

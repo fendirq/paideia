@@ -1,7 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { validatePasscode } from "@/lib/passcode";
 
 describe("validatePasscode", () => {
+  const originalPasscode = process.env.ADMIN_PASSCODE;
+
+  beforeEach(() => {
+    process.env.ADMIN_PASSCODE = "082600";
+  });
+
+  afterEach(() => {
+    if (originalPasscode === undefined) {
+      delete process.env.ADMIN_PASSCODE;
+      return;
+    }
+    process.env.ADMIN_PASSCODE = originalPasscode;
+  });
+
   it("accepts the correct passcode", () => {
     expect(validatePasscode("082600")).toBe(true);
   });

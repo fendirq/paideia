@@ -125,6 +125,7 @@ export function WaitlistGateForm() {
           <form onSubmit={handleJoin} className="space-y-7">
             <div className="relative">
               <input
+                id="waitlist-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -135,6 +136,7 @@ export function WaitlistGateForm() {
                 autoFocus
               />
               <label
+                htmlFor="waitlist-email"
                 className={`absolute left-0 transition-all duration-200 pointer-events-none font-display ${
                   emailFocused || email
                     ? "top-0 text-[10px] tracking-[0.15em] text-accent uppercase"
@@ -176,6 +178,7 @@ export function WaitlistGateForm() {
           <form onSubmit={handleCode} className="space-y-7">
             <div className="relative">
               <input
+                id="waitlist-access-code"
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -185,6 +188,7 @@ export function WaitlistGateForm() {
                 autoComplete="off"
               />
               <label
+                htmlFor="waitlist-access-code"
                 className={`absolute left-0 right-0 text-center transition-all duration-200 pointer-events-none font-display ${
                   codeFocused || code
                     ? "top-0 text-[10px] tracking-[0.15em] text-accent uppercase"

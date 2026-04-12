@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --font-playfair: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
   --color-bg-base: #1e1914;
   --color-bg-inner: #28211a;
   --color-bg-surface: #332b24;

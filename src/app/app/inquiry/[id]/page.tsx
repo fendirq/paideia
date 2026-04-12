@@ -33,9 +33,6 @@ export default async function InquiryPage({
 
   if (!inquiry || inquiry.userId !== session.user.id) redirect("/app");
 
-  const subjectLabel =
-    inquiry.subject.charAt(0) + inquiry.subject.slice(1).toLowerCase();
-
   return (
     <FileCabinet
       files={inquiry.files.map((f) => ({

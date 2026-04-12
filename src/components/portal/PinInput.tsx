@@ -86,6 +86,7 @@ export function PinInput() {
             key={i}
             ref={(el) => { inputsRef.current[i] = el; }}
             type="text"
+            aria-label={`Access code digit ${i + 1}`}
             inputMode="numeric"
             maxLength={1}
             value={digit}

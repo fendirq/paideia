@@ -10,6 +10,10 @@ interface UploadedFile {
   status: "pending" | "uploading" | "done" | "error";
 }
 
+interface PendingUploadFile extends UploadedFile {
+  _file: File;
+}
+
 interface AddMaterialFormProps {
   classId: string;
   onCreated: () => void;
@@ -28,7 +32,7 @@ export function AddMaterialForm({ classId, onCreated, onCancel }: AddMaterialFor
     const selected = e.target.files;
     if (!selected) return;
 
-    const newFiles = Array.from(selected).map((f) => ({
+    const newFiles: PendingUploadFile[] = Array.from(selected).map((f) => ({
       uid: crypto.randomUUID(),
       fileName: f.name,
       fileUrl: "",
@@ -37,7 +41,16 @@ export function AddMaterialForm({ classId, onCreated, onCancel }: AddMaterialFor
       _file: f,
     }));
 
-    setFiles((prev) => [...prev, ...newFiles.map(({ _file: _, ...rest }) => rest)]);
+    setFiles((prev) => [
+      ...prev,
+      ...newFiles.map(({ uid, fileName, fileUrl, fileType, status }) => ({
+        uid,
+        fileName,
+        fileUrl,
+        fileType,
+        status,
+      })),
+    ]);
 
     // Upload each file concurrently
     const uploadAll = async () => {

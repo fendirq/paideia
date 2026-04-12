@@ -1,7 +1,7 @@
 import { stripThinkingTags } from "./strip-thinking";
 
-// Matches variations: ---ACTIONS---, ACTIONS---, ACTIONS:, ---Actions---
-const ACTION_SEPARATOR = /\n*-*\s*ACTIONS\s*-*:?\s*/i;
+// Matches common model variants: ---ACTIONS---, ---ACTION---, ---ACT---, ACTIONS:
+const ACTION_SEPARATOR = /\n*\s*-{0,3}\s*ACT(?:ION)?S?\s*-{0,3}\s*:?\s*/i;
 
 export function splitActions(text: string): { before: string; after: string | null } {
   const match = text.match(ACTION_SEPARATOR);

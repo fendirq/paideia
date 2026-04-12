@@ -79,7 +79,11 @@ export function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <label className="sr-only" htmlFor="signup-name">
+        Name
+      </label>
       <input
+        id="signup-name"
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -87,7 +91,11 @@ export function SignupForm() {
         className="input-field w-full"
         autoComplete="name"
       />
+      <label className="sr-only" htmlFor="signup-email">
+        Email
+      </label>
       <input
+        id="signup-email"
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -95,7 +103,11 @@ export function SignupForm() {
         className="input-field w-full"
         autoComplete="email"
       />
+      <label className="sr-only" htmlFor="signup-phone">
+        Phone number
+      </label>
       <input
+        id="signup-phone"
         type="tel"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
@@ -104,7 +116,11 @@ export function SignupForm() {
         autoComplete="tel"
       />
       <div className="relative">
+        <label className="sr-only" htmlFor="signup-password">
+          Password
+        </label>
         <input
+          id="signup-password"
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -123,7 +139,11 @@ export function SignupForm() {
         )}
       </div>
       <div className="relative">
+        <label className="sr-only" htmlFor="signup-confirm-password">
+          Confirm password
+        </label>
         <input
+          id="signup-confirm-password"
           type={showConfirm ? "text" : "password"}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
