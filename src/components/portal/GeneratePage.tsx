@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { EssayOutput } from "./EssayOutput";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
-import { buildPersistedRequirements, inferTargetWordCount, normalizeSourceLinks } from "@/lib/source-context";
+import { MAX_SOURCE_LINKS, MAX_SOURCE_TEXT_CHARS, buildPersistedRequirements, inferTargetWordCount, normalizeSourceLinks } from "@/lib/source-context";
 
 interface GeneratePageProps {
   subject: string;
@@ -99,6 +99,15 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
 
   const generate = useCallback(async () => {
     if (!assignment.trim() || generating) return;
+    const normalizedSourceLinks = normalizeSourceLinks(sourceLinksInput);
+    if (sourceLinksInput.trim() && normalizedSourceLinks.length === 0 && !sourceText.trim()) {
+      setError("Paste valid source URLs or add source notes before generating.");
+      return;
+    }
+    if (sourceText.length > MAX_SOURCE_TEXT_CHARS) {
+      setError(`Source notes are too long. Keep them under ${MAX_SOURCE_TEXT_CHARS} characters.`);
+      return;
+    }
     setGenerating(true);
     setEssay("");
     setError("");
@@ -112,7 +121,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
           wordCount,
           requirements,
           level,
-          sourceLinks: normalizeSourceLinks(sourceLinksInput),
+          sourceLinks: normalizedSourceLinks,
           sourceText,
         }),
       });
@@ -359,7 +368,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
                 className="input-field font-serif resize-y text-text-primary"
               />
               <p className="text-[11px] text-text-muted mt-2">
-                Level 2 will fetch these and use them as approved evidence.
+                Add up to {MAX_SOURCE_LINKS} URLs. Level 2 will fetch these and use them as approved evidence.
               </p>
             </div>
             <div>
@@ -385,7 +394,10 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
                       if (res.ok) {
                         const { text } = await res.json();
                         setSourceText((prev) =>
-                          [prev.trim(), text.slice(0, 4000).trim()].filter(Boolean).join("\n\n---\n\n")
+                          [prev.trim(), text.slice(0, MAX_SOURCE_TEXT_CHARS).trim()]
+                            .filter(Boolean)
+                            .join("\n\n---\n\n")
+                            .slice(0, MAX_SOURCE_TEXT_CHARS)
                         );
                       } else {
                         setError("Failed to extract source article. Try again or paste the excerpt manually.");

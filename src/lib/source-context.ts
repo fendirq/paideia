@@ -1,9 +1,10 @@
-import { extractText, resolveMimeType, isExtractableType } from "./extract-text";
+import { extractText, resolveMimeType, isExtractableType } from "./extract-text.ts";
 
 export const MAX_SOURCE_LINKS = 3;
 const MAX_SOURCE_FETCH_BYTES = 5 * 1024 * 1024;
 const MAX_SOURCE_EXCERPT_CHARS = 2200;
-const MAX_SOURCE_TEXT_CHARS = 4000;
+export const MAX_SOURCE_TEXT_CHARS = 4000;
+const SOURCE_FETCH_TIMEOUT_MS = 15_000;
 
 export interface ResolvedSource {
   url: string;
@@ -57,6 +58,80 @@ export function inferTargetWordCount(text: string): number | null {
   const value = exactMatch ? Number(exactMatch[1] || exactMatch[2]) : NaN;
   if (Number.isFinite(value) && value >= 250 && value <= 2000) {
     return Math.round(value / 25) * 25;
+  }
+
+  return null;
+}
+
+export function inferWordCountBounds(text: string): { min: number | null; max: number | null } {
+  const normalized = text.toLowerCase().replace(/,/g, "");
+
+  const rangeMatch = normalized.match(/\b(\d{3,4})\s*(?:to|-)\s*(\d{3,4})\s*words?\b/);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    if (Number.isFinite(min) && Number.isFinite(max) && min >= 250 && max <= 2000 && min < max) {
+      return { min, max };
+    }
+  }
+
+  const exactMatch = normalized.match(/\b(\d{3,4})\s*-\s*word\b|\b(\d{3,4})\s*words?\b/);
+  const value = exactMatch ? Number(exactMatch[1] || exactMatch[2]) : NaN;
+  if (Number.isFinite(value) && value >= 250 && value <= 2000) {
+    return { min: value, max: value };
+  }
+
+  return { min: null, max: null };
+}
+
+export function inferRequiredEvidenceCount(text: string): number | null {
+  const normalized = text.toLowerCase().replace(/,/g, "");
+  const descriptors = String.raw`(?:(?:specific|concrete|historical)\s+)*`;
+  const evidenceKinds = String.raw`(?:evidence|support|examples|details)`;
+  const supportPhrase = String.raw`(?:(?:pieces of\s+)?${descriptors}${evidenceKinds}|${descriptors}(?:pieces of\s+)?${evidenceKinds})`;
+
+  const wordMap: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  };
+
+  const numericPatterns = [
+    new RegExp(`\\bat least (\\d+)\\s+${supportPhrase}\\b`),
+    new RegExp(`\\binclude (\\d+)\\s+${supportPhrase}\\b`),
+    new RegExp(`\\buse (\\d+)\\s+${supportPhrase}\\b`),
+    new RegExp(`\\bincorporate (\\d+)\\s+${supportPhrase}\\b`),
+    new RegExp(`\\b(\\d+)\\s+${supportPhrase}\\b`),
+  ];
+
+  for (const pattern of numericPatterns) {
+    const match = normalized.match(pattern);
+    if (match) {
+      const count = Number(match[1]);
+      if (Number.isFinite(count) && count > 0) return count;
+    }
+  }
+
+  const wordAlternation = Object.keys(wordMap).join("|");
+  const wordPatterns = [
+    new RegExp(`\\bat least (${wordAlternation})\\s+${supportPhrase}\\b`),
+    new RegExp(`\\binclude (${wordAlternation})\\s+${supportPhrase}\\b`),
+    new RegExp(`\\buse (${wordAlternation})\\s+${supportPhrase}\\b`),
+    new RegExp(`\\bincorporate (${wordAlternation})\\s+${supportPhrase}\\b`),
+  ];
+
+  for (const pattern of wordPatterns) {
+    const match = normalized.match(pattern);
+    if (match) {
+      return wordMap[match[1]] ?? null;
+    }
   }
 
   return null;
@@ -155,10 +230,16 @@ export async function fetchSourceContext(urls: string[]): Promise<ResolvedSource
         Accept: "text/html,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain;q=0.9,*/*;q=0.8",
       },
       redirect: "follow",
+      signal: AbortSignal.timeout(SOURCE_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch source: ${url}`);
+    }
+
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (Number.isFinite(contentLength) && contentLength > MAX_SOURCE_FETCH_BYTES) {
+      throw new Error(`Source is too large: ${url}`);
     }
 
     const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
@@ -179,6 +260,9 @@ export async function fetchSourceContext(urls: string[]): Promise<ResolvedSource
     }
 
     const html = await response.text();
+    if (html.length > MAX_SOURCE_FETCH_BYTES) {
+      throw new Error(`Source is too large: ${url}`);
+    }
     const { title, text } = stripHtml(html);
     resolved.push({
       url,

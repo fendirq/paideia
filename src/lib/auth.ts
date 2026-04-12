@@ -4,6 +4,28 @@ import { db } from "./db";
 import { validatePasscode } from "./passcode";
 import bcrypt from "bcrypt";
 
+export async function ensurePasscodeAdminUser() {
+  const adminEmail = "admin@paideia.local";
+  let adminUser = await db.user.findUnique({
+    where: { email: adminEmail },
+  });
+  if (!adminUser) {
+    adminUser = await db.user.create({
+      data: {
+        email: adminEmail,
+        name: "Admin",
+        role: "ADMIN",
+      },
+    });
+  } else if (adminUser.role !== "ADMIN") {
+    adminUser = await db.user.update({
+      where: { id: adminUser.id },
+      data: { role: "ADMIN" },
+    });
+  }
+  return adminUser;
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   providers: [
@@ -45,23 +67,11 @@ export const authOptions: NextAuthOptions = {
           typeof credentials?.passcode === "string" &&
           validatePasscode(credentials.passcode)
         ) {
-          const adminEmail = "admin@paideia.local";
-          let adminUser = await db.user.findUnique({
-            where: { email: adminEmail },
-          });
-          if (!adminUser) {
-            adminUser = await db.user.create({
-              data: {
-                email: adminEmail,
-                name: "Admin",
-                role: "ADMIN",
-              },
-            });
-          }
+          const adminUser = await ensurePasscodeAdminUser();
           return {
             id: adminUser.id,
             name: "Admin",
-            email: adminEmail,
+            email: "admin@paideia.local",
             role: "ADMIN",
           };
         }

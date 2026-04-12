@@ -7,6 +7,15 @@ import {
   buildLevel2CritiquePrompt,
   buildLevel2AuditPrompt,
   buildLevel2ExpansionPrompt,
+  buildLevel2EvidenceIntegrationPrompt,
+  buildLevel2AttributionPrompt,
+  buildLevel2CompliancePrompt,
+  buildLevel2SourceFlowPrompt,
+  buildLevel2TrimPrompt,
+  buildLevel2NaturalnessPrompt,
+  normalizeSupportedSourceAttribution,
+  polishLevel2SurfaceVoice,
+  stripUnsupportedSourceAttribution,
   humanizeEssay,
   sanitizeEssayOutput,
 } from "@/lib/essay-generator";
@@ -267,7 +276,7 @@ describe("buildLevel2WritingPrompt", () => {
 
   it("includes anti-checklist directive", () => {
     const result = buildLevel2WritingPrompt(makeOpts(), outline);
-    expect(result).toContain("Do NOT apply every stylistic trait in every paragraph");
+    expect(result).toContain("Preserve the student's recognizable style signatures");
   });
 
   it("includes AI red flag avoidance", () => {
@@ -303,6 +312,12 @@ describe("buildLevel2WritingPrompt", () => {
     expect(result).toContain('Do NOT hide behind placeholders like "in class we talked about"');
   });
 
+  it("adds a no-source specificity ceiling when no source packet is present", () => {
+    const result = buildLevel2WritingPrompt(makeOpts(), outline);
+    expect(result).toContain("well-prepared student could plausibly remember without research");
+    expect(result).toContain("Prefer major names, events, places, and policies over obscure dates or niche facts");
+  });
+
   it("includes approved source material when provided", () => {
     const result = buildLevel2WritingPrompt(
       makeOpts({ sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nBattle of the Zab happened in 750." }),
@@ -310,6 +325,11 @@ describe("buildLevel2WritingPrompt", () => {
     );
     expect(result).toContain("APPROVED SOURCE MATERIAL");
     expect(result).toContain("Battle of the Zab happened in 750");
+  });
+
+  it("scales paragraph guidance for long-form assignments", () => {
+    const result = buildLevel2WritingPrompt(makeOpts({ wordCount: 1300 }), outline);
+    expect(result).toContain("6-8 total paragraphs");
   });
 });
 
@@ -393,11 +413,12 @@ describe("buildLevel2AuditPrompt", () => {
     expect(result).toContain("would a teacher");
   });
 
-  it("explicitly says do NOT remove imperfections", () => {
+  it("explicitly says to preserve voice while improving quality", () => {
     const fp = makeFingerprint();
     const samples = [{ label: "Essay 1", content: "Sample writing" }];
     const result = buildLevel2AuditPrompt(essay, fp, samples);
-    expect(result).toContain("Do NOT remove intentional imperfections");
+    expect(result).toContain("Improve the essay's quality to an A-range standard");
+    expect(result).toContain("Preserve everything that already sounds like the student");
   });
 
   it("includes AI detector phrases", () => {
@@ -432,6 +453,15 @@ describe("buildLevel2AuditPrompt", () => {
 
     expect(result).toContain("Battle of the Zab in 750 mattered.");
   });
+
+  it("adds a no-source plausibility check when no source pack is present", () => {
+    const fp = makeFingerprint();
+    const samples = [{ label: "Essay 1", content: "Sample writing" }];
+    const result = buildLevel2AuditPrompt(essay, fp, samples);
+
+    expect(result).toContain("NO-SOURCE PLAUSIBILITY CHECK");
+    expect(result).toContain("outside research or historian-level precision");
+  });
 });
 
 describe("buildLevel2ExpansionPrompt", () => {
@@ -444,6 +474,228 @@ describe("buildLevel2ExpansionPrompt", () => {
     expect(result).toContain("Replace vague lines like \"in class\"");
     expect(result).toContain("Keep the same thesis");
     expect(result).toContain("VERDICT: Too short.");
+  });
+});
+
+describe("buildLevel2CompliancePrompt", () => {
+  it("enforces thesis, evidence count, and word-count compliance while preserving voice", () => {
+    const essay = "The Abbasids won because people were upset. This changed the Islamic world a lot.";
+    const result = buildLevel2CompliancePrompt(essay, makeOpts(), { minWords: 700, maxWords: 850 });
+
+    expect(result).toContain("clear thesis");
+    expect(result).toContain("at least 3 concrete pieces of evidence");
+    expect(result).toContain("It must not land below 700 words.");
+    expect(result).toContain("raise it to a polished A-range standard");
+    expect(result).toContain("do not sound like a textbook or historian");
+    expect(result).toContain("Keep a few natural contractions");
+  });
+});
+
+describe("buildLevel2EvidenceIntegrationPrompt", () => {
+  it("requires concrete evidence and analysis links", () => {
+    const essay = "The Abbasids won because people were upset. This changed the Islamic world a lot.";
+    const result = buildLevel2EvidenceIntegrationPrompt(essay, makeOpts({
+      sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nBattle of the Zab in 750.",
+    }), { requiredEvidenceCount: 3 });
+
+    expect(result).toContain("at least 3 distinct pieces of evidence");
+    expect(result).toContain("Every major example must be followed by 1-2 sentences explaining why it matters");
+    expect(result).toContain("prefer it over generic background knowledge");
+  });
+
+  it("sets a student-plausible evidence ceiling when no sources are present", () => {
+    const essay = "The Abbasids won because people were upset. This changed the Islamic world a lot.";
+    const result = buildLevel2EvidenceIntegrationPrompt(essay, makeOpts());
+
+    expect(result).toContain("3-5 concrete, high-confidence details");
+    expect(result).toContain("Prefer major names, events, places, and policies over niche facts or stacked dates");
+  });
+});
+
+describe("buildLevel2AttributionPrompt", () => {
+  it("requires explicit but natural source attribution and trimming", () => {
+    const essay = "The Abbasids won because people were upset. This changed the Islamic world a lot.";
+    const result = buildLevel2AttributionPrompt(
+      essay,
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nBattle of the Zab in 750.",
+      }),
+      { maxWords: 850 },
+    );
+
+    expect(result).toContain("include at least one directly attributable source phrase");
+    expect(result).toContain("Do not invent quotations.");
+    expect(result).toContain("does not exceed 850 words");
+  });
+});
+
+describe("buildLevel2TrimPrompt", () => {
+  it("enforces a hard max-word ceiling without changing the argument", () => {
+    const essay = "The Abbasids won because people were upset. This changed the Islamic world a lot.";
+    const result = buildLevel2TrimPrompt(essay, makeOpts(), { maxWords: 850 });
+
+    expect(result).toContain("does not exceed 850 words");
+    expect(result).toContain("Cut repetition, over-explanation, and the least necessary background first");
+    expect(result).toContain("Keep all major required elements already present");
+  });
+});
+
+describe("buildLevel2SourceFlowPrompt", () => {
+  it("targets sourced attribution and repeated analytical phrasing without changing structure", () => {
+    const essay = "According to the source, the Abbasids were strong. This shows they had support.";
+    const result = buildLevel2SourceFlowPrompt(
+      essay,
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nExcerpt.",
+      }),
+      { maxWords: 850 },
+    );
+
+    expect(result).toContain("source integration");
+    expect(result).toContain("Replace generic or mechanical source phrasing");
+    expect(result).toContain("Preserve the same paragraph count");
+    expect(result).toContain("at or under 850 words");
+  });
+});
+
+describe("buildLevel2NaturalnessPrompt", () => {
+  it("asks for less formulaic phrasing without weakening evidence", () => {
+    const essay = "This shows the Abbasids were strong. This shows the Umayyads were weak.";
+    const result = buildLevel2NaturalnessPrompt(essay, makeOpts());
+
+    expect(result).toContain("Replace repetitive analytical phrasing");
+    expect(result).toContain("Do NOT pretend you have class notes");
+    expect(result).toContain("Do not make the essay vaguer");
+  });
+
+  it("preserves supported attribution when sources are present", () => {
+    const essay = "The source shows the Abbasids were strong.";
+    const result = buildLevel2NaturalnessPrompt(
+      essay,
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nBattle of the Zab in 750.",
+      }),
+    );
+
+    expect(result).toContain("Keep source attribution when it is supported");
+    expect(result).not.toContain("Do NOT pretend you have class notes");
+  });
+});
+
+describe("stripUnsupportedSourceAttribution", () => {
+  it("removes invented classroom attributions from no-source prose", () => {
+    const essay = [
+      "According to the class notes, the Abbasids got support from the mawali.",
+      "As we discussed in class, the Umayyads had made a lot of enemies.",
+      "The class sources explain that Baghdad became important later.",
+    ].join(" ");
+
+    const result = stripUnsupportedSourceAttribution(essay);
+
+    expect(result).not.toContain("class notes");
+    expect(result).not.toContain("discussed in class");
+    expect(result).not.toContain("class sources");
+    expect(result).toContain("The Abbasids got support from the mawali.");
+  });
+
+  it("preserves paragraph breaks while stripping unsupported attributions", () => {
+    const essay = [
+      "According to the class notes, the Abbasids got support from the mawali.",
+      "",
+      "As we discussed in class, Baghdad became important later.",
+    ].join("\n\n");
+
+    const result = stripUnsupportedSourceAttribution(essay);
+
+    expect(result).toContain("\n\n");
+  });
+
+  it("strips broader unsupported course-material phrasing", () => {
+    const essay = "As the course material on the Abbasid Revolution shows, the Umayyads had real problems.";
+    const result = stripUnsupportedSourceAttribution(essay);
+
+    expect(result).not.toContain("course material");
+    expect(result).toContain("The Umayyads had real problems.");
+  });
+});
+
+describe("normalizeSupportedSourceAttribution", () => {
+  it("replaces generic class-note phrasing with generic source phrasing", () => {
+    const essay = [
+      "According to the class notes, the Abbasids won at the Zab.",
+      "The class sources explain that Baghdad became important later.",
+    ].join(" ");
+
+    const result = normalizeSupportedSourceAttribution(
+      essay,
+      "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nExcerpt.\n\n--- Source 2: Baghdad seminar notes ---\nExcerpt.",
+    );
+
+    expect(result).not.toContain("class notes");
+    expect(result).not.toContain("class sources");
+    expect(result).toContain("According to al-Tabari");
+    expect(result).not.toContain("The source shows");
+  });
+
+  it("normalizes broader notes phrasing to source language", () => {
+    const essay = [
+      "According to our class notes on the Abbasid Revolution, the Abbasids drew support from the mawali.",
+      "The revolution notes show that Abu Muslim organized support in Khorasan.",
+    ].join(" ");
+
+    const result = normalizeSupportedSourceAttribution(
+      essay,
+      "APPROVED SOURCE MATERIAL:\n--- Source 1: lecture packet on social grievances ---\nExcerpt.\n\n--- Source 2: seminar notes on the Battle of the Zab ---\nExcerpt.",
+    );
+
+    expect(result).not.toContain("class notes");
+    expect(result).not.toContain("revolution notes");
+    expect(result).toContain("According to the lecture packet on social grievances");
+    expect(result).toContain("The lecture packet on social grievances shows that Abu Muslim organized support in Khorasan.");
+  });
+
+  it("replaces generic source phrasing with a named source when context exists", () => {
+    const essay = "According to the source, the black banners mattered. As the source shows, the movement spread in Khurasan.";
+    const result = normalizeSupportedSourceAttribution(
+      essay,
+      "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nExcerpt.",
+    );
+
+    expect(result).toContain("According to al-Tabari");
+    expect(result).toContain("As al-Tabari shows");
+  });
+});
+
+describe("polishLevel2SurfaceVoice", () => {
+  it("injects a few natural contractions for writers who use them", () => {
+    const essay = [
+      "The Abbasids did not wait for the Umayyads to change.",
+      "It is clear that they were not going to accept that system forever.",
+      "The Umayyads could not keep control because they did not have broad support.",
+      "That is why the Abbasids were able to win.",
+    ].join(" ");
+
+    const result = polishLevel2SurfaceVoice(essay, makeFingerprint());
+    const matches = result.match(/\b(doesn't|don't|can't|isn't|it's|that's|weren't|didn't|couldn't)\b/gi) || [];
+
+    expect(matches.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("leaves contraction-free prose alone when the writer avoids contractions", () => {
+    const essay = "It is clear that they were not going to accept the old system.";
+    const fp = makeFingerprint({
+      voice: {
+        formality: "formal",
+        perspective: "third-person",
+        contractions: false,
+        toneDescription: "formal",
+        distinctiveTraits: [],
+      },
+    });
+
+    const result = polishLevel2SurfaceVoice(essay, fp);
+
+    expect(result).toBe(essay);
   });
 });
 

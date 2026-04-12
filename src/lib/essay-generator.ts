@@ -235,6 +235,16 @@ function excerptSampleContent(content: string, maxChars = 3200): string {
   return `${normalized.slice(0, headChars).trimEnd()}\n\n[...]\n\n${normalized.slice(-tailChars).trimStart()}`;
 }
 
+function getLevel2ParagraphGuidance(wordCount: number): string {
+  if (wordCount >= 1100) {
+    return "A long-form essay at this length should usually have 6-8 total paragraphs (intro, 4-6 body, conclusion), not one giant block and not 10+ tiny paragraphs.";
+  }
+  if (wordCount >= 800) {
+    return "A mid-length essay at this length should usually have 5-6 total paragraphs (intro, 3-4 body, conclusion), not one giant block and not 10+ tiny paragraphs.";
+  }
+  return "A shorter essay at this length should usually have 4-5 total paragraphs (intro, 2-3 body, conclusion), not one giant block and not 10+ tiny paragraphs.";
+}
+
 function selectDiverseSamples(samples: Sample[], maxChars = 12000): string {
   if (!samples.length) return "";
 
@@ -348,6 +358,68 @@ export function sanitizeEssayOutput(text: string): string {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function extractSourceTitles(sourceContext?: string): string[] {
+  if (!sourceContext) return [];
+
+  const titles: string[] = [];
+  const seen = new Set<string>();
+  const regex = /---\s*Source\s+\d+\s*:\s*(.+?)\s*---/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(sourceContext)) !== null) {
+    const title = match[1]?.trim();
+    if (!title || seen.has(title.toLowerCase())) continue;
+    seen.add(title.toLowerCase());
+    titles.push(title);
+  }
+
+  return titles;
+}
+
+function prettifySourceTitle(title: string): string {
+  const trimmed = title.trim().replace(/\bpacket excerpt\b/gi, "packet").replace(/\s{2,}/g, " ");
+  if (/^al-tabari\b/i.test(trimmed)) return "al-Tabari";
+  if (/^(lecture packet|seminar notes|historiographical note|administrative and urban change)/i.test(trimmed)) {
+    return `the ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`;
+  }
+  if (/\b(notes|packet)\b/i.test(trimmed)) {
+    return `the ${trimmed}`;
+  }
+  return trimmed;
+}
+
+function bestSourceReference(matchText: string, sourceContext?: string): string {
+  const titles = extractSourceTitles(sourceContext);
+  if (titles.length === 0) return "the source";
+
+  const normalizedMatch = matchText.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+  const ignoredTokens = new Set(["class", "notes", "note", "sources", "source", "discussion", "course", "material", "materials", "packet", "packets", "shows", "show", "explains", "explain", "describes", "describe"]);
+  let bestTitle = titles[0];
+  let bestScore = -1;
+
+  for (const title of titles) {
+    const tokens = title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 4 && !ignoredTokens.has(token));
+    const score = tokens.reduce((sum, token) => sum + (normalizedMatch.includes(token) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestTitle = title;
+    }
+  }
+
+  return prettifySourceTitle(bestTitle);
+}
+
+function sourceReferenceSentenceStart(reference: string): string {
+  if (/^the\s/i.test(reference)) {
+    return reference.replace(/^the\s/i, "The ");
+  }
+  return reference.charAt(0).toUpperCase() + reference.slice(1);
 }
 
 export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerprint {
@@ -678,7 +750,7 @@ ${outline}
 CRITICAL GUIDELINES — follow these in order of priority:
 
 1. PARAGRAPH STRUCTURE (MANDATORY):
-Each body paragraph MUST contain ${fingerprint.structure.avgParagraphLength} sentences (±1). Follow: "${fingerprint.structure.bodyParagraphPattern}". A ~${wordCount}-word essay should have 4-5 total paragraphs (intro + 2-3 body + conclusion), NOT 10+ short blocks. Count your sentences per paragraph before finishing.
+Each body paragraph MUST contain ${fingerprint.structure.avgParagraphLength} sentences (±1). Follow: "${fingerprint.structure.bodyParagraphPattern}". ${getLevel2ParagraphGuidance(wordCount)} Count your sentences per paragraph before finishing.
 
 2. SENTENCE VARIETY / BURSTINESS (MANDATORY — this is how AI detectors work):
 AI detectors measure sentence-length standard deviation ("burstiness"). You MUST score above 7.0 or the essay WILL be flagged.
@@ -688,13 +760,12 @@ How to achieve this — every body paragraph must contain ALL of these:
 - Several MEDIUM sentences (12-22 words) in between
 Real students write in bursts: a clumsy short sentence, then a rambling long one, then something average. NEVER write 3+ consecutive sentences of similar length. If you notice a run of 15-20 word sentences, break the pattern immediately with a very short or very long one.
 
-3. NATURAL ERRORS (MANDATORY — a flawless essay from a ${gradeRange} student is an instant AI flag):
-${fingerprint.errors.grammarPatterns.length ? `- Grammar patterns to include: ${fingerprint.errors.grammarPatterns.join(", ")} (e.g., "The green light symbolizes hope, and it also shows that Gatsby..." — comma splice before "and")` : ""}
-${fingerprint.errors.punctuationHabits.length ? `- Punctuation: ${fingerprint.errors.punctuationHabits.join(", ")}` : ""}
-${fingerprint.errors.spellingTendency ? `- Spelling: ${fingerprint.errors.spellingTendency}` : ""}
-${fingerprint.voice.contractions ? "- Contractions: They USE contractions regularly (don't, isn't, can't, doesn't, it's). An essay with zero contractions from this student is a red flag. Include 4-6 contractions spread throughout." : ""}
-${fingerprint.voice.toneDescription ? `- Tone: ${fingerprint.voice.toneDescription}. Include 1-2 moments where the register slips (e.g., "which is kind of the whole point" or "Gatsby basically can't accept that...").` : ""}
-Include at least 3-5 total imperfections. Scatter them naturally — don't cluster them.
+3. VOICE MARKERS (MANDATORY):
+Preserve the student's recognizable voice markers without copying their weakest mistakes.
+${fingerprint.voice.contractions ? "- Contractions: They use contractions naturally. Keep that casual rhythm where it sounds authentic, and include a few contractions across the essay when they fit." : "- Keep the student's overall formality level, but do not force contractions if they do not use them."}
+${fingerprint.voice.toneDescription ? `- Tone: ${fingerprint.voice.toneDescription}. Preserve their natural register and phrasing habits.` : ""}
+${fingerprint.transitions.favorites.length ? `- Favorite transitions and sentence patterns: ${fingerprint.transitions.favorites.join(", ")}.` : ""}
+Do NOT introduce sentence fragments, broken grammar, typo-like spelling errors, or fake awkwardness just to sound human.
 
 4. VOCABULARY CEILING (MANDATORY):
 This student's vocabulary tier is "${fingerprint.vocabulary.tier}". Their go-to words: ${fingerprint.vocabulary.signatureWords.join(", ")}.
@@ -704,15 +775,19 @@ Instead of fancy words, use the simple ones real students use: "shows", "proves"
 5. EVIDENCE SPECIFICITY (MANDATORY):
 Do NOT hide behind placeholders like "in class we talked about", "in the sources you can see", "history shows", or "the text says" unless you immediately name the actual evidence. Use concrete details whenever the topic allows it: people, cities, groups, policies, events, regions, dates, or direct source claims. A real student may be simple, but they still mention the actual thing they are talking about.
 ${sourceContext ? "If approved source material is provided, pull your evidence from it and name it directly. Do not invent source details that are not in the provided material." : ""}
+${!sourceContext ? "If no approved source material is provided, still use concrete evidence, but keep it to the kind of major details a well-prepared student could plausibly remember without research. Prefer major names, events, places, and policies over obscure dates or niche facts. Pick a few strong examples and develop them instead of trying to sound comprehensive." : ""}
 If the prompt or rubric requires a minimum number of evidence pieces, actually hit that number.
 
-6. QUALITY CEILING:
-This should read like a ${gradeRange} essay. That means:
-- Analysis is present but sometimes shallow or repetitive
-- Some points are underdeveloped or stated without full explanation
-- The conclusion may feel slightly rushed or repetitive
-- Not every quote is perfectly integrated or analyzed
-- Do NOT apply every stylistic trait in every paragraph — real writers are inconsistent.
+6. QUALITY FLOOR:
+This must read like the strongest, most educated version of this writer.
+- Clear thesis in the introduction
+- Concrete evidence, not generic placeholders
+- Explanation after each major piece of evidence
+- Grammatically clean prose
+- Strong organization and focused body paragraphs
+- A-range in clarity and argument, not textbook-level precision
+- Depth over coverage. A strong student essay should feel selective, not encyclopedic.
+- Preserve the student's recognizable style signatures, but do NOT preserve incoherence, weak grammar, or low-effort development.
 
 7. TARGET: ~${wordCount} words.
 
@@ -755,7 +830,7 @@ ${sourceContext ? `\n---\n\n${sourceContext}` : ""}
 
 YOUR TASK:
 
-You are a ruthless writing-forensics reviewer. Compare the generated essay against the student's real samples and identify the strongest signs that the essay does NOT fully sound like them yet.
+You are a ruthless writing-forensics reviewer. Compare the generated essay against the student's real samples and identify the strongest signs that the essay does NOT fully sound like them yet, while also checking whether it reaches a polished A-range quality floor.
 
 Prioritize:
 - sentence rhythm / burstiness
@@ -763,9 +838,9 @@ Prioritize:
 - vocabulary ceiling
 - evidence integration habits
 - transition habits and sentence openers
-- natural imperfection rate
+- grammar and sentence coherence
 - tone / register slips
-- places where the essay sounds smarter, smoother, or more polished than the samples
+- places where the essay is too generic, too vague, or too weakly argued
 
 RULES:
 - Ground every fix in the samples or profile. Do not invent traits.
@@ -847,11 +922,9 @@ Run these checks IN ORDER. The first three are the most critical — they are wh
 2. PARAGRAPH STRUCTURE:
    Count the sentences in each body paragraph. This student writes ~${fingerprint.structure.avgParagraphLength} sentences per paragraph. If there are single-sentence paragraphs, MERGE them. The essay should have 4-6 total paragraphs, NOT 10+ tiny blocks.
 
-3. NATURAL ERRORS — COUNT THEM:
-   Count every grammar/punctuation error in the essay. This student's patterns: ${fingerprint.errors.grammarPatterns.join(", ")}; ${fingerprint.errors.punctuationHabits.join(", ")}. ${fingerprint.errors.spellingTendency || ""}
-   ${fingerprint.voice.contractions ? "This student uses contractions. Count them — if fewer than 4, convert some formal phrases: \"does not\" → \"doesn't\", \"cannot\" → \"can't\", \"it is\" → \"it's\"." : ""}
-   ${fingerprint.voice.toneDescription ? `Their tone: "${fingerprint.voice.toneDescription}". If the essay is uniformly formal, add 1-2 casual slips like "kind of", "basically", "a lot", or "the whole point of".` : ""}
-   If the total error/imperfection count is below 3, you MUST add more until there are at least 3-5 scattered naturally throughout.
+3. GRAMMAR & CLARITY CHECK:
+   The essay should be grammatically clean and coherent. Fix sentence fragments, broken transitions, repetitive filler, or accidental roughness. Preserve the student's rhythm and tone, but do NOT preserve actual writing mistakes that drag the essay below an A-range standard.
+   ${fingerprint.voice.contractions ? "This student uses contractions. Keep them where natural, but do not force them in ways that make sentences weaker." : ""}
 
 4. VOCABULARY DOWNGRADE:
    Flag every word that is more sophisticated than what appears in their samples. Their tier: "${fingerprint.vocabulary.tier}". Replace advanced words with simpler alternatives:
@@ -867,7 +940,10 @@ Run these checks IN ORDER. The first three are the most critical — they are wh
 7. EVIDENCE SPECIFICITY CHECK:
    Hunt for vague evidence placeholders: "in class", "in the sources", "we learned that", "history shows", "the text says". Replace them with the actual evidence whenever the topic allows it: a named person, group, city, event, policy, source claim, or concrete example. The goal is not sophistication. The goal is sounding like a real student who remembers the actual material instead of padding with generic school-language.
 
-8. Any passage that reads as "too polished" compared to their actual writing level.
+${!sourceContext ? `8. NO-SOURCE PLAUSIBILITY CHECK:
+   If no approved source material is provided, cut any detail that sounds like outside research or historian-level precision. Keep the strongest well-known facts, but avoid stacking exact dates, rare names, or over-explained background unless a prepared student could plausibly know them from class.
+
+` : ""}${sourceContext ? "8." : "9."} Any passage that reads too generic, too weakly argued, or not thesis-driven enough for the assignment.
 
 ${fingerprint.voice.contractions ? `CONTRACTION ENFORCEMENT (do this last as a final pass):
 Scan the entire essay for these formal phrases and convert them to contractions:
@@ -881,7 +957,7 @@ Scan the entire essay for these formal phrases and convert them to contractions:
 - "they are" → "they're"
 The essay should have at least 4 contractions when finished. If you can't find formal phrases to convert, rewrite 2-3 sentences to naturally include contractions (e.g., "The dream is impossible" → "The dream isn't something anyone can actually reach").` : ""}
 
-9. TRANSITION & OPENER CHECK (count carefully):
+${sourceContext ? "9." : "10."} TRANSITION & OPENER CHECK (count carefully):
    Go through every sentence and write down its first word. Count how many start with "The".
    RULES:
    - If more than 40% of sentences start with "The", you MUST rewrite 3-4 of them. Use: "Fitzgerald's...", "This...", "Here,...", "In the novel,...", "What emerges is..."
@@ -891,9 +967,8 @@ The essay should have at least 4 contractions when finished. If you can't find f
    ${fingerprint.transitions.neverUses.length ? `They NEVER use: ${fingerprint.transitions.neverUses.join(", ")}. Remove any instances.` : ""}
 
 IMPORTANT:
-- Do NOT add polish, sophistication, or improve the essay's quality
-- Do NOT remove intentional imperfections — they are there because the student writes that way
-- Do NOT make the essay better. Make it more authentic.
+- Improve the essay's quality to an A-range standard while preserving the student's recognizable voice
+- Do NOT turn it into stiff academic boilerplate
 - Preserve everything that already sounds like the student
 - Return ONLY the corrected essay, no commentary`;
 }
@@ -905,11 +980,9 @@ export function buildLevel2ExpansionPrompt(
   opts: GenerateOptions,
   critiqueNotes?: string,
 ): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
+  const { fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
-  const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
-  const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
 
   return `STUDENT'S REAL WRITING — keep this voice:
 
@@ -944,15 +1017,16 @@ ${critiqueNotes}` : ""}
 
 YOUR TASK:
 
-Keep the same thesis, argument order, and overall student voice, but expand this essay so it feels like a complete ${gradeLevel} essay from a student who typically earns ${gradeRange}.
+Keep the same thesis, argument order, and overall student voice, but expand this essay so it feels like a complete, polished, high-performing essay from this writer.
 
 MANDATORY RULES:
 - Target about ${wordCount} words. Do not stay far under.
 - Expand EXISTING body paragraphs first. Do not turn this into a brand-new essay.
 - Add concrete evidence instead of placeholders. Replace vague lines like "in class", "in the sources", "we learned that", or "history shows" with actual details whenever the topic allows it: named people, groups, cities, policies, events, dates, or direct source claims.
 - If source material is provided, use it as the evidence pool. Name those examples directly instead of speaking in generalities.
+- If no source material is provided, prefer major, high-confidence facts a prepared student would plausibly remember. Do not pad with obscure or textbook-sounding detail, and do not try to cover every possible angle.
 - If the rubric asks for a minimum number of evidence pieces, make sure the draft actually reaches that threshold.
-- Keep the student's natural simplicity, repetition, and imperfections. Do not suddenly sound smarter than their samples.
+- Keep the student's natural style signatures, but do not preserve weak grammar, vague evidence, or underdeveloped analysis.
 - Keep paragraph sizes believable for this student.
 - Do not add headers, commentary, or bullet points.
 
@@ -968,6 +1042,416 @@ BAD MOVES:
 - Turning the essay into polished model prose
 
 Return ONLY the revised essay.`;
+}
+
+// ─── Level 2 Compliance Prompt (pass 6 — satisfy assignment without losing voice) ───
+
+export function buildLevel2CompliancePrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    minWords,
+    maxWords,
+  }: {
+    minWords?: number | null;
+    maxWords?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — protect this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Make the essay satisfy the assignment and rubric while still sounding like this writer. Keep the same overall argument and voice signatures, but raise it to a polished A-range standard.
+
+MANDATORY CHECKS:
+- The introduction must contain a clear thesis that answers BOTH parts of the assignment, not just the topic generally.
+- The essay must include at least 3 concrete pieces of evidence if the rubric asks for it.
+- Every piece of evidence must be followed by explanation of why it matters.
+- Each body paragraph should stay focused on one main point.
+- Fix accidental broken fragments that feel like editing mistakes rather than authentic student writing, especially sentences that begin with "Which", "Because", or similar leftovers and do not read naturally.
+- Keep the essay around ${wordCount} words.${minWords ? ` It must not land below ${minWords} words.` : ""}${maxWords ? ` Try not to exceed ${maxWords} words.` : ""}
+- Use approved source material when it is provided. Do not invent outside evidence.
+${!sourceContext ? "- Without approved source material, keep the specificity student-plausible. Use concrete examples, but do not sound like a textbook or historian. Prioritize 3-4 strong examples over trying to sound exhaustive." : ""}
+${fingerprint.voice.contractions ? "- Keep a few natural contractions in the essay so the voice does not become more formal than the student's real writing." : ""}
+
+IMPORTANT:
+- Keep the natural student diction and rhythm.
+- Do not preserve broken grammar, vague filler, or low-quality development just because it appears in the samples.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+// ─── Level 2 Evidence Integration Prompt (pass 6 — source-backed analysis enforcement) ───
+
+export function buildLevel2EvidenceIntegrationPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    requiredEvidenceCount,
+  }: {
+    requiredEvidenceCount?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — protect this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Strengthen this essay's evidence and analysis without changing its overall argument or recognizable voice.
+
+MANDATORY CHECKS:
+- Every body paragraph must contain a concrete historical example, not just a general statement.
+- Every major example must be followed by 1-2 sentences explaining why it matters.
+- Tie each body paragraph back to the thesis before moving on.
+${requiredEvidenceCount ? `- The essay must clearly include at least ${requiredEvidenceCount} distinct pieces of evidence.` : ""}
+- If a paragraph already has one strong example, deepen the explanation before piling on extra facts.
+- ${sourceContext ? "When approved source material is present, prefer it over generic background knowledge. Refer to the actual event, person, or source claim instead of generic phrases like \"class notes explain\" whenever possible." : "If no approved source material is present, use 3-5 concrete, high-confidence details a prepared student could plausibly remember from class. Prefer major names, events, places, and policies over niche facts or stacked dates, and do not try to cover everything."}
+- Add direct source phrasing when natural, such as \"the source shows\" or \"class notes explain,\" but only if the source context actually supports it.
+- Do not add fake citations, invented quotes, or niche specifics that were never established.
+
+IMPORTANT:
+- Keep the student's natural diction and rhythm.
+- Do not weaken the thesis or reduce clarity.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+// ─── Level 2 Attribution Prompt (pass 7 — source phrasing + trim) ───
+
+export function buildLevel2AttributionPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    maxWords,
+  }: {
+    maxWords?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — preserve this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Make the essay feel clearly grounded in actual source material while keeping the student's natural style.
+
+MANDATORY CHECKS:
+- If approved source material exists, include at least one directly attributable source phrase such as "the source shows," "the account of X suggests," or a short integrated quoted phrase if the source context clearly supports it.
+- Prefer naming the actual source or speaker over generic phrases like "the class notes explain" or "the source shows."
+- Do not invent quotations.
+- Do not add fake citation formats.
+- Keep evidence phrasing natural and student-like, not academic-boilerplate.
+${maxWords ? `- Trim the essay so it does not exceed ${maxWords} words.` : ""}
+- Preserve thesis, evidence quality, and grammar.
+
+IMPORTANT:
+- Keep the essay human and readable.
+- Do not make it sound robotic or over-edited.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+// ─── Level 2 Naturalness Prompt (pass 8 — reduce polish + repetitive phrasing) ───
+
+export function buildLevel2NaturalnessPrompt(
+  essay: string,
+  opts: GenerateOptions,
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — match this level and texture:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Keep the same argument, evidence, and overall structure, but make the essay sound more naturally like this student's real writing.
+
+MANDATORY CHECKS:
+- Simplify any sentence that sounds more polished, textbook-like, or over-explained than the real samples.
+- Replace repetitive analytical phrasing like "This shows," "This matters because," "According to," or other formulaic sentence starters when they repeat too often.
+- Keep some student-like repetition, but do not let the same analytical opener dominate the essay.
+- Use a few direct, plainspoken statements instead of turning every idea into polished commentary.
+${sourceContext ? "- Keep source attribution when it is supported by the provided material, but make it feel natural instead of mechanical." : "- Do NOT pretend you have class notes, class sources, or a source packet. If the essay mentions them, rewrite those lines so they state the evidence directly."}
+- Preserve the concrete evidence and thesis. Do not make the essay vaguer.
+
+IMPORTANT:
+- Keep the student's natural diction and rhythm.
+- Do not add headers or commentary.
+- Do not remove major historical details that are already helping the essay satisfy the assignment.
+
+Return ONLY the revised essay.`;
+}
+
+export function buildLevel2TrimPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    maxWords,
+  }: {
+    maxWords: number;
+  },
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — preserve this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Trim this essay so it does not exceed ${maxWords} words while preserving the thesis, evidence, and student voice.
+
+MANDATORY RULES:
+- Cut repetition, over-explanation, and the least necessary background first.
+- Keep all major required elements already present.
+- Do not weaken the thesis.
+- Keep the student's natural diction and rhythm.
+- Keep source naming natural and specific when sources are provided.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+export function buildLevel2SourceFlowPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    maxWords,
+  }: {
+    maxWords?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — preserve this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Smooth the essay's source integration and repetitive analytical phrasing without changing its argument, paragraph structure, or overall student voice.
+
+MANDATORY RULES:
+- Replace generic or mechanical source phrasing like "According to the source" or "the packet shows" with more natural, specific source naming when possible.
+- Keep source references light. Name the source when it matters, but do not make every paragraph sound citation-heavy.
+- Vary repetitive analytical openers like "This shows," "That matters because," "In other words," and "According to..."
+- Preserve the same paragraph count and overall evidence set.
+- Do not add new evidence, new quotes, or new arguments.
+- Do not make the essay more formal or more polished than the student samples.
+${maxWords ? `- Keep the essay at or under ${maxWords} words.` : ""}
+
+IMPORTANT:
+- Keep the student's natural diction and rhythm.
+- Keep the thesis and all required assignment elements.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+export function stripUnsupportedSourceAttribution(essay: string): string {
+  let result = normalizeQuotes(essay);
+
+  const attributionPatterns = [
+    /\bAccording to (?:the |our )?class (?:notes|sources|discussion),\s*/gi,
+    /\bAccording to (?:the |our )?class (?:notes|sources) on [^,]+,\s*/gi,
+    /\bAs (?:we )?(?:discussed|covered|learned) in class,\s*/gi,
+    /\bAs (?:our )?class (?:notes|sources) (?:show|explain),\s*/gi,
+    /\bAs the course material on [^,]+ shows,\s*/gi,
+    /\bAs the course materials on [^,]+ show,\s*/gi,
+    /\b(?:The |Our )class (?:notes|sources) (?:show|explain|make clear) that\s*/gi,
+    /\b(?:The |Our )class discussion (?:showed|explained) that\s*/gi,
+    /\bAs (?:our )?class discussion (?:showed|explained),\s*/gi,
+  ];
+
+  for (const pattern of attributionPatterns) {
+    result = result.replace(pattern, "");
+  }
+
+  return result
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/(^|[.!?]\s+)([a-z])/g, (_, prefix: string, ch: string) => `${prefix}${ch.toUpperCase()}`)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function normalizeSupportedSourceAttribution(essay: string, sourceContext?: string): string {
+  return normalizeQuotes(essay)
+    .replace(/\bAccording to (?:the |our )?(?:class |revolution )?(?:notes|sources|discussion)(?: on [^,]+)?,\s*/gi, (match) => `According to ${bestSourceReference(match, sourceContext)}, `)
+    .replace(/\bAs (?:our )?class (?:notes|sources) (?:show|explain),\s*/gi, (match) => `As ${bestSourceReference(match, sourceContext)} shows, `)
+    .replace(/\bAs the course material on [^,]+ shows,\s*/gi, (match) => `As ${bestSourceReference(match, sourceContext)} shows, `)
+    .replace(/\bAs the course materials on [^,]+ show,\s*/gi, () => "As the source packet shows, ")
+    .replace(/\bAccording to the source,\s*/gi, () => `According to ${bestSourceReference("the source", sourceContext)}, `)
+    .replace(/\bAccording to the sources,\s*/gi, () => "According to the source packet, ")
+    .replace(/\bAs the source shows,\s*/gi, () => `As ${bestSourceReference("the source", sourceContext)} shows, `)
+    .replace(/\bAs the sources show,\s*/gi, () => "As the source packet shows, ")
+    .replace(/\b(?:The |Our )?(?:class |revolution )?(?:notes|sources|discussion) (?:show|explain|make clear) that\s*/gi, (match) => `${sourceReferenceSentenceStart(bestSourceReference(match, sourceContext))} shows that `)
+    .replace(/\bThe source shows that\s*/gi, () => `${sourceReferenceSentenceStart(bestSourceReference("the source", sourceContext))} shows that `)
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function polishLevel2SurfaceVoice(essay: string, fingerprint: StyleFingerprint): string {
+  let result = normalizeQuotes(essay);
+
+  if (fingerprint.voice.contractions) {
+    result = injectContractions(result, 3, 5);
+  }
+
+  result = stripEmDashes(result);
+  return result.replace(/\.{2,}/g, ".");
 }
 
 // ─── Post-processing: deterministic humanization ───
@@ -1453,7 +1937,6 @@ function boostBurstinessParagraph(paragraph: string): string {
  */
 function splitSentenceAtBreakpoint(sentence: string): [string, string] | null {
   const breakPatterns = [
-    /,\s+(which\s)/i,
     /,\s+(and this\s)/i,
     /,\s+(and the\s)/i,
     /,\s+(and it\s)/i,
@@ -1464,21 +1947,7 @@ function splitSentenceAtBreakpoint(sentence: string): [string, string] | null {
     /,\s+(but\s)/i,
     /,\s+(however\s)/i,
     /,\s+(yet\s)/i,
-    /,\s+(while\s)/i,
-    /,\s+(where\s)/i,
-    /,\s+(leaving\s)/i,
-    /,\s+(making\s)/i,
-    /,\s+(creating\s)/i,
-    /,\s+(suggesting\s)/i,
-    /,\s+(demonstrating\s)/i,
-    /,\s+(revealing\s)/i,
-    /,\s+(showing\s)/i,
-    /,\s+(reflecting\s)/i,
-    /,\s+(symbolizing\s)/i,
-    /,\s+(indicating\s)/i,
-    /,\s+(meaning\s)/i,
     /,\s+(also\s)/i,
-    /,\s+(as\s)/i,
   ];
 
   for (const pattern of breakPatterns) {

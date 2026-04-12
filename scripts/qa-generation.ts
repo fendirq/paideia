@@ -10,18 +10,27 @@ import {
   buildLevel2CritiquePrompt,
   buildLevel2AuditPrompt,
   buildLevel2ExpansionPrompt,
-  humanizeEssay,
+  buildLevel2EvidenceIntegrationPrompt,
+  buildLevel2AttributionPrompt,
+  buildLevel2CompliancePrompt,
+  buildLevel2SourceFlowPrompt,
+  buildLevel2TrimPrompt,
+  normalizeSupportedSourceAttribution,
   normalizeFingerprint,
+  polishLevel2SurfaceVoice,
   sanitizeEssayOutput,
+  stripUnsupportedSourceAttribution,
   type GenerateOptions,
   type SelfAssessment,
   type StyleFingerprint,
   type TeacherProfile,
 } from "../src/lib/essay-generator.ts";
+import { inferRequiredEvidenceCount, inferWordCountBounds } from "../src/lib/source-context.ts";
 
 const ROOT = process.cwd();
 const QA_DOC_DIR = path.join(ROOT, "output", "doc", "qa-level2");
-const QA_OUTPUT_DIR = path.join(ROOT, "output", "qa", "generation");
+const QA_FIXTURE_DIR = path.join(ROOT, "scripts", "fixtures", "qa");
+const DEFAULT_QA_OUTPUT_DIR = path.join(ROOT, "output", "qa", "generation");
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 const LEVEL1_MODEL = "deepseek-ai/DeepSeek-V3";
 const LEVEL2_PRIMARY_MODEL =
@@ -67,8 +76,28 @@ interface JudgeScores {
   priorityFixes: string[];
 }
 
-function ensureOutputDir() {
-  fs.mkdirSync(QA_OUTPUT_DIR, { recursive: true });
+interface ScenarioConfig {
+  name: string;
+  assignment: string;
+  rubric: string;
+  samples: SampleInput[];
+  teacherProfile: TeacherProfile;
+  selfAssessment: SelfAssessment;
+  targetWordCount: number;
+  sourceContext: string;
+  outputDir: string;
+  summaryLines: string[];
+}
+
+interface FixtureMeta {
+  label: string;
+  targetWordCount: number;
+  teacherProfile: TeacherProfile;
+  selfAssessment: SelfAssessment;
+}
+
+function ensureOutputDir(outputDir: string) {
+  fs.mkdirSync(outputDir, { recursive: true });
 }
 
 function readDocxText(filename: string): string {
@@ -77,8 +106,161 @@ function readDocxText(filename: string): string {
   }).trim();
 }
 
+function readTextFile(filename: string): string {
+  return fs.readFileSync(filename, "utf8").trim();
+}
+
+function loadDefaultScenario(): ScenarioConfig {
+  const assignment = readDocxText("assignment-abbasid-essay.docx");
+  const rubric = readDocxText("rubric-abbasid-essay.docx");
+  const samples: SampleInput[] = [
+    "sample-1-revolution.docx",
+    "sample-2-primary-source.docx",
+    "sample-3-comparison.docx",
+    "sample-4-short-answer.docx",
+  ].map((filename, index) => {
+    const content = readDocxText(filename);
+    return {
+      label: `Sample ${index + 1}`,
+      content,
+      wordCount: countWords(content),
+    };
+  });
+
+  const teacherProfile: TeacherProfile = {
+    gradeLevel: "11th grade",
+    gradeOther: "",
+    losesPointsFor: ["weak thesis", "general statements", "not enough explanation after quotes"],
+    losesPointsOther: "",
+  };
+
+  const selfAssessment: SelfAssessment = {
+    gradeRange: "B",
+    gradeRangeOther: "",
+    revisionLevel: "I reread and fix obvious errors",
+    revisionOther: "",
+    evidenceApproach: "I find a quote and explain it",
+    evidenceOther: "",
+    conclusionApproach: "I restate my thesis in different words",
+    conclusionOther: "",
+    wordCountTendency: "I usually write slightly under the target",
+    wordCountOther: "",
+    writingHabits: ["I overuse transition words", "I repeat myself in conclusions"],
+    writingHabitsOther: "",
+    quoteIntroStyle: ["As the source says", "The text shows"],
+    quoteIntroOther: "",
+    overusedPhrases: ["this shows that", "this matters because"],
+    overusedPhrasesOther: "",
+    selfEditFocus: ["spelling mistakes", "awkward wording"],
+    selfEditOther: "",
+    timeSpentOn: "body paragraphs",
+    timeSpentOther: "",
+  };
+
+  const sourceContext = [
+    "APPROVED SOURCE MATERIAL:",
+    "--- Source 1: Abbasid Revolution notes ---",
+    "- The Abbasid movement drew major support from mawali and from Khorasan.",
+    "- Abu Muslim helped organize support in Khorasan.",
+    "- The Abbasids defeated the Umayyads at the Battle of the Zab in 750.",
+    "- The Abbasids claimed descent from al-Abbas, the Prophet's uncle.",
+    "- After taking power, they moved the capital to Baghdad and relied more on Persian officials.",
+    "- Baghdad became a center of trade, learning, and administration.",
+  ].join("\n");
+
+  return {
+    name: "default",
+    assignment,
+    rubric,
+    samples,
+    teacherProfile,
+    selfAssessment,
+    targetWordCount: 780,
+    sourceContext,
+    outputDir: DEFAULT_QA_OUTPUT_DIR,
+    summaryLines: [
+      "Assignment corpus: Abbasid essay prompt + rubric from `output/doc/qa-level2/`.",
+      "Student corpus: 4 repo-hosted sample essays from the same folder.",
+      "Target word count: 780.",
+    ],
+  };
+}
+
+function loadFixtureScenario(name: string): ScenarioConfig {
+  const scenarioDir = path.join(QA_FIXTURE_DIR, name);
+  if (!fs.existsSync(scenarioDir)) {
+    throw new Error(`Unknown QA scenario: ${name}`);
+  }
+
+  const meta = JSON.parse(readTextFile(path.join(scenarioDir, "meta.json"))) as FixtureMeta;
+  const assignment = readTextFile(path.join(scenarioDir, "assignment.txt"));
+  const rubric = readTextFile(path.join(scenarioDir, "rubric.txt"));
+  const sourceContext = readTextFile(path.join(scenarioDir, "source-context.txt"));
+
+  const sampleFiles = fs.readdirSync(scenarioDir)
+    .filter((file) => /^sample-\d+\.txt$/.test(file))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  const samples: SampleInput[] = sampleFiles.map((file, index) => {
+    const content = readTextFile(path.join(scenarioDir, file));
+    return {
+      label: `Sample ${index + 1}`,
+      content,
+      wordCount: countWords(content),
+    };
+  });
+
+  return {
+    name,
+    assignment,
+    rubric,
+    samples,
+    teacherProfile: meta.teacherProfile,
+    selfAssessment: meta.selfAssessment,
+    targetWordCount: meta.targetWordCount,
+    sourceContext,
+    outputDir: path.join(ROOT, "output", "qa", name),
+    summaryLines: [
+      `Scenario: \`${meta.label}\` fixture set from [scripts/fixtures/qa/${name}](/Users/kingtom91/Documents/Projects/Paideia/scripts/fixtures/qa/${name}).`,
+      `Assignment corpus: \`assignment.txt\` + \`rubric.txt\` from the fixture directory.`,
+      `Student corpus: ${samples.length} college-standard sample essays from the fixture directory.`,
+      `Target word count: ${meta.targetWordCount}.`,
+    ],
+  };
+}
+
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function countParagraphs(text: string): number {
+  return text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).length;
+}
+
+function passesRevisionLengthFloor(text: string, targetWordCount: number, currentEssay: string): boolean {
+  const revisedWords = countWords(text);
+  const currentWords = countWords(currentEssay);
+  return revisedWords >= Math.max(Math.floor(targetWordCount * 0.7), currentWords - 120);
+}
+
+function isWithinMaxWords(text: string, maxWords: number | null): boolean {
+  return maxWords == null || countWords(text) <= maxWords;
+}
+
+function needsSourceFlowPass(text: string): boolean {
+  const phrasePatterns = [
+    /\baccording to the source\b/gi,
+    /\baccording to the sources\b/gi,
+    /\baccording to the source packet\b/gi,
+    /\bthis shows\b/gi,
+    /\bthat matters because\b/gi,
+    /\bin other words\b/gi,
+  ];
+
+  return phrasePatterns.some((pattern) => {
+    const matches = text.match(pattern) ?? [];
+    return matches.length >= 2;
+  });
 }
 
 function splitSentences(text: string): string[] {
@@ -327,7 +509,7 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     extractAnthropicText(
       await createLevel2Message(anthropic, {
         prompt: buildLevel2WritingPrompt(opts, outline),
-        system: `You are ghostwriting an essay as a ${opts.teacherProfile.gradeLevel || "high school"} student who typically earns ${opts.selfAssessment.gradeRange || "B"}. Your only goal is to produce writing indistinguishable from their own. Study their writing samples — they are your primary guide. Match their vocabulary, sentence patterns, paragraph habits, and mistakes. Write exactly as they would. Not better. Not worse. Never write a perfect essay.`,
+        system: `You are ghostwriting in the student's recognizable voice, but at a polished A-range quality floor. Match the student's style signatures without reproducing weak grammar or underdeveloped reasoning.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
         maxTokens: 5000,
         temperature: 0.55,
       })
@@ -339,7 +521,7 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     const critique = sanitizeEssayOutput(
       extractAnthropicText(
         await createLevel2Message(anthropic, {
-          prompt: buildLevel2CritiquePrompt(draft, opts.fingerprint, opts.samples),
+          prompt: buildLevel2CritiquePrompt(draft, opts.fingerprint, opts.samples, opts.sourceContext),
           system: "You are a writing-forensics critic. Diagnose where a generated essay fails to match a student's real writing, prioritizing the highest-risk AI tells and voice mismatches.",
           maxTokens: 2500,
           temperature: 0.1,
@@ -359,8 +541,8 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     revised = sanitizeEssayOutput(
       extractAnthropicText(
         await createLevel2Message(anthropic, {
-          prompt: buildLevel2AuditPrompt(draft, opts.fingerprint, opts.samples, critiqueNotes),
-          system: "You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Fix voice mismatches, but do not make the essay better than the student actually writes.",
+          prompt: buildLevel2AuditPrompt(draft, opts.fingerprint, opts.samples, critiqueNotes, opts.sourceContext),
+          system: `You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Preserve the student's recognizable voice, but make the essay polished, coherent, well-supported, and strong enough to satisfy an A-range assignment standard.${opts.sourceContext ? " Ground the essay in the approved sources." : " Keep no-source essays concrete, but do not let them drift into textbook-level precision."}`,
           maxTokens: 5000,
           temperature: 0.2,
         })
@@ -391,7 +573,128 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     }
   }
 
-  return sanitizeEssayOutput(humanizeEssay(baseEssay, opts.fingerprint));
+  const requirementText = `${opts.assignment}\n${opts.requirements ?? ""}`;
+  const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
+  try {
+    const evidencePass = sanitizeEssayOutput(
+      extractAnthropicText(
+        await createLevel2Message(anthropic, {
+          prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
+            requiredEvidenceCount,
+          }),
+          system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
+          maxTokens: 5000,
+          temperature: 0.15,
+        })
+      )
+    );
+    if (passesRevisionLengthFloor(evidencePass, opts.wordCount, baseEssay)) {
+      baseEssay = evidencePass;
+    }
+  } catch {
+    baseEssay = revised || draft;
+  }
+
+  const bounds = inferWordCountBounds(requirementText);
+  if (opts.sourceContext || bounds.max) {
+    try {
+      const attribution = sanitizeEssayOutput(
+        extractAnthropicText(
+          await createLevel2Message(anthropic, {
+            prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
+              maxWords: bounds.max,
+            }),
+            system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
+            maxTokens: 5000,
+            temperature: 0.12,
+          })
+        )
+      );
+      if (countWords(attribution) > 0) {
+        baseEssay = attribution;
+      }
+    } catch {
+      baseEssay = revised || draft;
+    }
+  }
+
+  try {
+    const compliance = sanitizeEssayOutput(
+      extractAnthropicText(
+        await createLevel2Message(anthropic, {
+          prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
+            minWords: bounds.min,
+            maxWords: bounds.max,
+          }),
+          system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
+          maxTokens: 5000,
+          temperature: 0.15,
+        })
+      )
+    );
+    if (countWords(compliance) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))) {
+      baseEssay = compliance;
+    }
+  } catch {
+    baseEssay = revised || draft;
+  }
+
+  if (bounds.max && countWords(baseEssay) > bounds.max) {
+    try {
+      const trimmed = sanitizeEssayOutput(
+        extractAnthropicText(
+          await createLevel2Message(anthropic, {
+            prompt: buildLevel2TrimPrompt(baseEssay, opts, {
+              maxWords: bounds.max,
+            }),
+            system: "You are trimming a student-voice essay to fit a hard word-count ceiling. Preserve the argument and evidence, but cut repetition and excess explanation.",
+            maxTokens: 5000,
+            temperature: 0.1,
+          })
+        )
+      );
+      if (
+        passesRevisionLengthFloor(trimmed, opts.wordCount, baseEssay) &&
+        (isWithinMaxWords(trimmed, bounds.max) || countWords(trimmed) < countWords(baseEssay))
+      ) {
+        baseEssay = trimmed;
+      }
+    } catch {
+      baseEssay = baseEssay;
+    }
+  }
+
+  if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
+    try {
+      const flowed = sanitizeEssayOutput(
+        extractAnthropicText(
+          await createLevel2Message(anthropic, {
+            prompt: buildLevel2SourceFlowPrompt(baseEssay, opts, {
+              maxWords: bounds.max,
+            }),
+            system: "You are smoothing source integration in a student-voice essay. Preserve the argument and paragraph structure, but make attributions and repeated analytical phrases feel more natural.",
+            maxTokens: 5000,
+            temperature: 0.1,
+          })
+        )
+      );
+      if (
+        passesRevisionLengthFloor(flowed, opts.wordCount, baseEssay) &&
+        countParagraphs(flowed) === countParagraphs(baseEssay) &&
+        isWithinMaxWords(flowed, bounds.max)
+      ) {
+        baseEssay = flowed;
+      }
+    } catch {
+      baseEssay = baseEssay;
+    }
+  }
+
+  baseEssay = opts.sourceContext
+    ? normalizeSupportedSourceAttribution(baseEssay, opts.sourceContext)
+    : stripUnsupportedSourceAttribution(baseEssay);
+
+  return sanitizeEssayOutput(polishLevel2SurfaceVoice(baseEssay, opts.fingerprint));
 }
 
 async function judgeEssay(
@@ -467,65 +770,26 @@ function markdownSection(title: string, body: string): string {
 }
 
 async function main() {
-  ensureOutputDir();
-
-  const assignment = readDocxText("assignment-abbasid-essay.docx");
-  const rubric = readDocxText("rubric-abbasid-essay.docx");
-  const samples: SampleInput[] = [
-    "sample-1-revolution.docx",
-    "sample-2-primary-source.docx",
-    "sample-3-comparison.docx",
-    "sample-4-short-answer.docx",
-  ].map((filename, index) => {
-    const content = readDocxText(filename);
-    return {
-      label: `Sample ${index + 1}`,
-      content,
-      wordCount: countWords(content),
-    };
-  });
-
-  const teacherProfile: TeacherProfile = {
-    gradeLevel: "11th grade",
-    gradeOther: "",
-    losesPointsFor: ["weak thesis", "general statements", "not enough explanation after quotes"],
-    losesPointsOther: "",
-  };
-
-  const selfAssessment: SelfAssessment = {
-    gradeRange: "B",
-    gradeRangeOther: "",
-    revisionLevel: "I reread and fix obvious errors",
-    revisionOther: "",
-    evidenceApproach: "I find a quote and explain it",
-    evidenceOther: "",
-    conclusionApproach: "I restate my thesis in different words",
-    conclusionOther: "",
-    wordCountTendency: "I usually write slightly under the target",
-    wordCountOther: "",
-    writingHabits: ["I overuse transition words", "I repeat myself in conclusions"],
-    writingHabitsOther: "",
-    quoteIntroStyle: ["As the source says", "The text shows"],
-    quoteIntroOther: "",
-    overusedPhrases: ["this shows that", "this matters because"],
-    overusedPhrasesOther: "",
-    selfEditFocus: ["spelling mistakes", "awkward wording"],
-    selfEditOther: "",
-    timeSpentOn: "body paragraphs",
-    timeSpentOther: "",
-  };
+  const scenarioName = process.env.QA_SCENARIO || process.argv[2] || "default";
+  const scenario = scenarioName === "default" ? loadDefaultScenario() : loadFixtureScenario(scenarioName);
+  ensureOutputDir(scenario.outputDir);
 
   console.log("Analyzing writing samples...");
-  const fingerprint = await analyzeStyle(samples);
+  const fingerprint = await analyzeStyle(scenario.samples);
 
   const opts: GenerateOptions = {
-    teacherProfile,
-    selfAssessment,
+    teacherProfile: scenario.teacherProfile,
+    selfAssessment: scenario.selfAssessment,
     fingerprint,
-    samples: samples.map(({ label, content }) => ({ label, content })),
-    assignment,
-    wordCount: 780,
-    requirements: rubric,
+    samples: scenario.samples.map(({ label, content }) => ({ label, content })),
+    assignment: scenario.assignment,
+    wordCount: scenario.targetWordCount,
+    requirements: scenario.rubric,
+  };
+
+  const sourceGroundedOpts: GenerateOptions = {
+    ...opts,
+    sourceContext: scenario.sourceContext,
   };
 
   console.log("Generating Level 1 essay...");
@@ -534,51 +798,59 @@ async function main() {
   console.log("Generating Level 2 essay...");
   const level2Essay = await generateLevel2Essay(opts);
 
+  console.log("Generating Level 2 essay with sources...");
+  const level2SourcedEssay = await generateLevel2Essay(sourceGroundedOpts);
+
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const level1Metrics = analyzeEssay(level1Essay, fingerprint);
   const level2Metrics = analyzeEssay(level2Essay, fingerprint);
+  const level2SourcedMetrics = analyzeEssay(level2SourcedEssay, fingerprint);
   const level1Heuristic = heuristicGrade(level1Metrics, fingerprint, opts.wordCount);
   const level2Heuristic = heuristicGrade(level2Metrics, fingerprint, opts.wordCount);
+  const level2SourcedHeuristic = heuristicGrade(level2SourcedMetrics, fingerprint, opts.wordCount);
 
   console.log("Judging outputs...");
-  const [level1Judge, level2Judge] = await Promise.all([
+  const [level1Judge, level2Judge, level2SourcedJudge] = await Promise.all([
     judgeEssay(anthropic, {
       levelLabel: "Level 1",
-      assignment,
-      rubric,
-      samples,
+      assignment: scenario.assignment,
+      rubric: scenario.rubric,
+      samples: scenario.samples,
       essay: level1Essay,
       metrics: level1Metrics,
       heuristic: level1Heuristic,
     }),
     judgeEssay(anthropic, {
       levelLabel: "Level 2",
-      assignment,
-      rubric,
-      samples,
+      assignment: scenario.assignment,
+      rubric: scenario.rubric,
+      samples: scenario.samples,
       essay: level2Essay,
       metrics: level2Metrics,
       heuristic: level2Heuristic,
     }),
+    judgeEssay(anthropic, {
+      levelLabel: "Level 2 + Sources",
+      assignment: scenario.assignment,
+      rubric: scenario.rubric,
+      samples: scenario.samples,
+      essay: level2SourcedEssay,
+      metrics: level2SourcedMetrics,
+      heuristic: level2SourcedHeuristic,
+    }),
   ]);
 
-  fs.writeFileSync(path.join(QA_OUTPUT_DIR, "level1-essay.txt"), `${level1Essay}\n`);
-  fs.writeFileSync(path.join(QA_OUTPUT_DIR, "level2-essay.txt"), `${level2Essay}\n`);
+  fs.writeFileSync(path.join(scenario.outputDir, "level1-essay.txt"), `${level1Essay}\n`);
+  fs.writeFileSync(path.join(scenario.outputDir, "level2-essay.txt"), `${level2Essay}\n`);
+  fs.writeFileSync(path.join(scenario.outputDir, "level2-sourced-essay.txt"), `${level2SourcedEssay}\n`);
 
   const report = [
     "# Generation QA Report",
     "",
     `Generated at: ${new Date().toISOString()}`,
     "",
-    markdownSection(
-      "Scenario",
-      [
-        "Assignment corpus: Abbasid essay prompt + rubric from `output/doc/qa-level2/`.",
-        "Student corpus: 4 repo-hosted sample essays from the same folder.",
-        "Target word count: 780.",
-      ].join("\n")
-    ),
+    markdownSection("Scenario", scenario.summaryLines.join("\n")),
     markdownSection("Level 1 Scores", [
       `Heuristic AI resistance: ${level1Heuristic.aiDetectionResistance}/10`,
       `Heuristic authenticity: ${level1Heuristic.authenticity}/10`,
@@ -619,13 +891,35 @@ async function main() {
       JSON.stringify(level2Metrics, null, 2),
       "```",
     ].join("\n")),
+    markdownSection("Level 2 + Sources Scores", [
+      `Heuristic AI resistance: ${level2SourcedHeuristic.aiDetectionResistance}/10`,
+      `Heuristic authenticity: ${level2SourcedHeuristic.authenticity}/10`,
+      `Judge AI resistance: ${level2SourcedJudge.aiDetectionResistance}/10`,
+      `Judge sample accuracy: ${level2SourcedJudge.sampleAccuracy}/10`,
+      `Judge rubric accuracy: ${level2SourcedJudge.rubricAccuracy}/10`,
+      `Judge evidence handling: ${level2SourcedJudge.evidenceHandling}/10`,
+      `Judge overall writing: ${level2SourcedJudge.overallWriting}/10`,
+      "",
+      `Verdict: ${level2SourcedJudge.overallVerdict}`,
+      "",
+      `Strengths: ${level2SourcedJudge.strengths.join("; ")}`,
+      `Weaknesses: ${level2SourcedJudge.weaknesses.join("; ")}`,
+      `Priority fixes: ${level2SourcedJudge.priorityFixes.join("; ")}`,
+      "",
+      "Metrics:",
+      "```json",
+      JSON.stringify(level2SourcedMetrics, null, 2),
+      "```",
+    ].join("\n")),
     markdownSection("Level 1 Essay", `\`\`\`\n${level1Essay}\n\`\`\``),
     markdownSection("Level 2 Essay", `\`\`\`\n${level2Essay}\n\`\`\``),
+    markdownSection("Level 2 + Sources Essay", `\`\`\`\n${level2SourcedEssay}\n\`\`\``),
   ].join("\n");
 
-  fs.writeFileSync(path.join(QA_OUTPUT_DIR, "report.md"), report);
+  fs.writeFileSync(path.join(scenario.outputDir, "report.md"), report);
 
   console.log(JSON.stringify({
+    scenario: scenario.name,
     level1: {
       heuristic: level1Heuristic,
       judge: level1Judge,
@@ -634,7 +928,11 @@ async function main() {
       heuristic: level2Heuristic,
       judge: level2Judge,
     },
-    outputDir: QA_OUTPUT_DIR,
+    level2Sourced: {
+      heuristic: level2SourcedHeuristic,
+      judge: level2SourcedJudge,
+    },
+    outputDir: scenario.outputDir,
   }, null, 2));
 }
 
