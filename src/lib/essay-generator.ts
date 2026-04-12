@@ -123,6 +123,7 @@ export interface GenerateOptions {
   assignment: string;
   wordCount: number;
   requirements?: string;
+  sourceContext?: string;
 }
 
 export interface LegacyGenerateOptions {
@@ -131,6 +132,7 @@ export interface LegacyGenerateOptions {
   assignment: string;
   wordCount: number;
   requirements?: string;
+  sourceContext?: string;
 }
 
 // ─── Style Analysis (run at save time) ───
@@ -496,7 +498,7 @@ export function formatFingerprintNarrative(
 // ─── Level 1 Prompt (fingerprint-first, uses base 8 questions) ───
 
 export function buildLevel1Prompt(opts: GenerateOptions): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
+  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
 
   // Include 2 shortest samples as inline reference
   const sortedSamples = [...samples].sort((a, b) => a.content.length - b.content.length);
@@ -537,8 +539,10 @@ ${habits}
 ## Assignment
 ${assignment}
 ${requirements ? `\nRubric/Requirements:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
 
 ## Critical Rules
+0. If approved source material is provided, you MUST use it concretely. Do not rely on vague placeholders like "in class we learned" when you can name the actual example.
 1. VOCABULARY: Use words from the "signatureWords" list. NEVER use words from "avoidedWords". Stay within their vocabulary tier (${fingerprint.vocabulary.tier}).
 2. SENTENCES: Match their average sentence length (~${fingerprint.sentencePatterns.averageLength} words). Replicate their sentence variation pattern (${fingerprint.sentencePatterns.variation}).
 3. TRANSITIONS: ONLY use transitions from their "favorites" list. NEVER use transitions from their "neverUses" list.
@@ -557,7 +561,7 @@ Write the essay now.`;
 // ─── Level 2 Plan Prompt (simplified structural outline) ───
 
 export function buildLevel2PlanPrompt(opts: GenerateOptions): string {
-  const { teacherProfile: tp, selfAssessment: sa, assignment, wordCount, requirements } = opts;
+  const { teacherProfile: tp, selfAssessment: sa, assignment, wordCount, requirements, sourceContext } = opts;
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -569,6 +573,7 @@ export function buildLevel2PlanPrompt(opts: GenerateOptions): string {
 ASSIGNMENT:
 ${assignment}
 ${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
 
 TARGET WORD COUNT: ${wordCount}
 
@@ -581,7 +586,7 @@ STUDENT CONTEXT:
 The outline should include:
 - A thesis direction (not the exact wording)
 - Number of body paragraphs and what each argues
-- Which evidence or quotes to use in each paragraph
+- Which evidence or quotes to use in each paragraph, prioritizing approved source material when it is provided
 - A brief note on conclusion approach
 
 Keep it structural. Do NOT include voice instructions, style notes, phrase placements, or writing tips. Structure only.`;
@@ -590,7 +595,7 @@ Keep it structural. Do NOT include voice instructions, style notes, phrase place
 // ─── Level 2 Writing Prompt (sample-first generation) ───
 
 export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
+  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
 
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
@@ -663,6 +668,7 @@ ${selfReportedLines.join("\n")}
 ASSIGNMENT:
 ${assignment}
 ${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
 
 OUTLINE TO FOLLOW:
 ${outline}
@@ -697,6 +703,8 @@ Instead of fancy words, use the simple ones real students use: "shows", "proves"
 
 5. EVIDENCE SPECIFICITY (MANDATORY):
 Do NOT hide behind placeholders like "in class we talked about", "in the sources you can see", "history shows", or "the text says" unless you immediately name the actual evidence. Use concrete details whenever the topic allows it: people, cities, groups, policies, events, regions, dates, or direct source claims. A real student may be simple, but they still mention the actual thing they are talking about.
+${sourceContext ? "If approved source material is provided, pull your evidence from it and name it directly. Do not invent source details that are not in the provided material." : ""}
+If the prompt or rubric requires a minimum number of evidence pieces, actually hit that number.
 
 6. QUALITY CEILING:
 This should read like a ${gradeRange} essay. That means:
@@ -720,6 +728,7 @@ export function buildLevel2CritiquePrompt(
   essay: string,
   fingerprint: StyleFingerprint,
   samples: Sample[],
+  sourceContext?: string,
 ): string {
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
@@ -739,6 +748,8 @@ ${essay}
 WRITER'S PROFILE (for reference):
 
 ${narrative}
+
+${sourceContext ? `\n---\n\n${sourceContext}` : ""}
 
 ---
 
@@ -784,6 +795,7 @@ export function buildLevel2AuditPrompt(
   fingerprint: StyleFingerprint,
   samples: Sample[],
   critiqueNotes?: string,
+  sourceContext?: string,
 ): string {
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
@@ -803,6 +815,8 @@ ${essay}
 WRITER'S PROFILE (for reference):
 
 ${narrative}
+
+${sourceContext ? `\n---\n\n${sourceContext}` : ""}
 
 ${critiqueNotes ? `---
 
@@ -891,7 +905,7 @@ export function buildLevel2ExpansionPrompt(
   opts: GenerateOptions,
   critiqueNotes?: string,
 ): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements } = opts;
+  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
@@ -918,6 +932,7 @@ ${narrative}
 ASSIGNMENT:
 ${assignment}
 ${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
 
 ${critiqueNotes ? `---
 
@@ -935,6 +950,8 @@ MANDATORY RULES:
 - Target about ${wordCount} words. Do not stay far under.
 - Expand EXISTING body paragraphs first. Do not turn this into a brand-new essay.
 - Add concrete evidence instead of placeholders. Replace vague lines like "in class", "in the sources", "we learned that", or "history shows" with actual details whenever the topic allows it: named people, groups, cities, policies, events, dates, or direct source claims.
+- If source material is provided, use it as the evidence pool. Name those examples directly instead of speaking in generalities.
+- If the rubric asks for a minimum number of evidence pieces, make sure the draft actually reaches that threshold.
 - Keep the student's natural simplicity, repetition, and imperfections. Do not suddenly sound smarter than their samples.
 - Keep paragraph sizes believable for this student.
 - Do not add headers, commentary, or bullet points.
@@ -1498,7 +1515,7 @@ function isInsideQuotes(text: string, idx: number): boolean {
 // ─── Legacy Prompts (fallback when no fingerprint exists) ───
 
 export function buildLegacyLevel1Prompt(opts: LegacyGenerateOptions): string {
-  const { profile, samples, assignment, wordCount, requirements } = opts;
+  const { profile, samples, assignment, wordCount, requirements, sourceContext } = opts;
   const { teacherProfile: tp, selfAssessment: sa, writingStyle: ws } = profile;
 
   const sampleTexts = samples
@@ -1532,6 +1549,7 @@ ${sampleTexts}
 ## Assignment
 ${assignment}
 ${requirements ? `\nAdditional Requirements: ${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
 
 ## Instructions
 Write approximately ${wordCount} words. Match the student's:
