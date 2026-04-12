@@ -1,0 +1,50 @@
+{
+  "label": "college-level",
+  "targetWordCount": 1300,
+  "teacherProfile": {
+    "gradeLevel": "college sophomore",
+    "gradeOther": "",
+    "losesPointsFor": [
+      "weak historiographical framing",
+      "evidence that is not interpreted",
+      "dropped quotations"
+    ],
+    "losesPointsOther": ""
+  },
+  "selfAssessment": {
+    "gradeRange": "A-/B+",
+    "gradeRangeOther": "",
+    "revisionLevel": "I do multiple revision passes and usually restructure paragraphs",
+    "revisionOther": "",
+    "evidenceApproach": "I build paragraphs around evidence and usually compare sources",
+    "evidenceOther": "",
+    "conclusionApproach": "I return to the thesis and qualify my argument",
+    "conclusionOther": "",
+    "wordCountTendency": "I usually write right at or slightly over the target",
+    "wordCountOther": "",
+    "writingHabits": [
+      "I repeat transition patterns",
+      "I over-explain after quotations"
+    ],
+    "writingHabitsOther": "",
+    "quoteIntroStyle": [
+      "As al-Tabari puts it",
+      "The source packet suggests"
+    ],
+    "quoteIntroOther": "",
+    "overusedPhrases": [
+      "at the same time",
+      "this matters because",
+      "in other words"
+    ],
+    "overusedPhrasesOther": "",
+    "selfEditFocus": [
+      "cutting repetition",
+      "tightening thesis language",
+      "smoother source integration"
+    ],
+    "selfEditOther": "",
+    "timeSpentOn": "introductions and body paragraph transitions",
+    "timeSpentOther": ""
+  }
+}

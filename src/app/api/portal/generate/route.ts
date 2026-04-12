@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
-import { fetchSourceContext, formatSourceContextForPrompt, normalizeSourceLinks } from "@/lib/source-context";
+import { fetchSourceContext, formatSourceContextForPrompt, inferRequiredEvidenceCount, inferWordCountBounds, normalizeSourceLinks } from "@/lib/source-context";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,
@@ -12,10 +12,17 @@ import {
   buildLevel2CritiquePrompt,
   buildLevel2AuditPrompt,
   buildLevel2ExpansionPrompt,
+  buildLevel2EvidenceIntegrationPrompt,
+  buildLevel2AttributionPrompt,
+  buildLevel2CompliancePrompt,
+  buildLevel2SourceFlowPrompt,
+  buildLevel2TrimPrompt,
   buildLegacyLevel1Prompt,
+  normalizeSupportedSourceAttribution,
   normalizeFingerprint,
-  humanizeEssay,
+  polishLevel2SurfaceVoice,
   sanitizeEssayOutput,
+  stripUnsupportedSourceAttribution,
 } from "@/lib/essay-generator";
 import type {
   TeacherProfile,
@@ -50,19 +57,16 @@ interface GenerateBody {
   sourceText?: string;
 }
 
-function resolveSelectedValue(value: string | null | undefined, other: string | null | undefined): string {
-  if (value === "__other__") {
-    return other?.trim() || "";
-  }
-  return value?.trim() || "";
-}
-
 function isTimeoutError(err: unknown): boolean {
   return err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
 }
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function countParagraphs(text: string): number {
+  return text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).length;
 }
 
 function isValidCritique(text: string): boolean {
@@ -82,6 +86,32 @@ function isUsableEssayCandidate(text: string, targetWordCount: number): boolean 
 function needsExpansionPass(text: string, targetWordCount: number): boolean {
   const genericEvidencePattern = /\b(in class|in the sources|we learned that|history shows|the text says)\b/i;
   return countWords(text) < Math.floor(targetWordCount * 0.85) || genericEvidencePattern.test(text);
+}
+
+function passesRevisionLengthFloor(text: string, targetWordCount: number, currentEssay: string): boolean {
+  const revisedWords = countWords(text);
+  const currentWords = countWords(currentEssay);
+  return revisedWords >= Math.max(Math.floor(targetWordCount * 0.7), currentWords - 120);
+}
+
+function isWithinMaxWords(text: string, maxWords: number | null): boolean {
+  return maxWords == null || countWords(text) <= maxWords;
+}
+
+function needsSourceFlowPass(text: string): boolean {
+  const phrasePatterns = [
+    /\baccording to the source\b/gi,
+    /\baccording to the sources\b/gi,
+    /\baccording to the source packet\b/gi,
+    /\bthis shows\b/gi,
+    /\bthat matters because\b/gi,
+    /\bin other words\b/gi,
+  ];
+
+  return phrasePatterns.some((pattern) => {
+    const matches = text.match(pattern) ?? [];
+    return matches.length >= 2;
+  });
 }
 
 function extractAnthropicText(message: Anthropic.Message): string {
@@ -389,11 +419,9 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
 
     // Step 2: Sample-first draft
     const writingPrompt = buildLevel2WritingPrompt(opts, outline);
-    const gradeCtx = resolveSelectedValue(opts.teacherProfile.gradeLevel, opts.teacherProfile.gradeOther) || "high school";
-    const gradeRange = resolveSelectedValue(opts.selfAssessment.gradeRange, opts.selfAssessment.gradeRangeOther) || "B";
     const essayMsg = await createLevel2Message(anthropic, {
       prompt: writingPrompt,
-      system: `You are ghostwriting an essay as a ${gradeCtx} student who typically earns ${gradeRange}. Your only goal is to produce writing indistinguishable from their own. Study their writing samples — they are your primary guide. Match their vocabulary, sentence patterns, paragraph habits, and mistakes. Write exactly as they would. Not better. Not worse. Never write a perfect essay.`,
+      system: `You are ghostwriting an essay in this student's recognizable voice, but at a polished A-range quality floor. Study their writing samples as style references. Match their vocabulary preferences, sentence habits, and tone, but do not copy their weakest mistakes. The essay must be grammatically strong, thesis-driven, well-supported, and clearly argued.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
       maxTokens: 5000,
       temperature: 0.55,
       timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
@@ -460,7 +488,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   try {
     const auditMsg = await createLevel2Message(anthropic, {
       prompt: auditPrompt,
-      system: "You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Fix voice mismatches, but do not make the essay better than the student actually writes.",
+      system: `You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Preserve the student's recognizable voice, but make the essay polished, coherent, well-supported, and strong enough to satisfy an A-range assignment standard.${opts.sourceContext ? " Ground the essay in the approved sources." : " Keep no-source essays concrete, but do not let them drift into textbook-level precision."}`,
       maxTokens: 5000,
       temperature: 0.2,
       timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
@@ -498,8 +526,133 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     }
   }
 
-  // Step 6: Deterministic post-processing — inject contractions and error patterns
-  const finalEssay = sanitizeEssayOutput(humanizeEssay(baseEssay, opts.fingerprint));
+  // Step 6: Evidence integration pass — ensure concrete evidence and analysis actually land
+  const requirementText = `${opts.assignment}\n${opts.requirements ?? ""}`;
+  const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
+  try {
+    const evidenceMsg = await createLevel2Message(anthropic, {
+      prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
+        requiredEvidenceCount,
+      }),
+      system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
+      maxTokens: 5000,
+      temperature: 0.15,
+      timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+      stageLabel: "evidence",
+    });
+    const evidenceEssay = sanitizeEssayOutput(extractAnthropicText(evidenceMsg));
+    if (isUsableEssayCandidate(evidenceEssay, opts.wordCount) && passesRevisionLengthFloor(evidenceEssay, opts.wordCount, baseEssay)) {
+      baseEssay = evidenceEssay;
+    }
+  } catch (err) {
+    console.warn("Level 2 evidence stage failed; keeping current essay.", err);
+  }
+
+  // Step 7: Attribution pass — make source use explicit and trim sourced essays to the ceiling
+  const bounds = inferWordCountBounds(requirementText);
+  if (opts.sourceContext || bounds.max) {
+    try {
+      const attributionMsg = await createLevel2Message(anthropic, {
+        prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
+          maxWords: bounds.max,
+        }),
+        system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
+        maxTokens: 5000,
+        temperature: 0.12,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "attribution",
+      });
+      const attributionEssay = sanitizeEssayOutput(extractAnthropicText(attributionMsg));
+      if (isUsableEssayCandidate(attributionEssay, opts.wordCount)) {
+        baseEssay = attributionEssay;
+      }
+    } catch (err) {
+      console.warn("Level 2 attribution stage failed; keeping current essay.", err);
+    }
+  }
+
+  // Step 8: Compliance pass — tighten thesis/evidence/word-count compliance without losing voice
+  try {
+    const complianceMsg = await createLevel2Message(anthropic, {
+      prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
+        minWords: bounds.min,
+        maxWords: bounds.max,
+      }),
+      system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
+      maxTokens: 5000,
+      temperature: 0.15,
+      timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+      stageLabel: "compliance",
+    });
+    const complianceEssay = sanitizeEssayOutput(extractAnthropicText(complianceMsg));
+    if (
+      isUsableEssayCandidate(complianceEssay, opts.wordCount) &&
+      countWords(complianceEssay) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))
+    ) {
+      baseEssay = complianceEssay;
+    }
+  } catch (err) {
+    console.warn("Level 2 compliance stage failed; keeping current essay.", err);
+  }
+
+  // Step 9: Hard ceiling trim — if we still exceed the max, force a focused trim pass
+  if (bounds.max && countWords(baseEssay) > bounds.max) {
+    try {
+      const trimMsg = await createLevel2Message(anthropic, {
+        prompt: buildLevel2TrimPrompt(baseEssay, opts, {
+          maxWords: bounds.max,
+        }),
+        system: "You are trimming a student-voice essay to fit a hard word-count ceiling. Preserve the argument and evidence, but cut repetition and excess explanation.",
+        maxTokens: 5000,
+        temperature: 0.1,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "trim",
+      });
+      const trimmedEssay = sanitizeEssayOutput(extractAnthropicText(trimMsg));
+      if (
+        isUsableEssayCandidate(trimmedEssay, opts.wordCount) &&
+        passesRevisionLengthFloor(trimmedEssay, opts.wordCount, baseEssay) &&
+        (isWithinMaxWords(trimmedEssay, bounds.max) || countWords(trimmedEssay) < countWords(baseEssay))
+      ) {
+        baseEssay = trimmedEssay;
+      }
+    } catch (err) {
+      console.warn("Level 2 trim stage failed; keeping current essay.", err);
+    }
+  }
+
+  // Step 10: Source flow pass — smooth sourced attribution without reopening the whole essay
+  if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
+    try {
+      const flowMsg = await createLevel2Message(anthropic, {
+        prompt: buildLevel2SourceFlowPrompt(baseEssay, opts, {
+          maxWords: bounds.max,
+        }),
+        system: "You are smoothing source integration in a student-voice essay. Preserve the argument and paragraph structure, but make attributions and repeated analytical phrases feel more natural.",
+        maxTokens: 5000,
+        temperature: 0.1,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "source-flow",
+      });
+      const flowedEssay = sanitizeEssayOutput(extractAnthropicText(flowMsg));
+      if (
+        isUsableEssayCandidate(flowedEssay, opts.wordCount) &&
+        passesRevisionLengthFloor(flowedEssay, opts.wordCount, baseEssay) &&
+        countParagraphs(flowedEssay) === countParagraphs(baseEssay) &&
+        isWithinMaxWords(flowedEssay, bounds.max)
+      ) {
+        baseEssay = flowedEssay;
+      }
+    } catch (err) {
+      console.warn("Level 2 source-flow stage failed; keeping current essay.", err);
+    }
+  }
+
+  // Step 11: Final cleanup — keep Level 2 polished instead of re-injecting roughness
+  baseEssay = opts.sourceContext
+    ? normalizeSupportedSourceAttribution(baseEssay, opts.sourceContext)
+    : stripUnsupportedSourceAttribution(baseEssay);
+  const finalEssay = sanitizeEssayOutput(polishLevel2SurfaceVoice(baseEssay, opts.fingerprint));
 
   // Stream the final essay to the client in chunks for consistent UX
   const encoder = new TextEncoder();
