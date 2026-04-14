@@ -361,6 +361,27 @@ describe("buildLevel2WritingPrompt", () => {
     expect(result).toContain("Use at most 1-2 short integrated quoted phrases");
     expect(result).toContain("Source references should support the argument");
   });
+
+  it("includes paragraph-level source strategy for sourced essays", () => {
+    const result = buildLevel2WritingPrompt(
+      makeOpts({
+        sourceContext: [
+          "APPROVED SOURCE MATERIAL:",
+          "--- Source 1: al-Tabari excerpt ---",
+          "TYPE: PRIMARY",
+          "Quoted line.",
+          "--- Source 2: modern interpretation ---",
+          "TYPE: SECONDARY",
+          "Interpretive note.",
+        ].join("\n"),
+      }),
+      outline,
+    );
+
+    expect(result).toContain("PARAGRAPH-LEVEL SOURCE STRATEGY");
+    expect(result).toContain("Do not make every body paragraph do the same kind of source work");
+    expect(result).toContain("one paragraph carries most of the explicit source comparison");
+  });
 });
 
 // ─── Audit prompt tests ───

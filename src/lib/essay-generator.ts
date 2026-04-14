@@ -92,6 +92,13 @@ interface Sample {
   content: string;
 }
 
+interface PromptSourceBlock {
+  index: number;
+  title: string;
+  type: string;
+  body: string;
+}
+
 // Old interfaces for backward compat
 interface LegacyWritingProfile {
   teacherProfile: {
@@ -247,6 +254,83 @@ export function shouldAllowFirstPerson(
   if (fingerprint.voice.perspective === "third-person") return false;
   const sampleHits = samples.filter((sample) => sampleHasFirstPerson(sample.content)).length;
   return sampleHits >= Math.max(1, Math.ceil(samples.length / 2));
+}
+
+function parsePromptSourceBlocks(sourceContext?: string): PromptSourceBlock[] {
+  if (!sourceContext) return [];
+
+  const blocks = sourceContext.split(/\n(?=--- Source \d+:)/).map((block) => block.trim()).filter(Boolean);
+  const parsed: PromptSourceBlock[] = [];
+
+  for (const block of blocks) {
+    const titleMatch = block.match(/^--- Source (\d+): (.+?) ---/m);
+    if (!titleMatch) continue;
+    const typeMatch = block.match(/^TYPE:\s*(.+)$/m);
+    const body = block
+      .replace(/^--- Source \d+: .+? ---\n?/m, "")
+      .replace(/^TYPE:\s*.+\n?/m, "")
+      .replace(/^URL:\s*.+\n?/m, "")
+      .trim();
+
+    parsed.push({
+      index: Number(titleMatch[1]),
+      title: titleMatch[2].trim(),
+      type: (typeMatch?.[1] ?? "REFERENCE").trim(),
+      body,
+    });
+  }
+
+  return parsed;
+}
+
+function buildPromptSourceUseGuide(sourceContext?: string): string {
+  const sources = parsePromptSourceBlocks(sourceContext);
+  if (sources.length === 0) return "";
+
+  const lines = sources.map((source) => {
+    const use =
+      source.type === "PRIMARY"
+        ? "best for short quoted phrases or participant framing"
+        : source.type === "SECONDARY"
+          ? "best for interpretation or historiographical comparison"
+          : source.type === "LECTURE"
+            ? "best for background framing and course context"
+            : source.type === "NOTES"
+              ? "best for specific details, not paragraph texture"
+              : "best for supporting context";
+    return `- Source ${source.index}: ${source.title} [${source.type}] — ${use}`;
+  });
+
+  return `SOURCE USE GUIDE:\n${lines.join("\n")}`;
+}
+
+function buildParagraphSourceStrategyGuide(sourceContext?: string): string {
+  const sources = parsePromptSourceBlocks(sourceContext);
+  if (sources.length === 0) return "";
+
+  const hasPrimary = sources.some((source) => source.type === "PRIMARY");
+  const hasSecondary = sources.some((source) => source.type === "SECONDARY");
+  const hasNotesLike = sources.some((source) => source.type === "LECTURE" || source.type === "NOTES");
+
+  const lines: string[] = [
+    "PARAGRAPH-LEVEL SOURCE STRATEGY:",
+    "- Do not make every body paragraph do the same kind of source work.",
+    "- Let each paragraph have one main evidence job, then explain why that evidence matters.",
+  ];
+
+  if (hasPrimary) {
+    lines.push("- Use the primary source for one sharp quoted or closely paraphrased moment, not for every paragraph.");
+  }
+  if (hasSecondary) {
+    lines.push("- Use the later interpretation mainly to sharpen comparison or historiographical framing, not as constant paragraph texture.");
+  }
+  if (hasNotesLike) {
+    lines.push("- Use lecture/notes material for concrete factual support and context, but do not let note-language dominate the prose.");
+  }
+
+  lines.push("- It is fine if one paragraph carries most of the explicit source comparison while the others stay more direct and evidence-driven.");
+
+  return lines.join("\n");
 }
 
 function getLevel2ParagraphGuidance(wordCount: number): string {
@@ -695,6 +779,8 @@ The outline should include:
 - Number of body paragraphs and what each argues
 - Which evidence or quotes to use in each paragraph, prioritizing approved source material when it is provided
 - A brief note on conclusion approach
+${sourceContext ? `\n\n${buildPromptSourceUseGuide(sourceContext)}` : ""}
+${sourceContext ? `\n\n${buildParagraphSourceStrategyGuide(sourceContext)}` : ""}
 
 Keep it structural. Do NOT include voice instructions, style notes, phrase placements, or writing tips. Structure only.`;
 }
@@ -780,6 +866,8 @@ ${sourceContext ? `\n\n${sourceContext}` : ""}
 
 OUTLINE TO FOLLOW:
 ${outline}
+${sourceContext ? `\n\n${buildPromptSourceUseGuide(sourceContext)}` : ""}
+${sourceContext ? `\n\n${buildParagraphSourceStrategyGuide(sourceContext)}` : ""}
 
 ---
 
