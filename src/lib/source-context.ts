@@ -12,6 +12,8 @@ export interface ResolvedSource {
   excerpt: string;
 }
 
+export type PromptSourceType = "PRIMARY" | "SECONDARY" | "LECTURE" | "NOTES" | "REFERENCE";
+
 export function normalizeSourceLinks(input: string[] | string | undefined): string[] {
   const rawItems = Array.isArray(input)
     ? input
@@ -137,6 +139,49 @@ export function inferRequiredEvidenceCount(text: string): number | null {
   return null;
 }
 
+export function inferRequiredQuoteCount(text: string): number | null {
+  const normalized = text.toLowerCase().replace(/,/g, "");
+
+  const wordMap: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+  };
+
+  const quoteKinds = String.raw`(?:quote|quotes|quotation|quotations|quoted phrase|quoted phrases)`;
+  const numericPatterns = [
+    new RegExp(`\\bat least (\\d+)\\s+(?:short\\s+)?${quoteKinds}\\b`),
+    new RegExp(`\\binclude (\\d+)\\s+(?:short\\s+)?${quoteKinds}\\b`),
+    new RegExp(`\\buse (\\d+)\\s+(?:short\\s+)?${quoteKinds}\\b`),
+  ];
+
+  for (const pattern of numericPatterns) {
+    const match = normalized.match(pattern);
+    if (match) {
+      const count = Number(match[1]);
+      if (Number.isFinite(count) && count > 0) return count;
+    }
+  }
+
+  const wordAlternation = Object.keys(wordMap).join("|");
+  const wordPatterns = [
+    new RegExp(`\\bat least (${wordAlternation})\\s+(?:short\\s+)?${quoteKinds}\\b`),
+    new RegExp(`\\binclude (${wordAlternation})\\s+(?:short\\s+)?${quoteKinds}\\b`),
+    new RegExp(`\\buse (${wordAlternation})\\s+(?:short\\s+)?${quoteKinds}\\b`),
+  ];
+
+  for (const pattern of wordPatterns) {
+    const match = normalized.match(pattern);
+    if (match) {
+      return wordMap[match[1]] ?? null;
+    }
+  }
+
+  return null;
+}
+
 export function buildPersistedRequirements(
   requirements: string | undefined,
   sourceLinks: string[],
@@ -170,7 +215,7 @@ export function formatSourceContextForPrompt(
         sources
           .map(
             (source, index) =>
-              `--- Source ${index + 1}: ${source.title} ---\nURL: ${source.url}\n${source.excerpt}`
+              `--- Source ${index + 1}: ${source.title} ---\nTYPE: ${inferPromptSourceType(source)}\nURL: ${source.url}\n${source.excerpt}`
           )
           .join("\n\n")
     );
@@ -181,6 +226,26 @@ export function formatSourceContextForPrompt(
   }
 
   return sections.join("\n\n");
+}
+
+export function inferPromptSourceType(source: Pick<ResolvedSource, "title" | "excerpt">): PromptSourceType {
+  const haystack = `${source.title}\n${source.excerpt}`.toLowerCase();
+
+  if (
+    /\b(letter|chronicle|speech|sermon|decree|edict|memoir|diary|account|excerpt|primary source|al-tabari|ibn battuta)\b/.test(haystack)
+  ) {
+    return "PRIMARY";
+  }
+  if (/\b(historiography|historian|interpretation|analysis|analytical|secondary source)\b/.test(haystack)) {
+    return "SECONDARY";
+  }
+  if (/\b(lecture|seminar|class discussion|discussion)\b/.test(haystack)) {
+    return "LECTURE";
+  }
+  if (/\b(notes|packet|study guide|summary)\b/.test(haystack)) {
+    return "NOTES";
+  }
+  return "REFERENCE";
 }
 
 function decodeEntities(text: string): string {

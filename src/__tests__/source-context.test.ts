@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildPersistedRequirements,
   formatSourceContextForPrompt,
+  inferPromptSourceType,
   inferRequiredEvidenceCount,
+  inferRequiredQuoteCount,
   inferTargetWordCount,
   normalizeSourceLinks,
 } from "@/lib/source-context";
@@ -38,6 +40,12 @@ describe("source-context helpers", () => {
     expect(inferRequiredEvidenceCount("Include seven concrete details drawn from the primary sources.")).toBe(7);
   });
 
+  it("infers required quote count from rubric language", () => {
+    expect(inferRequiredQuoteCount("Include at least one short quotation from the source packet.")).toBe(1);
+    expect(inferRequiredQuoteCount("Use 2 quotes in your response.")).toBe(2);
+    expect(inferRequiredQuoteCount("Include three short quotations with analysis.")).toBe(3);
+  });
+
   it("builds persisted requirements with source sections", () => {
     const result = buildPersistedRequirements(
       "Use three pieces of evidence.",
@@ -57,7 +65,15 @@ describe("source-context helpers", () => {
     );
 
     expect(result).toContain("APPROVED SOURCE MATERIAL");
+    expect(result).toContain("TYPE:");
     expect(result).toContain("Important source text.");
     expect(result).toContain("USER-PROVIDED SOURCE NOTES");
+  });
+
+  it("infers prompt source types from titles and excerpts", () => {
+    expect(inferPromptSourceType({ title: "al-Tabari excerpt", excerpt: "The family of the Prophet" })).toBe("PRIMARY");
+    expect(inferPromptSourceType({ title: "Historiographical comparison", excerpt: "A modern historian argues..." })).toBe("SECONDARY");
+    expect(inferPromptSourceType({ title: "Lecture on social grievance", excerpt: "Class lecture summary" })).toBe("LECTURE");
+    expect(inferPromptSourceType({ title: "Course packet notes", excerpt: "Study guide note" })).toBe("NOTES");
   });
 });

@@ -10,10 +10,15 @@ import {
   buildLevel2EvidenceIntegrationPrompt,
   buildLevel2AttributionPrompt,
   buildLevel2CompliancePrompt,
+  buildLevel2SourcedDraftChoicePrompt,
+  buildLevel2QuoteIntegrationPrompt,
+  buildLevel2SourcedSynthesisPrompt,
+  buildLevel2SourcedVoicePrompt,
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
   buildLevel2NaturalnessPrompt,
   normalizeSupportedSourceAttribution,
+  polishSourcedVoiceTexture,
   polishLevel2SurfaceVoice,
   stripUnsupportedSourceAttribution,
   humanizeEssay,
@@ -279,6 +284,20 @@ describe("buildLevel2WritingPrompt", () => {
     expect(result).toContain("Preserve the student's recognizable style signatures");
   });
 
+  it("treats quotations as introduce-and-explain evidence moves", () => {
+    const result = buildLevel2WritingPrompt(
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nThe movement called for \"the family of the Prophet.\"",
+      }),
+      outline,
+    );
+
+    expect(result).toContain("When a quote is used, introduce it by naming the source or speaker");
+    expect(result).toContain("In history-style writing, name the source in prose");
+    expect(result).toContain("weave the quotation into the sentence and analyze it immediately after");
+    expect(result).toContain("what stands out to me");
+  });
+
   it("includes AI red flag avoidance", () => {
     const result = buildLevel2WritingPrompt(makeOpts(), outline);
     expect(result).toContain("delve into");
@@ -330,6 +349,17 @@ describe("buildLevel2WritingPrompt", () => {
   it("scales paragraph guidance for long-form assignments", () => {
     const result = buildLevel2WritingPrompt(makeOpts({ wordCount: 1300 }), outline);
     expect(result).toContain("6-8 total paragraphs");
+  });
+
+  it("tells sourced drafts to argue from sources instead of reporting packet language", () => {
+    const result = buildLevel2WritingPrompt(
+      makeOpts({ sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1 ---\nThe movement called for \"the family of the Prophet.\"" }),
+      outline,
+    );
+
+    expect(result).toContain("Do NOT sound like you are reporting from an assignment packet");
+    expect(result).toContain("Use at most 1-2 short integrated quoted phrases");
+    expect(result).toContain("Source references should support the argument");
   });
 });
 
@@ -525,6 +555,7 @@ describe("buildLevel2AttributionPrompt", () => {
 
     expect(result).toContain("include at least one directly attributable source phrase");
     expect(result).toContain("Do not invent quotations.");
+    expect(result).toContain("keep those voices distinct");
     expect(result).toContain("does not exceed 850 words");
   });
 });
@@ -555,6 +586,87 @@ describe("buildLevel2SourceFlowPrompt", () => {
     expect(result).toContain("Replace generic or mechanical source phrasing");
     expect(result).toContain("Preserve the same paragraph count");
     expect(result).toContain("at or under 850 words");
+    expect(result).toContain("Add 2-4 moments of student-like hedging or direct interpretive language");
+    expect(result).toContain("non-first-person phrasing");
+    expect(result).toContain("mechanically covering a rubric bullet");
+    expect(result).toContain("Make the ending answer the central question a little more decisively");
+  });
+});
+
+describe("buildLevel2SourcedVoicePrompt", () => {
+  it("keeps sourced structure while asking for less systematic polish", () => {
+    const essay = "The Abbasids built a coalition in Khurasan.";
+    const result = buildLevel2SourcedVoicePrompt(
+      essay,
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nThe movement called for \"the family of the Prophet.\"",
+      }),
+      { maxWords: 850 },
+    );
+
+    expect(result).toContain("less perfectly organized");
+    expect(result).toContain("Keep the same paragraph count");
+    expect(result).toContain("Preserve every required source quotation");
+    expect(result).toContain("a little more like a real student's live reasoning");
+    expect(result).toContain("Do not add first-person framing at all");
+  });
+});
+
+describe("buildLevel2SourcedSynthesisPrompt", () => {
+  it("asks for more organic source-and-analysis stitching without changing structure", () => {
+    const essay = "According to the source packet, the Abbasids were strong.";
+    const result = buildLevel2SourcedSynthesisPrompt(
+      essay,
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nThe movement called for \"the family of the Prophet.\"",
+      }),
+      { maxWords: 850 },
+    );
+
+    expect(result).toContain("source-and-analysis stitching");
+    expect(result).toContain("Keep the same thesis, paragraph count, quotations, and major evidence");
+    expect(result).toContain("Avoid phrases like \"the packet says,\"");
+    expect(result).toContain("The prose should feel like a strong student essay");
+  });
+});
+
+describe("buildLevel2QuoteIntegrationPrompt", () => {
+  it("requires short integrated quotations with preserved structure", () => {
+    const essay = "The Abbasids won because they built support in Khurasan.";
+    const result = buildLevel2QuoteIntegrationPrompt(
+      essay,
+      makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nThe movement called for \"the family of the Prophet.\"",
+      }),
+      { requiredQuoteCount: 1, maxWords: 850 },
+    );
+
+    expect(result).toContain("Integrate short source quotations naturally");
+    expect(result).toContain("must include at least 1 direct quoted phrase");
+    expect(result).toContain("Keep the same paragraph count and overall structure");
+    expect(result).toContain("Do not add block quotes");
+    expect(result).toContain("Good candidates include");
+    expect(result).toContain("quote the primary source");
+    expect(result).toContain("how its wording changes the interpretation");
+  });
+});
+
+describe("buildLevel2SourcedDraftChoicePrompt", () => {
+  it("asks for an A/B choice favoring student-like sourced drafts", () => {
+    const result = buildLevel2SourcedDraftChoicePrompt({
+      candidateA: "Essay A",
+      candidateB: "Essay B",
+      candidateC: "Essay C",
+      opts: makeOpts({
+        sourceContext: "APPROVED SOURCE MATERIAL:\n--- Source 1: al-Tabari packet excerpt ---\nThe movement called for \"the family of the Prophet.\"",
+      }),
+    });
+
+    expect(result).toContain("Choose the best sourced draft");
+    expect(result).toContain("stronger thesis and evidence handling");
+    expect(result).toContain("more natural source integration");
+    expect(result).toContain("clearer, more direct academic prose");
+    expect(result).toContain("Return only one token: A, B, or C");
   });
 });
 
@@ -650,8 +762,8 @@ describe("normalizeSupportedSourceAttribution", () => {
 
     expect(result).not.toContain("class notes");
     expect(result).not.toContain("revolution notes");
-    expect(result).toContain("According to the lecture packet on social grievances");
-    expect(result).toContain("The lecture packet on social grievances shows that Abu Muslim organized support in Khorasan.");
+    expect(result).toContain("According to the packet's discussion of social grievances");
+    expect(result).toContain("The packet's discussion of social grievances shows that Abu Muslim organized support in Khorasan.");
   });
 
   it("replaces generic source phrasing with a named source when context exists", () => {
@@ -663,6 +775,67 @@ describe("normalizeSupportedSourceAttribution", () => {
 
     expect(result).toContain("According to al-Tabari");
     expect(result).toContain("As al-Tabari shows");
+  });
+});
+
+describe("polishSourcedVoiceTexture", () => {
+  it("shortens packet-ish source labels and adds a more personal marker", () => {
+    const essay = [
+      "The lecture packet on social grievances makes this point directly.",
+      "The seminar discussion of administrative and urban change frames Baghdad differently.",
+      "What stands out is the shift in power.",
+      "That matters because the empire changed.",
+      "That matters because the ruling order changed too.",
+      "At the same time, the coalition was broad.",
+      "At the same time, the empire was changing.",
+      "Even so, the old elite survived.",
+      "Even so, the structure changed.",
+      "So The best description is the Abbasid Revolution as complicated.",
+      "The stronger argument is that the empire changed.",
+    ].join(" ");
+
+    const result = polishSourcedVoiceTexture(essay);
+
+    expect(result).toContain("A note on social grievances");
+    expect(result).toContain("The discussion of administrative change in the packet");
+    expect(result).toContain("What stands out is");
+    expect((result.match(/That matters because/g) || []).length).toBe(1);
+    expect(result).not.toContain("So The best description is");
+    expect(result).toContain("What matters more is that");
+    expect((result.match(/At the same time,/g) || []).length).toBe(1);
+    expect((result.match(/Even so,/g) || []).length).toBe(1);
+  });
+
+  it("can keep first-person texture when explicitly allowed", () => {
+    const essay = "What stands out is the shift in power.";
+    const result = polishSourcedVoiceTexture(essay, { allowFirstPerson: true });
+
+    expect(result).toContain("What stands out to me is");
+  });
+
+  it("keeps sourced prose non-first-person when first person is not allowed", () => {
+    const essay = "What stands out to me is the shift in power.";
+    const result = polishSourcedVoiceTexture(essay, { allowFirstPerson: false });
+
+    expect(result).toContain("What stands out is");
+    expect(result).not.toContain("What stands out to me is");
+  });
+
+  it("rewrites common analytical first-person openings in sourced prose", () => {
+    const essay = "I do not think that framing captures what actually happened.";
+    const result = polishSourcedVoiceTexture(essay, { allowFirstPerson: false });
+
+    expect(result).not.toContain("I do not think");
+    expect(result).not.toContain("I don't think");
+  });
+
+  it("rewrites I would describe phrasing in sourced prose", () => {
+    const essay = "So I would describe the Abbasid Revolution as a coalition revolution.";
+    const result = polishSourcedVoiceTexture(essay, { allowFirstPerson: false });
+
+    expect(result).not.toContain("I would describe");
+    expect(result).toContain("a better way to put it is");
+    expect(result).not.toContain("a better way to put it is it as");
   });
 });
 
@@ -696,6 +869,26 @@ describe("polishLevel2SurfaceVoice", () => {
     const result = polishLevel2SurfaceVoice(essay, fp);
 
     expect(result).toBe(essay);
+  });
+
+  it("smooths repeated analytical transitions and downgrades AI-ish phrases", () => {
+    const essay = [
+      "At the same time, the Abbasids had support.",
+      "At the same time, they had a strong message.",
+      "In other words, the movement was broad.",
+      "In other words, it was persuasive.",
+      "That is why the revolution mattered.",
+      "That is why the empire changed.",
+      "It became a compelling narrative for later writers.",
+    ].join(" ");
+
+    const result = polishLevel2SurfaceVoice(essay, makeFingerprint({ voice: { formality: "mixed", perspective: "third-person", contractions: false, toneDescription: "", distinctiveTraits: [] } }));
+
+    expect((result.match(/At the same time,/g) || []).length).toBe(1);
+    expect((result.match(/In other words,/g) || []).length).toBe(1);
+    expect((result.match(/That is why/g) || []).length).toBe(1);
+    expect(result).toContain("strong account");
+    expect(result).not.toContain("compelling narrative");
   });
 });
 

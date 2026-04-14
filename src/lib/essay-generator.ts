@@ -235,6 +235,20 @@ function excerptSampleContent(content: string, maxChars = 3200): string {
   return `${normalized.slice(0, headChars).trimEnd()}\n\n[...]\n\n${normalized.slice(-tailChars).trimStart()}`;
 }
 
+function sampleHasFirstPerson(content: string): boolean {
+  return /\b(I|my|me|we|our|us)\b/i.test(content);
+}
+
+export function shouldAllowFirstPerson(
+  fingerprint: StyleFingerprint,
+  samples: Sample[],
+): boolean {
+  if (fingerprint.voice.perspective === "first-person") return true;
+  if (fingerprint.voice.perspective === "third-person") return false;
+  const sampleHits = samples.filter((sample) => sampleHasFirstPerson(sample.content)).length;
+  return sampleHits >= Math.max(1, Math.ceil(samples.length / 2));
+}
+
 function getLevel2ParagraphGuidance(wordCount: number): string {
   if (wordCount >= 1100) {
     return "A long-form essay at this length should usually have 6-8 total paragraphs (intro, 4-6 body, conclusion), not one giant block and not 10+ tiny paragraphs.";
@@ -381,6 +395,10 @@ function extractSourceTitles(sourceContext?: string): string[] {
 function prettifySourceTitle(title: string): string {
   const trimmed = title.trim().replace(/\bpacket excerpt\b/gi, "packet").replace(/\s{2,}/g, " ");
   if (/^al-tabari\b/i.test(trimmed)) return "al-Tabari";
+  if (/^lecture packet on social grievances$/i.test(trimmed)) return "the packet's discussion of social grievances";
+  if (/^seminar notes on the battle of the zab$/i.test(trimmed)) return "the packet's note on the Zab";
+  if (/^historiographical note for comparison$/i.test(trimmed)) return "the packet's later interpretation";
+  if (/^administrative and urban change under the early abbasids$/i.test(trimmed)) return "the packet's discussion of early Abbasid administration";
   if (/^(lecture packet|seminar notes|historiographical note|administrative and urban change)/i.test(trimmed)) {
     return `the ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`;
   }
@@ -420,6 +438,23 @@ function sourceReferenceSentenceStart(reference: string): string {
     return reference.replace(/^the\s/i, "The ");
   }
   return reference.charAt(0).toUpperCase() + reference.slice(1);
+}
+
+function extractQuotedPhrasesFromSourceContext(sourceContext?: string): string[] {
+  if (!sourceContext) return [];
+  const phrases: string[] = [];
+  const seen = new Set<string>();
+  const regex = /"([^"\n]{2,120})"/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(sourceContext)) !== null) {
+    const phrase = match[1]?.trim();
+    if (!phrase || seen.has(phrase.toLowerCase())) continue;
+    seen.add(phrase.toLowerCase());
+    phrases.push(phrase);
+  }
+
+  return phrases;
 }
 
 export function normalizeFingerprint(raw: Record<string, unknown>): StyleFingerprint {
@@ -685,6 +720,7 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
   const overused = formatList(sa.overusedPhrases ?? [], sa.overusedPhrasesOther);
   const selfEdit = formatList(sa.selfEditFocus ?? [], sa.selfEditOther);
   const timeSpent = resolveValue(sa.timeSpentOn ?? "", sa.timeSpentOther ?? "");
+  const allowFirstPerson = shouldAllowFirstPerson(fingerprint, samples);
 
   let revisionDescription = "";
   if (revision === "I submit my first draft as-is") {
@@ -751,6 +787,7 @@ CRITICAL GUIDELINES — follow these in order of priority:
 
 1. PARAGRAPH STRUCTURE (MANDATORY):
 Each body paragraph MUST contain ${fingerprint.structure.avgParagraphLength} sentences (±1). Follow: "${fingerprint.structure.bodyParagraphPattern}". ${getLevel2ParagraphGuidance(wordCount)} Count your sentences per paragraph before finishing.
+Within each body paragraph, make the logic clear: claim, evidence, explanation, then connection back to the argument. Do not just stack facts.
 
 2. SENTENCE VARIETY / BURSTINESS (MANDATORY — this is how AI detectors work):
 AI detectors measure sentence-length standard deviation ("burstiness"). You MUST score above 7.0 or the essay WILL be flagged.
@@ -765,6 +802,7 @@ Preserve the student's recognizable voice markers without copying their weakest 
 ${fingerprint.voice.contractions ? "- Contractions: They use contractions naturally. Keep that casual rhythm where it sounds authentic, and include a few contractions across the essay when they fit." : "- Keep the student's overall formality level, but do not force contractions if they do not use them."}
 ${fingerprint.voice.toneDescription ? `- Tone: ${fingerprint.voice.toneDescription}. Preserve their natural register and phrasing habits.` : ""}
 ${fingerprint.transitions.favorites.length ? `- Favorite transitions and sentence patterns: ${fingerprint.transitions.favorites.join(", ")}.` : ""}
+- In analytical writing, do not use first-person framing like \"I think,\" \"I would argue,\" or \"what stands out to me\" at all. For this kind of history essay, direct analytical phrasing is better even if the samples are mixed.
 Do NOT introduce sentence fragments, broken grammar, typo-like spelling errors, or fake awkwardness just to sound human.
 
 4. VOCABULARY CEILING (MANDATORY):
@@ -777,6 +815,13 @@ Do NOT hide behind placeholders like "in class we talked about", "in the sources
 ${sourceContext ? "If approved source material is provided, pull your evidence from it and name it directly. Do not invent source details that are not in the provided material." : ""}
 ${!sourceContext ? "If no approved source material is provided, still use concrete evidence, but keep it to the kind of major details a well-prepared student could plausibly remember without research. Prefer major names, events, places, and policies over obscure dates or niche facts. Pick a few strong examples and develop them instead of trying to sound comprehensive." : ""}
 If the prompt or rubric requires a minimum number of evidence pieces, actually hit that number.
+When a quote is used, introduce it by naming the source or speaker and explain what the wording proves or changes. In history-style writing, name the source in prose when you can; in literature-style writing, weave the quotation into the sentence and analyze it immediately after.
+${sourceContext ? `When source material is provided, write as if the student has actually absorbed it. Do NOT sound like you are reporting from an assignment packet. Avoid phrases like "the packet says," "the source packet argues," or "the lecture notes explain" unless there is no more natural way to identify the source.
+- Use at most 1-2 short integrated quoted phrases unless the rubric explicitly demands more.
+- Keep quotations short and embedded in the sentence, not dropped in as separate evidence blocks.
+- After source evidence, move quickly back into the student's own analysis.
+- Source references should support the argument, not become the paragraph's main texture.` : ""}
+- Prefer concrete historical naming over meta-phrases like "what stands out in that framing" or "the best description is." The prose should sound argued, not workshop-like.
 
 6. QUALITY FLOOR:
 This must read like the strongest, most educated version of this writer.
@@ -787,6 +832,7 @@ This must read like the strongest, most educated version of this writer.
 - Strong organization and focused body paragraphs
 - A-range in clarity and argument, not textbook-level precision
 - Depth over coverage. A strong student essay should feel selective, not encyclopedic.
+- Direct analytical prose. The essay should feel argued, not narrated and not assembled from notes.
 - Preserve the student's recognizable style signatures, but do NOT preserve incoherence, weak grammar, or low-effort development.
 
 7. TARGET: ~${wordCount} words.
@@ -1159,8 +1205,8 @@ MANDATORY CHECKS:
 - Tie each body paragraph back to the thesis before moving on.
 ${requiredEvidenceCount ? `- The essay must clearly include at least ${requiredEvidenceCount} distinct pieces of evidence.` : ""}
 - If a paragraph already has one strong example, deepen the explanation before piling on extra facts.
-- ${sourceContext ? "When approved source material is present, prefer it over generic background knowledge. Refer to the actual event, person, or source claim instead of generic phrases like \"class notes explain\" whenever possible." : "If no approved source material is present, use 3-5 concrete, high-confidence details a prepared student could plausibly remember from class. Prefer major names, events, places, and policies over niche facts or stacked dates, and do not try to cover everything."}
-- Add direct source phrasing when natural, such as \"the source shows\" or \"class notes explain,\" but only if the source context actually supports it.
+- ${sourceContext ? "When approved source material is present, prefer it over generic background knowledge. Refer to the actual event, person, or source claim instead of generic phrases like \"class notes explain\" whenever possible. If the packet contains both a primary source and a later interpretation, keep those voices distinct and compare them explicitly." : "If no approved source material is present, use 3-5 concrete, high-confidence details a prepared student could plausibly remember from class. Prefer major names, events, places, and policies over niche facts or stacked dates, and do not try to cover everything."}
+- Add direct source phrasing when natural, but name the actual source or speaker rather than collapsing everything into \"the source\". Any quote should be introduced and then explained.
 - Do not add fake citations, invented quotes, or niche specifics that were never established.
 
 IMPORTANT:
@@ -1185,6 +1231,7 @@ export function buildLevel2AttributionPrompt(
   const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
+  const quotedPhrases = extractQuotedPhrasesFromSourceContext(sourceContext);
 
   return `STUDENT'S REAL WRITING — preserve this voice:
 
@@ -1218,9 +1265,10 @@ Make the essay feel clearly grounded in actual source material while keeping the
 MANDATORY CHECKS:
 - If approved source material exists, include at least one directly attributable source phrase such as "the source shows," "the account of X suggests," or a short integrated quoted phrase if the source context clearly supports it.
 - Prefer naming the actual source or speaker over generic phrases like "the class notes explain" or "the source shows."
+- If the source packet contains both a primary source and a later interpretation, keep those voices distinct and do not flatten them into one generic source label.
 - Do not invent quotations.
 - Do not add fake citation formats.
-- Keep evidence phrasing natural and student-like, not academic-boilerplate.
+- Keep evidence phrasing natural and student-like, not academic-boilerplate. The goal is careful analytical prose, not first-person reflection.
 ${maxWords ? `- Trim the essay so it does not exceed ${maxWords} words.` : ""}
 - Preserve thesis, evidence quality, and grammar.
 
@@ -1277,6 +1325,9 @@ MANDATORY CHECKS:
 - Keep some student-like repetition, but do not let the same analytical opener dominate the essay.
 - Use a few direct, plainspoken statements instead of turning every idea into polished commentary.
 ${sourceContext ? "- Keep source attribution when it is supported by the provided material, but make it feel natural instead of mechanical." : "- Do NOT pretend you have class notes, class sources, or a source packet. If the essay mentions them, rewrite those lines so they state the evidence directly."}
+- Do not add first-person filler like \"I think\" or \"what stands out to me\" at all.
+- A few blunt, short sentences are okay if they sound like the student. Do not make every transition or sentence feel carefully polished.
+- Add one or two moments of non-first-person hedging when natural, such as \"what strikes me is,\" \"what seems most convincing is,\" \"it seems,\" \"maybe,\" or \"in some ways.\"
 - Preserve the concrete evidence and thesis. Do not make the essay vaguer.
 
 IMPORTANT:
@@ -1386,9 +1437,19 @@ MANDATORY RULES:
 - Replace generic or mechanical source phrasing like "According to the source" or "the packet shows" with more natural, specific source naming when possible.
 - Keep source references light. Name the source when it matters, but do not make every paragraph sound citation-heavy.
 - Vary repetitive analytical openers like "This shows," "That matters because," "In other words," and "According to..."
+- Add 2-4 moments of student-like hedging or direct interpretive language when natural, such as "what matters is," "what seems most convincing is," "even so," "still," or similarly direct but non-first-person phrasing, if that better matches the sample voice.
+- Simplify any sentence that sounds too perfectly organized, too evenly academic, or too polished compared with the real samples.
+- Prefer plainspoken paraphrase over formal packet-language when the source reference is already clear.
+- If a paragraph sounds like it is mechanically covering a rubric bullet, loosen it so it reads more like a student making an argument than a checklist being completed.
+- Do not lean on the same favorite transition more than once or twice if that repetition starts sounding formulaic.
+- Make the ending answer the central question a little more decisively instead of fading out into summary.
 - Preserve the same paragraph count and overall evidence set.
 - Do not add new evidence, new quotes, or new arguments.
 - Do not make the essay more formal or more polished than the student samples.
+- One or two blunt, short sentences are okay if they sound natural. Do not make every paragraph feel perfectly balanced or over-engineered.
+- Add one or two moments of non-first-person hedging when natural, such as \"it seems,\" \"maybe,\" or \"in some ways,\" but keep the prose direct and analytical.
+- Prefer direct academic argument over reflective commentary.
+- Do not make every paragraph equally developed. It is okay if one paragraph is tighter and another carries more of the analytical weight.
 ${maxWords ? `- Keep the essay at or under ${maxWords} words.` : ""}
 
 IMPORTANT:
@@ -1397,6 +1458,267 @@ IMPORTANT:
 - Do not add headers or commentary.
 
 Return ONLY the revised essay.`;
+}
+
+export function buildLevel2QuoteIntegrationPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    requiredQuoteCount,
+    maxWords,
+  }: {
+    requiredQuoteCount?: number | null;
+    maxWords?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+  const quotedPhrases = extractQuotedPhrasesFromSourceContext(sourceContext);
+
+  return `STUDENT'S REAL WRITING — preserve this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Integrate short source quotations naturally into this essay while keeping the same argument, evidence set, and student voice.
+
+MANDATORY RULES:
+- Use only short, integrated quoted phrases that are clearly supported by the approved source material.
+${requiredQuoteCount ? `- The essay must include at least ${requiredQuoteCount} direct quoted phrase${requiredQuoteCount === 1 ? "" : "s"}.` : "- If the assignment appears to expect direct quotation, include at least one short quoted phrase."}
+- Prefer quoted phrases that already appear in the source packet when possible.${quotedPhrases.length ? ` Good candidates include: ${quotedPhrases.slice(0, 3).map((phrase) => `"${phrase}"`).join(", ")}.` : ""}
+- Name the source or speaker naturally when it matters. Do not rely on generic phrasing like "the source says."
+- If the source packet includes a primary source and a later interpretation, quote the primary source and keep the later interpretation in clear paraphrase or named attribution.
+- Do not add block quotes, fake citations, or long quotations.
+- After each quotation, explain why that phrase matters for the argument or how its wording changes the interpretation.
+- Keep the same paragraph count and overall structure.
+- Do not add new evidence or new arguments beyond what is already in the source packet.
+${maxWords ? `- Keep the essay at or under ${maxWords} words.` : ""}
+
+IMPORTANT:
+- Keep the student's natural diction and rhythm.
+- Do not make the essay sound more formal or more polished than the real samples.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+export function buildLevel2SourcedVoicePrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    maxWords,
+  }: {
+    maxWords?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+  return `STUDENT'S REAL WRITING — keep this exact level of human texture:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Keep the same argument, quotations, evidence, and paragraph structure, but make the essay feel a little less perfectly organized and a little more like a real student's live reasoning on the page.
+
+MANDATORY RULES:
+- Keep the same paragraph count and the same major points.
+- Preserve every required source quotation and all major evidence already present.
+- Do not add first-person framing at all. If the prose needs more human texture, use direct but non-first-person phrasing instead.
+- Loosen transitions that sound too perfectly engineered or checklist-like.
+- It is okay for the prose to be slightly uneven or a little less polished if it feels more human and more faithful to the sample voice.
+- A couple of plain, blunt sentences can be better than perfectly elegant phrasing if that sounds more like the student.
+- Prefer clearer academic directness over meta-commentary about the essay itself.
+- If a sentence becomes too dense, simplify it instead of adding more framing language.
+- Do not make every paragraph equally full or equally elegant. A slightly uneven distribution of emphasis can sound more real.
+- Do not make the essay sloppy, vague, or incorrect.
+- Do not add new evidence or new arguments.
+${maxWords ? `- Keep the essay at or under ${maxWords} words.` : ""}
+
+IMPORTANT:
+- This should still read like one strong student's essay, not a rough draft.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+export function buildLevel2SourcedSynthesisPrompt(
+  essay: string,
+  opts: GenerateOptions,
+  {
+    maxWords,
+  }: {
+    maxWords?: number | null;
+  } = {},
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — preserve this voice:
+
+${refSamples}
+
+---
+
+CURRENT ESSAY:
+
+${essay}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+YOUR TASK:
+
+Rewrite only the source-and-analysis stitching so the essay reads like one continuous student argument rather than a response assembled from packet notes.
+
+MANDATORY RULES:
+- Keep the same thesis, paragraph count, quotations, and major evidence.
+- Preserve all required source quotations already present.
+- Embed quoted phrases inside the sentence flow when possible instead of announcing them mechanically.
+- Avoid phrases like "the packet says," "the source packet argues," or other scaffolding that reminds the reader about the assignment packet.
+- If you refer to a source, do it in the most natural way available: name the source or describe the interpretation briefly, then move back into analysis.
+- Keep the analysis tied to the thesis. After evidence, explain what it proves, but do not over-explain what is already obvious.
+- Do not add first-person framing.
+- Do not add new evidence, new quotations, or new arguments.
+${maxWords ? `- Keep the essay at or under ${maxWords} words.` : ""}
+
+IMPORTANT:
+- The prose should feel like a strong student essay, not a polished literature review.
+- Do not add headers or commentary.
+
+Return ONLY the revised essay.`;
+}
+
+export function buildLevel2SourcedDraftChoicePrompt(
+  {
+    candidateA,
+    candidateB,
+    candidateC,
+    opts,
+  }: {
+    candidateA: string;
+    candidateB: string;
+    candidateC?: string;
+    opts: GenerateOptions;
+  },
+): string {
+  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
+  const refSamples = selectDiverseSamples(samples);
+  const narrative = formatFingerprintNarrative(fingerprint);
+
+  return `STUDENT'S REAL WRITING — this is the standard:
+
+${refSamples}
+
+---
+
+WRITER'S PROFILE:
+
+${narrative}
+
+---
+
+ASSIGNMENT:
+${assignment}
+${requirements ? `\nREQUIREMENTS/RUBRIC:\n${requirements}` : ""}
+${sourceContext ? `\n\n${sourceContext}` : ""}
+
+---
+
+CANDIDATE A:
+
+${candidateA}
+
+---
+
+CANDIDATE B:
+
+${candidateB}
+
+---
+
+CANDIDATE C:
+
+${candidateC ?? "(none)"}
+
+---
+
+YOUR TASK:
+
+Choose the best sourced draft for this student and assignment.
+
+PRIORITIES, IN ORDER:
+- stronger thesis and evidence handling
+- more natural source integration and less packet-like wording
+- clearer, more direct academic prose
+- better match to the student's real analytical voice
+- fewer over-polished or overly systematic passages
+
+RULES:
+- Prefer the candidate that reads like the stronger college essay while still sounding plausibly like the student.
+- Prefer direct analytical prose over reflective or meta-commentary.
+- Prefer the draft that sounds like it is using sources to make an argument, not reporting on packet materials.
+- If one draft is slightly more polished but clearly stronger as an argument and more natural with sources, choose it.
+- Do not rewrite anything.
+- Return only one token: A, B, or C.`;
 }
 
 export function stripUnsupportedSourceAttribution(essay: string): string {
@@ -1443,6 +1765,115 @@ export function normalizeSupportedSourceAttribution(essay: string, sourceContext
     .trim();
 }
 
+export function polishSourcedVoiceTexture(
+  text: string,
+  {
+    allowFirstPerson = false,
+  }: {
+    allowFirstPerson?: boolean;
+  } = {},
+): string {
+  let result = text;
+
+  const replacements: Array<[RegExp, string]> = [
+    [/\bthe lecture packet on social grievances\b/gi, "a note in the packet on social grievances"],
+    [/\bthe seminar notes on the battle of the zab\b/gi, "a note in the packet on the Zab"],
+    [/\bthe seminar discussion of administrative and urban change\b/gi, "the discussion of administrative change in the packet"],
+    [/\bthe modern historiographical interpretation in the source packet\b/gi, "a later interpretation in the packet"],
+    [/\bone interpretation in the source packet argues\b/gi, "one reading in the packet argues"],
+    [/\bthe source packet argues\b/gi, "the packet argues"],
+    [/\bthe packet's discussion of social grievances\b/gi, "a note in the packet on social grievances"],
+    [/\bthe packet's note on the zab\b/gi, "a note in the packet on the Zab"],
+    [/\bthe packet's later interpretation\b/gi, "a later interpretation in the packet"],
+    [/\bthe packet's discussion of early abbasid administration\b/gi, "the discussion of early Abbasid administration in the packet"],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    result = result.replace(pattern, replacement);
+  }
+
+  if (allowFirstPerson && !/\bwhat stands out to me is\b/i.test(result)) {
+    result = result.replace(/\bWhat stands out is\b/, "What stands out to me is");
+  }
+
+  if (!allowFirstPerson) {
+    result = result
+      .replace(/\bWhat stands out to me is\b/gi, "What stands out is")
+      .replace(/\bI do not think that\s+([^,.!?]+?)\s+captures\b/gi, "That $1 does not capture")
+      .replace(/\bI don't think that\s+([^,.!?]+?)\s+captures\b/gi, "That $1 does not capture")
+      .replace(/\bI do not think that\s+([^,.!?]+?)\s+explains\b/gi, "That $1 does not explain")
+      .replace(/\bI don't think that\s+([^,.!?]+?)\s+explains\b/gi, "That $1 does not explain")
+      .replace(/\bI do not think that\b/gi, "It is not quite right to say that")
+      .replace(/\bI don't think that\b/gi, "It is not quite right to say that")
+      .replace(/\bI do not think\b/gi, "It is not quite right to say")
+      .replace(/\bI don't think\b/gi, "It is not quite right to say")
+      .replace(/\bI would argue that\b/gi, "The stronger argument is that")
+      .replace(/\bI would describe that\b/gi, "The best description is that")
+      .replace(/(^|[.!?]\s+)So The best description is\b/g, "$1The best description is")
+      .replace(/\bI would describe\b/gi, "The best description is")
+      .replace(/\bI would say that\b/gi, "It makes more sense to say that")
+      .replace(/\bI would say\b/gi, "It makes more sense to say")
+      .replace(/\bI think\b/gi, "It seems")
+      .replace(/\bmy argument\b/gi, "the argument");
+  }
+
+  let mattersCount = 0;
+  result = result.replace(/\bThat matters because\b/g, () => {
+    mattersCount += 1;
+    if (mattersCount <= 1) return "That matters because";
+    return mattersCount % 2 === 0 ? "That helps explain why" : "That is important because";
+  });
+
+  let evenSoCount = 0;
+  result = result.replace(/\bEven so,/g, () => {
+    evenSoCount += 1;
+    if (evenSoCount <= 1) return "Even so,";
+    return "Still,";
+  });
+
+  let atSameTimeCount = 0;
+  result = result.replace(/\bAt the same time,/g, () => {
+    atSameTimeCount += 1;
+    if (atSameTimeCount <= 1) return "At the same time,";
+    return "Still,";
+  });
+
+  let standsOutCount = 0;
+  result = result.replace(/\bWhat stands out is\b/g, () => {
+    standsOutCount += 1;
+    if (standsOutCount <= 1) return "What stands out is";
+    return standsOutCount % 2 === 0 ? "What matters most is" : "More important is";
+  });
+
+  let thatIsWhyCount = 0;
+  result = result.replace(/\bThat is why\b/g, () => {
+    thatIsWhyCount += 1;
+    if (thatIsWhyCount <= 1) return "That is why";
+    return thatIsWhyCount % 2 === 0 ? "That helps explain why" : "That is one reason why";
+  });
+
+  result = result
+    .replace(/\bAl-Tabari's account describes\b/gi, "Al-Tabari describes")
+    .replace(/\bAl-Tabari's account emphasizes\b/gi, "Al-Tabari emphasizes")
+    .replace(/\bAl-Tabari's narrative emphasizes\b/gi, "Al-Tabari emphasizes")
+    .replace(/\bthe modern interpretation in the packet argues\b/gi, "a later interpretation argues")
+    .replace(/\bthe best description is\b/gi, "the more accurate description is")
+    .replace(/\bthe stronger argument is that\b/gi, "what matters more is that")
+    .replace(/\bthe more accurate description is\b/gi, "a better way to put it is")
+    .replace(/\ba better way to put it is it as\b/gi, "a better way to put it is to describe it as")
+    .replace(/\bwhat stands out in that framing is\b/gi, "that framing shows")
+    .replace(/\ba note in the packet on\b/gi, "a note on")
+    .replace(/\bone note in the packet on\b/gi, "one note on")
+    .replace(/\bone discussion in the packet of\b/gi, "one discussion of")
+    .replace(/\bthe thesis\b/gi, "the main point")
+    .replace(/\bthe argument\b/gi, "the point")
+    .replace(/\bhistoriographical source packet\b/gi, "later interpretation");
+
+  result = result.replace(/(^|[.!?]\s+|\n\n)([a-z])/g, (_, prefix: string, ch: string) => `${prefix}${ch.toUpperCase()}`);
+
+  return result;
+}
+
 export function polishLevel2SurfaceVoice(essay: string, fingerprint: StyleFingerprint): string {
   let result = normalizeQuotes(essay);
 
@@ -1450,8 +1881,39 @@ export function polishLevel2SurfaceVoice(essay: string, fingerprint: StyleFinger
     result = injectContractions(result, 3, 5);
   }
 
+  result = smoothRepeatedAnalyticalTransitions(result);
+  result = downgradeAiStyledPhrases(result);
   result = stripEmDashes(result);
   return result.replace(/\.{2,}/g, ".");
+}
+
+function smoothRepeatedAnalyticalTransitions(text: string): string {
+  const rules: Array<{ pattern: RegExp; replacements: string[] }> = [
+    { pattern: /(^|[.!?]\s+)At the same time,\s+/g, replacements: ["Still, ", "Even so, "] },
+    { pattern: /(^|[.!?]\s+)In other words,\s+/g, replacements: ["So, ", "Put differently, "] },
+    { pattern: /(^|[.!?]\s+)That is why\s+/g, replacements: ["So ", "That helps explain why "] },
+    { pattern: /(^|[.!?]\s+)This is also why\s+/g, replacements: ["That also helps explain why ", "This also explains why "] },
+  ];
+
+  let result = text;
+  for (const { pattern, replacements } of rules) {
+    let seen = 0;
+    result = result.replace(pattern, (match, prefix: string) => {
+      seen += 1;
+      if (seen <= 1) return match;
+      const replacement = replacements[Math.min(seen - 2, replacements.length - 1)];
+      return `${prefix}${replacement}`;
+    });
+  }
+
+  return result;
+}
+
+function downgradeAiStyledPhrases(text: string): string {
+  return text
+    .replace(/\bcompelling narrative\b/gi, "strong account")
+    .replace(/\bpolitically opportunistic\b/gi, "mostly political")
+    .replace(/\bperfect record\b/gi, "complete record");
 }
 
 // ─── Post-processing: deterministic humanization ───

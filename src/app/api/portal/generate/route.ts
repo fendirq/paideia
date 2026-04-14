@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
-import { fetchSourceContext, formatSourceContextForPrompt, inferRequiredEvidenceCount, inferWordCountBounds, normalizeSourceLinks } from "@/lib/source-context";
+import { fetchSourceContext, formatSourceContextForPrompt, inferRequiredEvidenceCount, inferRequiredQuoteCount, inferWordCountBounds, normalizeSourceLinks } from "@/lib/source-context";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,
@@ -15,11 +15,15 @@ import {
   buildLevel2EvidenceIntegrationPrompt,
   buildLevel2AttributionPrompt,
   buildLevel2CompliancePrompt,
+  buildLevel2SourcedDraftChoicePrompt,
+  buildLevel2QuoteIntegrationPrompt,
+  buildLevel2SourcedVoicePrompt,
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
   buildLegacyLevel1Prompt,
   normalizeSupportedSourceAttribution,
   normalizeFingerprint,
+  polishSourcedVoiceTexture,
   polishLevel2SurfaceVoice,
   sanitizeEssayOutput,
   stripUnsupportedSourceAttribution,
@@ -67,6 +71,54 @@ function countWords(text: string): number {
 
 function countParagraphs(text: string): number {
   return text.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).length;
+}
+
+function countIntegratedQuotes(text: string): number {
+  return (text.match(/"[^"\n]{2,120}"/g) ?? []).length;
+}
+
+function extractQuotedPhrasesFromSourceContext(sourceContext?: string): string[] {
+  if (!sourceContext) return [];
+  const phrases: string[] = [];
+  const seen = new Set<string>();
+  const regex = /"([^"\n]{2,120})"/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(sourceContext)) !== null) {
+    const phrase = match[1]?.trim();
+    if (!phrase || seen.has(phrase.toLowerCase())) continue;
+    seen.add(phrase.toLowerCase());
+    phrases.push(phrase);
+  }
+
+  return phrases;
+}
+
+function countSourcePacketQuotes(text: string, sourceContext?: string): number {
+  const phrases = extractQuotedPhrasesFromSourceContext(sourceContext);
+  const lower = text.toLowerCase();
+  return phrases.reduce((count, phrase) => count + (lower.includes(`"${phrase.toLowerCase()}"`) ? 1 : 0), 0);
+}
+
+function scoreSourcedPolishRisk(text: string): number {
+  const phrasePatterns = [
+    /\bAt the same time,\b/g,
+    /\bIn other words,\b/g,
+    /\bThat is why\b/g,
+    /\bSo I would\b/g,
+    /\bWhat stands out\b/g,
+    /\bIt is not quite right to say\b/g,
+    /\ba better way to put it is\b/g,
+    /\bone note on\b/g,
+    /\bone discussion of\b/g,
+  ];
+  const phraseScore = phrasePatterns.reduce((sum, pattern) => sum + ((text.match(pattern) ?? []).length), 0);
+  const longSentenceScore = text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim().split(/\s+/).filter(Boolean).length)
+    .filter((count) => count >= 38)
+    .length;
+  return phraseScore + longSentenceScore;
 }
 
 function isValidCritique(text: string): boolean {
@@ -183,6 +235,41 @@ async function createLevel2Message(
   }
 
   throw lastError;
+}
+
+async function chooseBestSourcedDraft(
+  anthropic: Anthropic,
+  {
+    candidateA,
+    candidateB,
+    candidateC,
+    opts,
+  }: {
+    candidateA: string;
+    candidateB: string;
+    candidateC?: string;
+    opts: GenerateOptions;
+  },
+): Promise<"A" | "B" | "C" | null> {
+  try {
+    const response = await createLevel2Message(anthropic, {
+      prompt: buildLevel2SourcedDraftChoicePrompt({
+        candidateA,
+        candidateB,
+        candidateC,
+        opts,
+      }),
+      system: "You are choosing the better of two sourced student-essay drafts. Prefer the one that is the stronger college-level argument while still sounding plausibly like the student. Stronger thesis, evidence use, and natural source integration matter more than slight differences in polish.",
+      maxTokens: 10,
+      temperature: 0,
+      timeoutMs: LEVEL2_CRITIQUE_TIMEOUT_MS,
+      stageLabel: "draft-choice",
+    });
+    const choice = extractAnthropicText(response).trim().toUpperCase();
+    return choice === "A" || choice === "B" || choice === "C" ? choice : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: Request) {
@@ -421,13 +508,47 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     const writingPrompt = buildLevel2WritingPrompt(opts, outline);
     const essayMsg = await createLevel2Message(anthropic, {
       prompt: writingPrompt,
-      system: `You are ghostwriting an essay in this student's recognizable voice, but at a polished A-range quality floor. Study their writing samples as style references. Match their vocabulary preferences, sentence habits, and tone, but do not copy their weakest mistakes. The essay must be grammatically strong, thesis-driven, well-supported, and clearly argued.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
+      system: `You are ghostwriting an essay in this student's recognizable voice, but at a polished A-range quality floor. Study their writing samples as style references. Match their vocabulary preferences, sentence habits, and tone, but do not copy their weakest mistakes. The essay must be grammatically strong, thesis-driven, well-supported, and clearly argued.${opts.sourceContext ? " Use the approved source material directly, but make the prose feel like a student building an argument from sources rather than reporting from a packet. Keep quotations short, integrated, and immediately explained." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
       maxTokens: 5000,
       temperature: 0.55,
       timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
       stageLabel: "drafting",
     });
     rawEssay = sanitizeEssayOutput(extractAnthropicText(essayMsg));
+
+    if (opts.sourceContext) {
+      const altEssayMsg = await createLevel2Message(anthropic, {
+        prompt: writingPrompt,
+        system: "You are ghostwriting a sourced student essay. Match the student's real analytical voice, but make the prose slightly less polished, less symmetrical, and more naturally argued than a model essay. Use the approved source material directly, keep quotations short and embedded, avoid packet-like wording, and prefer direct academic argument over reflective commentary. The essay should feel like one strong student thinking with sources, not a perfectly assembled response.",
+        maxTokens: 5000,
+        temperature: 0.45,
+        timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
+        stageLabel: "drafting-alt",
+      });
+      const alternateEssay = sanitizeEssayOutput(extractAnthropicText(altEssayMsg));
+      const rawAltEssayMsg = await createLevel2Message(anthropic, {
+        prompt: writingPrompt,
+        system: "You are ghostwriting a sourced student essay. Match the student's voice, but bias toward sharper, more direct academic prose with fewer framework phrases and less over-explained source handling. Keep quotations short and integrated. The essay should still sound like a student, but stronger and more decisive.",
+        maxTokens: 5000,
+        temperature: 0.6,
+        timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
+        stageLabel: "drafting-alt-2",
+      });
+      const thirdEssay = sanitizeEssayOutput(extractAnthropicText(rawAltEssayMsg));
+      if (isUsableEssayCandidate(alternateEssay, opts.wordCount) || isUsableEssayCandidate(thirdEssay, opts.wordCount)) {
+        const winner = await chooseBestSourcedDraft(anthropic, {
+          candidateA: rawEssay,
+          candidateB: alternateEssay,
+          candidateC: thirdEssay,
+          opts,
+        });
+        if (winner === "B") {
+          rawEssay = alternateEssay;
+        } else if (winner === "C") {
+          rawEssay = thirdEssay;
+        }
+      }
+    }
   } catch (err) {
     const isTimeout = isTimeoutError(err);
     return NextResponse.json(
@@ -529,6 +650,8 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   // Step 6: Evidence integration pass — ensure concrete evidence and analysis actually land
   const requirementText = `${opts.assignment}\n${opts.requirements ?? ""}`;
   const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
+  const requiredQuoteCount = inferRequiredQuoteCount(requirementText);
+  const requiredPacketQuotes = Math.max(requiredQuoteCount ?? 0, opts.sourceContext ? 1 : 0);
   try {
     const evidenceMsg = await createLevel2Message(anthropic, {
       prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
@@ -595,7 +718,37 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     console.warn("Level 2 compliance stage failed; keeping current essay.", err);
   }
 
-  // Step 9: Hard ceiling trim — if we still exceed the max, force a focused trim pass
+  // Step 9: Quote integration pass — satisfy sourced quotation requirements without changing structure
+  if (opts.sourceContext && (requiredQuoteCount || countIntegratedQuotes(baseEssay) === 0)) {
+    try {
+      const quoteMsg = await createLevel2Message(anthropic, {
+        prompt: buildLevel2QuoteIntegrationPrompt(baseEssay, opts, {
+          requiredQuoteCount,
+          maxWords: bounds.max,
+        }),
+        system: "You are integrating short, natural source quotations into a student-voice essay. Preserve the argument and paragraph structure, but make sure quoted phrases feel real and well-explained.",
+        maxTokens: 5000,
+        temperature: 0.1,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "quotes",
+      });
+      const quotedEssay = sanitizeEssayOutput(extractAnthropicText(quoteMsg));
+      if (
+        isUsableEssayCandidate(quotedEssay, opts.wordCount) &&
+        passesRevisionLengthFloor(quotedEssay, opts.wordCount, baseEssay) &&
+        countParagraphs(quotedEssay) === countParagraphs(baseEssay) &&
+        isWithinMaxWords(quotedEssay, bounds.max) &&
+        countIntegratedQuotes(quotedEssay) >= Math.max(1, requiredQuoteCount ?? 1) &&
+        countSourcePacketQuotes(quotedEssay, opts.sourceContext) >= requiredPacketQuotes
+      ) {
+        baseEssay = quotedEssay;
+      }
+    } catch (err) {
+      console.warn("Level 2 quote stage failed; keeping current essay.", err);
+    }
+  }
+
+  // Step 10: Hard ceiling trim — if we still exceed the max, force a focused trim pass
   if (bounds.max && countWords(baseEssay) > bounds.max) {
     try {
       const trimMsg = await createLevel2Message(anthropic, {
@@ -621,14 +774,14 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     }
   }
 
-  // Step 10: Source flow pass — smooth sourced attribution without reopening the whole essay
+  // Step 11: Source flow pass — smooth sourced attribution without reopening the whole essay
   if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
     try {
       const flowMsg = await createLevel2Message(anthropic, {
         prompt: buildLevel2SourceFlowPrompt(baseEssay, opts, {
           maxWords: bounds.max,
         }),
-        system: "You are smoothing source integration in a student-voice essay. Preserve the argument and paragraph structure, but make attributions and repeated analytical phrases feel more natural.",
+        system: "You are smoothing source integration in a student-voice essay. Preserve the argument and paragraph structure, but make attributions and repeated analytical phrases feel more natural, less systematic, and more like a real student's reasoning on the page. The essay should not feel like it is marching through a rubric checklist, and the ending should land on a clearer final judgment. Prefer direct academic prose over reflective commentary.",
         maxTokens: 5000,
         temperature: 0.1,
         timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
@@ -639,7 +792,9 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
         isUsableEssayCandidate(flowedEssay, opts.wordCount) &&
         passesRevisionLengthFloor(flowedEssay, opts.wordCount, baseEssay) &&
         countParagraphs(flowedEssay) === countParagraphs(baseEssay) &&
-        isWithinMaxWords(flowedEssay, bounds.max)
+        isWithinMaxWords(flowedEssay, bounds.max) &&
+        countSourcePacketQuotes(flowedEssay, opts.sourceContext) >= countSourcePacketQuotes(baseEssay, opts.sourceContext) &&
+        scoreSourcedPolishRisk(flowedEssay) <= scoreSourcedPolishRisk(baseEssay)
       ) {
         baseEssay = flowedEssay;
       }
@@ -648,10 +803,44 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
     }
   }
 
-  // Step 11: Final cleanup — keep Level 2 polished instead of re-injecting roughness
+  // Step 11: Sourced voice pass — reduce the last bit of over-polish without changing structure
+  if (opts.sourceContext) {
+    try {
+      const voiceMsg = await createLevel2Message(anthropic, {
+        prompt: buildLevel2SourcedVoicePrompt(baseEssay, opts, {
+          maxWords: bounds.max,
+        }),
+        system: "You are making a sourced student essay feel a little less perfectly systematic and a little more like real student thinking. Preserve the argument, quotations, and structure, but add a touch more human texture. Keep the prose academically direct rather than reflective.",
+        maxTokens: 5000,
+        temperature: 0.1,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "sourced-voice",
+      });
+      const voicedEssay = sanitizeEssayOutput(extractAnthropicText(voiceMsg));
+      if (
+        isUsableEssayCandidate(voicedEssay, opts.wordCount) &&
+        passesRevisionLengthFloor(voicedEssay, opts.wordCount, baseEssay) &&
+        countParagraphs(voicedEssay) === countParagraphs(baseEssay) &&
+        isWithinMaxWords(voicedEssay, bounds.max) &&
+        countSourcePacketQuotes(voicedEssay, opts.sourceContext) >= countSourcePacketQuotes(baseEssay, opts.sourceContext) &&
+        scoreSourcedPolishRisk(voicedEssay) <= scoreSourcedPolishRisk(baseEssay)
+      ) {
+        baseEssay = voicedEssay;
+      }
+    } catch (err) {
+      console.warn("Level 2 sourced-voice stage failed; keeping current essay.", err);
+    }
+  }
+
+  // Step 12: Final cleanup — keep Level 2 polished instead of re-injecting roughness
   baseEssay = opts.sourceContext
     ? normalizeSupportedSourceAttribution(baseEssay, opts.sourceContext)
     : stripUnsupportedSourceAttribution(baseEssay);
+  if (opts.sourceContext) {
+    baseEssay = polishSourcedVoiceTexture(baseEssay, {
+      allowFirstPerson: false,
+    });
+  }
   const finalEssay = sanitizeEssayOutput(polishLevel2SurfaceVoice(baseEssay, opts.fingerprint));
 
   // Stream the final essay to the client in chunks for consistent UX
