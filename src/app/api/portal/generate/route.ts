@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import Anthropic from "@anthropic-ai/sdk";
+import { getProvider } from "@/lib/providers";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
 import { fetchSourceContext, formatSourceContextForPrompt, inferRequiredEvidenceCount, inferWordCountBounds, normalizeSourceLinks } from "@/lib/source-context";
 import {
@@ -34,14 +34,10 @@ import type {
 export const maxDuration = 300;
 
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
-const LEVEL1_MODEL = "deepseek-ai/DeepSeek-V3";
-const LEVEL2_PRIMARY_MODEL =
-  process.env.ANTHROPIC_LEVEL2_PRIMARY_MODEL ||
-  process.env.ANTHROPIC_MODEL ||
-  "claude-opus-4-6";
-const LEVEL2_FALLBACK_MODEL =
-  process.env.ANTHROPIC_LEVEL2_FALLBACK_MODEL ||
-  "claude-sonnet-4-6";
+// Level 1 model is env-driven so DeepSeek V3 vs Kimi (or any Together-hosted
+// model) can be swapped without a code change. Default preserves current
+// production behavior.
+const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
 const LEVEL2_PLAN_TIMEOUT_MS = 60_000;
 const LEVEL2_DRAFT_TIMEOUT_MS = 90_000;
@@ -112,77 +108,6 @@ function needsSourceFlowPass(text: string): boolean {
     const matches = text.match(pattern) ?? [];
     return matches.length >= 2;
   });
-}
-
-function extractAnthropicText(message: Anthropic.Message): string {
-  return message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-}
-
-function shouldFallbackAnthropic(err: unknown): boolean {
-  if (err instanceof Anthropic.APIConnectionError) return true;
-  if (err instanceof Anthropic.APIError) {
-    return err.status === 400 || err.status === 404 || err.status === 429 || (err.status !== undefined && err.status >= 500);
-  }
-  return false;
-}
-
-function shouldUseAdaptiveThinking(model: string): boolean {
-  return model.startsWith("claude-opus-4-6") || model.startsWith("claude-sonnet-4-6");
-}
-
-async function createLevel2Message(
-  anthropic: Anthropic,
-  {
-    prompt,
-    system,
-    maxTokens,
-    temperature,
-    timeoutMs,
-    stageLabel,
-    thinking,
-  }: {
-    prompt: string;
-    system: string;
-    maxTokens: number;
-    temperature?: number;
-    timeoutMs: number;
-    stageLabel: string;
-    thinking?: { type: "adaptive"; display?: "summarized" | "omitted" };
-  }
-): Promise<Anthropic.Message> {
-  const models = [LEVEL2_PRIMARY_MODEL];
-  if (LEVEL2_FALLBACK_MODEL && LEVEL2_FALLBACK_MODEL !== LEVEL2_PRIMARY_MODEL) {
-    models.push(LEVEL2_FALLBACK_MODEL);
-  }
-
-  let lastError: unknown;
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
-    try {
-      const useThinking = Boolean(thinking && shouldUseAdaptiveThinking(model));
-      return await anthropic.messages.create(
-        {
-          model,
-          max_tokens: maxTokens,
-          ...(!useThinking && temperature !== undefined ? { temperature } : {}),
-          system,
-          messages: [{ role: "user", content: prompt }],
-          ...(useThinking ? { thinking } : {}),
-        },
-        { signal: AbortSignal.timeout(timeoutMs) }
-      );
-    } catch (err) {
-      lastError = err;
-      const canRetry = i < models.length - 1 && !isTimeoutError(err) && shouldFallbackAnthropic(err);
-      if (!canRetry) throw err;
-      console.warn(`Level 2 ${stageLabel} failed on ${model}; retrying with ${models[i + 1]}.`, err);
-    }
-  }
-
-  throw lastError;
 }
 
 export async function POST(req: Request) {
@@ -303,7 +228,7 @@ export async function POST(req: Request) {
     if (level === 1) {
       return streamLevel1(opts);
     } else {
-      return await streamLevel2Anthropic(opts);
+      return await streamLevel2(opts);
     }
   } else {
     // Legacy fallback — old profile shape, no fingerprint (Level 1 only)
@@ -389,15 +314,19 @@ function streamLevel1(opts: GenerateOptions): Response {
   });
 }
 
-// ─── Level 2: Anthropic premium pipeline (plan + draft + critique + revision) ───
+// ─── Level 2: premium pipeline (plan + draft + critique + revision) ───
+// Provider is resolved via LEVEL2_PROVIDER env (default: anthropic). The
+// provider abstraction handles model selection, retry/fallback, and
+// thinking-mode semantics consistently across vendors.
 
-async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "Anthropic API key not configured" }, { status: 500 });
+async function streamLevel2(opts: GenerateOptions): Promise<Response> {
+  let provider;
+  try {
+    provider = getProvider();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "LLM provider not configured";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const anthropic = new Anthropic({ apiKey });
 
   let outline = "";
   let rawEssay = "";
@@ -406,20 +335,20 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   try {
     // Step 1: Structural plan
     const planPrompt = buildLevel2PlanPrompt(opts);
-    const outlineMsg = await createLevel2Message(anthropic, {
+    const outlineMsg = await provider.createLevel2Message({
       prompt: planPrompt,
       system: "You are an essay planning assistant. Create a concise structural outline for the assignment.",
       maxTokens: 2048,
       temperature: 0.25,
       timeoutMs: LEVEL2_PLAN_TIMEOUT_MS,
       stageLabel: "planning",
-      thinking: { type: "adaptive", display: "omitted" },
+      thinking: true,
     });
-    outline = extractAnthropicText(outlineMsg);
+    outline = outlineMsg.text;
 
     // Step 2: Sample-first draft
     const writingPrompt = buildLevel2WritingPrompt(opts, outline);
-    const essayMsg = await createLevel2Message(anthropic, {
+    const essayMsg = await provider.createLevel2Message({
       prompt: writingPrompt,
       system: `You are ghostwriting an essay in this student's recognizable voice, but at a polished A-range quality floor. Study their writing samples as style references. Match their vocabulary preferences, sentence habits, and tone, but do not copy their weakest mistakes. The essay must be grammatically strong, thesis-driven, well-supported, and clearly argued.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
       maxTokens: 5000,
@@ -427,7 +356,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
       stageLabel: "drafting",
     });
-    rawEssay = sanitizeEssayOutput(extractAnthropicText(essayMsg));
+    rawEssay = sanitizeEssayOutput(essayMsg.text);
   } catch (err) {
     const isTimeout = isTimeoutError(err);
     return NextResponse.json(
@@ -460,16 +389,16 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       opts.samples,
       opts.sourceContext,
     );
-    const critiqueMsg = await createLevel2Message(anthropic, {
+    const critiqueMsg = await provider.createLevel2Message({
       prompt: critiquePrompt,
       system: "You are a writing-forensics critic. Diagnose where a generated essay fails to match a student's real writing, prioritizing the highest-risk AI tells and voice mismatches.",
       maxTokens: 2500,
       temperature: 0.1,
       timeoutMs: LEVEL2_CRITIQUE_TIMEOUT_MS,
       stageLabel: "critique",
-      thinking: { type: "adaptive", display: "omitted" },
+      thinking: true,
     });
-    const critiqueCandidate = extractAnthropicText(critiqueMsg).trim();
+    const critiqueCandidate = critiqueMsg.text.trim();
     critiqueNotes = isValidCritique(critiqueCandidate) ? critiqueCandidate : "";
   } catch (err) {
     console.warn("Level 2 critique stage failed; continuing without critique notes.", err);
@@ -486,7 +415,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
 
   let auditedEssay = "";
   try {
-    const auditMsg = await createLevel2Message(anthropic, {
+    const auditMsg = await provider.createLevel2Message({
       prompt: auditPrompt,
       system: `You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Preserve the student's recognizable voice, but make the essay polished, coherent, well-supported, and strong enough to satisfy an A-range assignment standard.${opts.sourceContext ? " Ground the essay in the approved sources." : " Keep no-source essays concrete, but do not let them drift into textbook-level precision."}`,
       maxTokens: 5000,
@@ -495,7 +424,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       stageLabel: "revision",
     });
 
-    auditedEssay = sanitizeEssayOutput(extractAnthropicText(auditMsg));
+    auditedEssay = sanitizeEssayOutput(auditMsg.text);
   } catch (err) {
     console.warn("Level 2 revision stage failed; falling back to draft output.", err);
   }
@@ -509,7 +438,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   let baseEssay = auditedEssay || rawEssay;
   if (needsExpansionPass(baseEssay, opts.wordCount)) {
     try {
-      const expansionMsg = await createLevel2Message(anthropic, {
+      const expansionMsg = await provider.createLevel2Message({
         prompt: buildLevel2ExpansionPrompt(baseEssay, opts, critiqueNotes),
         system: "You are extending a student's essay without changing who they sound like. Keep the same argument and voice, but make the draft feel complete and concrete.",
         maxTokens: 5000,
@@ -517,7 +446,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
         timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
         stageLabel: "expansion",
       });
-      const expandedEssay = sanitizeEssayOutput(extractAnthropicText(expansionMsg));
+      const expandedEssay = sanitizeEssayOutput(expansionMsg.text);
       if (isUsableEssayCandidate(expandedEssay, opts.wordCount) && countWords(expandedEssay) >= countWords(baseEssay)) {
         baseEssay = expandedEssay;
       }
@@ -530,7 +459,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   const requirementText = `${opts.assignment}\n${opts.requirements ?? ""}`;
   const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
   try {
-    const evidenceMsg = await createLevel2Message(anthropic, {
+    const evidenceMsg = await provider.createLevel2Message({
       prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
         requiredEvidenceCount,
       }),
@@ -540,7 +469,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
       stageLabel: "evidence",
     });
-    const evidenceEssay = sanitizeEssayOutput(extractAnthropicText(evidenceMsg));
+    const evidenceEssay = sanitizeEssayOutput(evidenceMsg.text);
     if (isUsableEssayCandidate(evidenceEssay, opts.wordCount) && passesRevisionLengthFloor(evidenceEssay, opts.wordCount, baseEssay)) {
       baseEssay = evidenceEssay;
     }
@@ -552,7 +481,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   const bounds = inferWordCountBounds(requirementText);
   if (opts.sourceContext || bounds.max) {
     try {
-      const attributionMsg = await createLevel2Message(anthropic, {
+      const attributionMsg = await provider.createLevel2Message({
         prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
           maxWords: bounds.max,
         }),
@@ -562,7 +491,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
         timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
         stageLabel: "attribution",
       });
-      const attributionEssay = sanitizeEssayOutput(extractAnthropicText(attributionMsg));
+      const attributionEssay = sanitizeEssayOutput(attributionMsg.text);
       if (isUsableEssayCandidate(attributionEssay, opts.wordCount)) {
         baseEssay = attributionEssay;
       }
@@ -573,7 +502,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
 
   // Step 8: Compliance pass — tighten thesis/evidence/word-count compliance without losing voice
   try {
-    const complianceMsg = await createLevel2Message(anthropic, {
+    const complianceMsg = await provider.createLevel2Message({
       prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
         minWords: bounds.min,
         maxWords: bounds.max,
@@ -584,7 +513,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
       timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
       stageLabel: "compliance",
     });
-    const complianceEssay = sanitizeEssayOutput(extractAnthropicText(complianceMsg));
+    const complianceEssay = sanitizeEssayOutput(complianceMsg.text);
     if (
       isUsableEssayCandidate(complianceEssay, opts.wordCount) &&
       countWords(complianceEssay) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))
@@ -598,7 +527,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   // Step 9: Hard ceiling trim — if we still exceed the max, force a focused trim pass
   if (bounds.max && countWords(baseEssay) > bounds.max) {
     try {
-      const trimMsg = await createLevel2Message(anthropic, {
+      const trimMsg = await provider.createLevel2Message({
         prompt: buildLevel2TrimPrompt(baseEssay, opts, {
           maxWords: bounds.max,
         }),
@@ -608,7 +537,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
         timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
         stageLabel: "trim",
       });
-      const trimmedEssay = sanitizeEssayOutput(extractAnthropicText(trimMsg));
+      const trimmedEssay = sanitizeEssayOutput(trimMsg.text);
       if (
         isUsableEssayCandidate(trimmedEssay, opts.wordCount) &&
         passesRevisionLengthFloor(trimmedEssay, opts.wordCount, baseEssay) &&
@@ -624,7 +553,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
   // Step 10: Source flow pass — smooth sourced attribution without reopening the whole essay
   if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
     try {
-      const flowMsg = await createLevel2Message(anthropic, {
+      const flowMsg = await provider.createLevel2Message({
         prompt: buildLevel2SourceFlowPrompt(baseEssay, opts, {
           maxWords: bounds.max,
         }),
@@ -634,7 +563,7 @@ async function streamLevel2Anthropic(opts: GenerateOptions): Promise<Response> {
         timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
         stageLabel: "source-flow",
       });
-      const flowedEssay = sanitizeEssayOutput(extractAnthropicText(flowMsg));
+      const flowedEssay = sanitizeEssayOutput(flowMsg.text);
       if (
         isUsableEssayCandidate(flowedEssay, opts.wordCount) &&
         passesRevisionLengthFloor(flowedEssay, opts.wordCount, baseEssay) &&
