@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import Anthropic from "@anthropic-ai/sdk";
+import { getProvider, resolveProviderName, type LLMProvider, type LLMResponse } from "../src/lib/providers/index.ts";
+import type { GradeReport, GenerationResult } from "./qa-lib/grade-report.ts";
+import { resolveModels as resolveGeminiModels } from "../src/lib/providers/gemini.ts";
+import { resolveModels as resolveAnthropicModels } from "../src/lib/providers/anthropic.ts";
 import {
   buildStyleAnalysisPrompt,
   buildLevel1Prompt,
@@ -32,14 +35,26 @@ const QA_DOC_DIR = path.join(ROOT, "output", "doc", "qa-level2");
 const QA_FIXTURE_DIR = path.join(ROOT, "scripts", "fixtures", "qa");
 const DEFAULT_QA_OUTPUT_DIR = path.join(ROOT, "output", "qa", "generation");
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
-const LEVEL1_MODEL = "deepseek-ai/DeepSeek-V3";
-const LEVEL2_PRIMARY_MODEL =
-  process.env.ANTHROPIC_LEVEL2_PRIMARY_MODEL ||
-  process.env.ANTHROPIC_MODEL ||
-  "claude-opus-4-6";
-const LEVEL2_FALLBACK_MODEL =
-  process.env.ANTHROPIC_LEVEL2_FALLBACK_MODEL ||
-  "claude-sonnet-4-6";
+// Level 1 model is env-driven (DeepSeek V3 default; swap to a Kimi
+// checkpoint for longer-context assignments).
+const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
+
+const LEVEL2_PLAN_TIMEOUT_MS = 60_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 90_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 75_000;
+const JUDGE_TIMEOUT_MS = 90_000;
+
+// Provider is resolved lazily at call time so scripts that only run
+// Level 1 (Together AI) don't require GEMINI_API_KEY / ANTHROPIC_API_KEY.
+let cachedProvider: LLMProvider | null = null;
+function resolveLlmProvider(): LLMProvider {
+  if (!cachedProvider) cachedProvider = getProvider();
+  return cachedProvider;
+}
+
+function extractText(response: LLMResponse): string {
+  return response.text;
+}
 
 interface SampleInput {
   label: string;
@@ -70,6 +85,9 @@ interface JudgeScores {
   rubricAccuracy: number;
   evidenceHandling: number;
   overallWriting: number;
+  voiceNaturalness: number;
+  sourceIntegration: number;
+  academicQuality: number;
   overallVerdict: string;
   strengths: string[];
   weaknesses: string[];
@@ -410,76 +428,21 @@ async function callTogether(prompt: string): Promise<string> {
   return sanitizeEssayOutput(data.choices?.[0]?.message?.content ?? "");
 }
 
-function shouldUseAdaptiveThinking(model: string): boolean {
-  return model.startsWith("claude-opus-4-6") || model.startsWith("claude-sonnet-4-6");
-}
-
-async function createLevel2Message(
-  anthropic: Anthropic,
-  {
-    prompt,
-    system,
-    maxTokens,
-    temperature,
-    thinking,
-  }: {
-    prompt: string;
-    system: string;
-    maxTokens: number;
-    temperature?: number;
-    thinking?: { type: "adaptive"; display?: "summarized" | "omitted" };
-  }
-) {
-  const models = [LEVEL2_PRIMARY_MODEL];
-  if (LEVEL2_FALLBACK_MODEL && LEVEL2_FALLBACK_MODEL !== LEVEL2_PRIMARY_MODEL) {
-    models.push(LEVEL2_FALLBACK_MODEL);
-  }
-
-  let lastError: unknown;
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
-    try {
-      const useThinking = Boolean(thinking && shouldUseAdaptiveThinking(model));
-      return await anthropic.messages.create({
-        model,
-        max_tokens: maxTokens,
-        ...(!useThinking && temperature !== undefined ? { temperature } : {}),
-        system,
-        messages: [{ role: "user", content: prompt }],
-        ...(useThinking ? { thinking } : {}),
-      });
-    } catch (error) {
-      lastError = error;
-      if (i === models.length - 1) throw error;
-    }
-  }
-
-  throw lastError;
-}
-
-function extractAnthropicText(message: Anthropic.Message): string {
-  return message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-}
 
 async function analyzeStyle(samples: SampleInput[]): Promise<StyleFingerprint> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured");
-  }
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const provider = resolveLlmProvider();
   const prompt = buildStyleAnalysisPrompt(samples.map(({ label, content }) => ({ label, content })));
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 8000,
-    temperature: 0.2,
+  const response = await provider.createLevel2Message({
+    prompt,
     system: "You are a forensic writing analyst. Extract granular patterns from student writing samples. Every claim must cite specific words, phrases, or patterns directly from the text. Return only valid JSON.",
-    messages: [{ role: "user", content: prompt }],
+    maxTokens: 8000,
+    temperature: 0.2,
+    timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
+    stageLabel: "style-analysis",
+    thinking: true,
   });
 
-  const content = extractAnthropicText(response)
+  const content = extractText(response)
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
@@ -488,30 +451,30 @@ async function analyzeStyle(samples: SampleInput[]): Promise<StyleFingerprint> {
 }
 
 async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not configured");
-  }
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const provider = resolveLlmProvider();
   const outline = sanitizeEssayOutput(
-    extractAnthropicText(
-      await createLevel2Message(anthropic, {
+    extractText(
+      await provider.createLevel2Message({
         prompt: buildLevel2PlanPrompt(opts),
         system: "You are an essay planning assistant. Create a concise structural outline for the assignment.",
         maxTokens: 2048,
         temperature: 0.25,
-        thinking: { type: "adaptive", display: "omitted" },
+        timeoutMs: LEVEL2_PLAN_TIMEOUT_MS,
+        stageLabel: "planning",
+        thinking: true,
       })
     )
   );
 
   const draft = sanitizeEssayOutput(
-    extractAnthropicText(
-      await createLevel2Message(anthropic, {
+    extractText(
+      await provider.createLevel2Message({
         prompt: buildLevel2WritingPrompt(opts, outline),
         system: `You are ghostwriting in the student's recognizable voice, but at a polished A-range quality floor. Match the student's style signatures without reproducing weak grammar or underdeveloped reasoning.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
         maxTokens: 5000,
         temperature: 0.55,
+        timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
+        stageLabel: "drafting",
       })
     )
   );
@@ -519,13 +482,15 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   let critiqueNotes = "";
   try {
     const critique = sanitizeEssayOutput(
-      extractAnthropicText(
-        await createLevel2Message(anthropic, {
+      extractText(
+        await provider.createLevel2Message({
           prompt: buildLevel2CritiquePrompt(draft, opts.fingerprint, opts.samples, opts.sourceContext),
           system: "You are a writing-forensics critic. Diagnose where a generated essay fails to match a student's real writing, prioritizing the highest-risk AI tells and voice mismatches.",
           maxTokens: 2500,
           temperature: 0.1,
-          thinking: { type: "adaptive", display: "omitted" },
+          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+          stageLabel: "critique",
+          thinking: true,
         })
       )
     );
@@ -539,12 +504,14 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   let revised = "";
   try {
     revised = sanitizeEssayOutput(
-      extractAnthropicText(
-        await createLevel2Message(anthropic, {
+      extractText(
+        await provider.createLevel2Message({
           prompt: buildLevel2AuditPrompt(draft, opts.fingerprint, opts.samples, critiqueNotes, opts.sourceContext),
           system: `You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Preserve the student's recognizable voice, but make the essay polished, coherent, well-supported, and strong enough to satisfy an A-range assignment standard.${opts.sourceContext ? " Ground the essay in the approved sources." : " Keep no-source essays concrete, but do not let them drift into textbook-level precision."}`,
           maxTokens: 5000,
           temperature: 0.2,
+          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+          stageLabel: "revision",
         })
       )
     );
@@ -556,12 +523,14 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   if (countWords(baseEssay) < Math.floor(opts.wordCount * 0.85) || /\b(in class|in the sources|we learned that|history shows|the text says)\b/i.test(baseEssay)) {
     try {
       const expanded = sanitizeEssayOutput(
-        extractAnthropicText(
-          await createLevel2Message(anthropic, {
+        extractText(
+          await provider.createLevel2Message({
             prompt: buildLevel2ExpansionPrompt(baseEssay, opts, critiqueNotes),
             system: "You are extending a student's essay without changing who they sound like. Keep the same argument and voice, but make the draft feel complete and concrete.",
             maxTokens: 5000,
             temperature: 0.25,
+            timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+            stageLabel: "expansion",
           })
         )
       );
@@ -577,14 +546,16 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
   try {
     const evidencePass = sanitizeEssayOutput(
-      extractAnthropicText(
-        await createLevel2Message(anthropic, {
+      extractText(
+        await provider.createLevel2Message({
           prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
             requiredEvidenceCount,
           }),
           system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
           maxTokens: 5000,
           temperature: 0.15,
+          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+          stageLabel: "evidence",
         })
       )
     );
@@ -599,14 +570,16 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   if (opts.sourceContext || bounds.max) {
     try {
       const attribution = sanitizeEssayOutput(
-        extractAnthropicText(
-          await createLevel2Message(anthropic, {
+        extractText(
+          await provider.createLevel2Message({
             prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
               maxWords: bounds.max,
             }),
             system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
             maxTokens: 5000,
             temperature: 0.12,
+            timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+            stageLabel: "attribution",
           })
         )
       );
@@ -620,8 +593,8 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
 
   try {
     const compliance = sanitizeEssayOutput(
-      extractAnthropicText(
-        await createLevel2Message(anthropic, {
+      extractText(
+        await provider.createLevel2Message({
           prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
             minWords: bounds.min,
             maxWords: bounds.max,
@@ -629,6 +602,8 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
           system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
           maxTokens: 5000,
           temperature: 0.15,
+          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+          stageLabel: "compliance",
         })
       )
     );
@@ -642,14 +617,16 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   if (bounds.max && countWords(baseEssay) > bounds.max) {
     try {
       const trimmed = sanitizeEssayOutput(
-        extractAnthropicText(
-          await createLevel2Message(anthropic, {
+        extractText(
+          await provider.createLevel2Message({
             prompt: buildLevel2TrimPrompt(baseEssay, opts, {
               maxWords: bounds.max,
             }),
             system: "You are trimming a student-voice essay to fit a hard word-count ceiling. Preserve the argument and evidence, but cut repetition and excess explanation.",
             maxTokens: 5000,
             temperature: 0.1,
+            timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+            stageLabel: "trim",
           })
         )
       );
@@ -667,14 +644,16 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
     try {
       const flowed = sanitizeEssayOutput(
-        extractAnthropicText(
-          await createLevel2Message(anthropic, {
+        extractText(
+          await provider.createLevel2Message({
             prompt: buildLevel2SourceFlowPrompt(baseEssay, opts, {
               maxWords: bounds.max,
             }),
             system: "You are smoothing source integration in a student-voice essay. Preserve the argument and paragraph structure, but make attributions and repeated analytical phrases feel more natural.",
             maxTokens: 5000,
             temperature: 0.1,
+            timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+            stageLabel: "source-flow",
           })
         )
       );
@@ -697,26 +676,24 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   return sanitizeEssayOutput(polishLevel2SurfaceVoice(baseEssay, opts.fingerprint));
 }
 
-async function judgeEssay(
-  anthropic: Anthropic,
-  {
-    levelLabel,
-    assignment,
-    rubric,
-    samples,
-    essay,
-    metrics,
-    heuristic,
-  }: {
-    levelLabel: string;
-    assignment: string;
-    rubric: string;
-    samples: SampleInput[];
-    essay: string;
-    metrics: EssayMetrics;
-    heuristic: { aiDetectionResistance: number; authenticity: number };
-  }
-): Promise<JudgeScores> {
+async function judgeEssay({
+  levelLabel,
+  assignment,
+  rubric,
+  samples,
+  essay,
+  metrics,
+  heuristic,
+}: {
+  levelLabel: string;
+  assignment: string;
+  rubric: string;
+  samples: SampleInput[];
+  essay: string;
+  metrics: EssayMetrics;
+  heuristic: { aiDetectionResistance: number; authenticity: number };
+}): Promise<JudgeScores> {
+  const provider = resolveLlmProvider();
   const prompt = `You are QA grading an AI-generated student essay against real student writing samples.
 
 ASSIGNMENT:
@@ -740,6 +717,9 @@ Grade the generated essay from 1-10 in these categories:
 - rubricAccuracy: how well it answers the prompt and rubric
 - evidenceHandling: how well it uses and explains evidence
 - overallWriting: overall quality at the student's actual level
+- voiceNaturalness: does this read as an organic student voice, or mechanical/formal?
+- sourceIntegration: how naturally is source material absorbed vs announced? (If no sources were provided, score 10 by default.)
+- academicQuality: does the argument and analysis meet the academic bar the assignment expects?
 
 Return valid JSON only:
 {
@@ -748,25 +728,74 @@ Return valid JSON only:
   "rubricAccuracy": number,
   "evidenceHandling": number,
   "overallWriting": number,
+  "voiceNaturalness": number,
+  "sourceIntegration": number,
+  "academicQuality": number,
   "overallVerdict": "short paragraph",
   "strengths": ["..."],
   "weaknesses": ["..."],
   "priorityFixes": ["..."]
 }`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2000,
-    temperature: 0.1,
+  const response = await provider.createLevel2Message({
+    prompt,
     system: "You are a strict QA reviewer for student-voice essay generation. Be candid and concrete. Return only valid JSON.",
-    messages: [{ role: "user", content: prompt }],
+    maxTokens: 4000,
+    temperature: 0.1,
+    timeoutMs: JUDGE_TIMEOUT_MS,
+    stageLabel: "judging",
+    thinking: true,
   });
 
-  return JSON.parse(extractJsonObject(extractAnthropicText(response))) as JudgeScores;
+  return JSON.parse(extractJsonObject(extractText(response))) as JudgeScores;
 }
 
 function markdownSection(title: string, body: string): string {
   return `## ${title}\n\n${body}\n`;
+}
+
+function toGenerationResult(
+  variant: "level1" | "level2" | "level2-sourced",
+  sourced: boolean,
+  essay: string,
+  metrics: EssayMetrics,
+  heuristic: { aiDetectionResistance: number; authenticity: number },
+  judge: JudgeScores,
+): GenerationResult {
+  const transitionHits = metrics.favoriteTransitionHits ?? [];
+  const maxTransitionReuse = transitionHits.length > 0
+    ? Math.max(...transitionHits.map((t) => {
+        const lower = essay.toLowerCase();
+        return (lower.match(new RegExp(t.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
+      }))
+    : 0;
+  return {
+    variant,
+    sourced,
+    essay,
+    wordCount: metrics.wordCount,
+    heuristics: {
+      heuristicAiResistance: heuristic.aiDetectionResistance,
+      heuristicAuthenticity: heuristic.authenticity,
+      maxRepeatedOpenerRun: metrics.maxRepeatedOpenerRun,
+      maxTransitionReuse,
+      sentenceStdDev: metrics.sentenceStdDev,
+    },
+    judge: {
+      aiDetectionResistance: judge.aiDetectionResistance,
+      sampleAccuracy: judge.sampleAccuracy,
+      rubricAccuracy: judge.rubricAccuracy,
+      evidenceHandling: judge.evidenceHandling,
+      overallWriting: judge.overallWriting,
+      voiceNaturalness: judge.voiceNaturalness,
+      sourceIntegration: judge.sourceIntegration,
+      academicQuality: judge.academicQuality,
+      overallVerdict: judge.overallVerdict,
+      strengths: judge.strengths,
+      weaknesses: judge.weaknesses,
+      priorityFixes: judge.priorityFixes,
+    },
+  };
 }
 
 async function main() {
@@ -801,8 +830,6 @@ async function main() {
   console.log("Generating Level 2 essay with sources...");
   const level2SourcedEssay = await generateLevel2Essay(sourceGroundedOpts);
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
   const level1Metrics = analyzeEssay(level1Essay, fingerprint);
   const level2Metrics = analyzeEssay(level2Essay, fingerprint);
   const level2SourcedMetrics = analyzeEssay(level2SourcedEssay, fingerprint);
@@ -812,7 +839,7 @@ async function main() {
 
   console.log("Judging outputs...");
   const [level1Judge, level2Judge, level2SourcedJudge] = await Promise.all([
-    judgeEssay(anthropic, {
+    judgeEssay({
       levelLabel: "Level 1",
       assignment: scenario.assignment,
       rubric: scenario.rubric,
@@ -821,7 +848,7 @@ async function main() {
       metrics: level1Metrics,
       heuristic: level1Heuristic,
     }),
-    judgeEssay(anthropic, {
+    judgeEssay({
       levelLabel: "Level 2",
       assignment: scenario.assignment,
       rubric: scenario.rubric,
@@ -830,7 +857,7 @@ async function main() {
       metrics: level2Metrics,
       heuristic: level2Heuristic,
     }),
-    judgeEssay(anthropic, {
+    judgeEssay({
       levelLabel: "Level 2 + Sources",
       assignment: scenario.assignment,
       rubric: scenario.rubric,
@@ -917,6 +944,28 @@ async function main() {
   ].join("\n");
 
   fs.writeFileSync(path.join(scenario.outputDir, "report.md"), report);
+
+  // GradeReport JSON for consumption by qa:diff.
+  const providerName = resolveProviderName();
+  const level2Models = providerName === "gemini" ? resolveGeminiModels() : resolveAnthropicModels();
+  const gradeReport: GradeReport = {
+    fixture: scenario.name,
+    timestamp: new Date().toISOString(),
+    provider: {
+      level1: { name: "together", model: LEVEL1_MODEL },
+      level2: { name: providerName, model: level2Models[0] },
+      judge: { name: providerName, model: level2Models[0] },
+    },
+    generations: [
+      toGenerationResult("level1", false, level1Essay, level1Metrics, level1Heuristic, level1Judge),
+      toGenerationResult("level2", false, level2Essay, level2Metrics, level2Heuristic, level2Judge),
+      toGenerationResult("level2-sourced", true, level2SourcedEssay, level2SourcedMetrics, level2SourcedHeuristic, level2SourcedJudge),
+    ],
+  };
+  fs.writeFileSync(
+    path.join(scenario.outputDir, "grade-report.json"),
+    JSON.stringify(gradeReport, null, 2),
+  );
 
   console.log(JSON.stringify({
     scenario: scenario.name,
