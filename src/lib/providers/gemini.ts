@@ -82,12 +82,21 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           // temperature; on older/flash models we honor the caller's hint
           // and pass temperature through.
           const useThinking = thinkingOnly || Boolean(input.thinking && supportsAdaptiveThinking(model));
+          // Thinking models burn output budget on internal reasoning. Empirically
+          // on gemini-3.1-pro-preview a 5000-token request with auto-thinking
+          // truncates a 1300-word essay at ~200 words — thinking consumes most
+          // of the budget. Callers pass desired-output-size in maxTokens; we
+          // triple it and add a floor when thinking is active so thinking has
+          // room without starving the visible output.
+          const effectiveMaxTokens = useThinking
+            ? Math.max(input.maxTokens * 3, 12000)
+            : input.maxTokens;
           const response = await client.models.generateContent({
             model,
             contents: [{ role: "user", parts: [{ text: input.prompt }] }],
             config: {
               systemInstruction: input.system,
-              maxOutputTokens: input.maxTokens,
+              maxOutputTokens: effectiveMaxTokens,
               ...(!useThinking && input.temperature !== undefined
                 ? { temperature: input.temperature }
                 : {}),
