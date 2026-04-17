@@ -1,8 +1,8 @@
-import { createAnthropicProvider } from "./anthropic";
-import { createGeminiProvider } from "./gemini";
-import type { LLMProvider, LLMProviderName } from "./types";
+import { createAnthropicProvider } from "./anthropic.ts";
+import { createGeminiProvider } from "./gemini.ts";
+import type { LLMProvider, LLMProviderName } from "./types.ts";
 
-export type { LLMMessage, LLMResponse, LLMProvider, LLMProviderName } from "./types";
+export type { LLMMessage, LLMResponse, LLMProvider, LLMProviderName } from "./types.ts";
 
 export function resolveProviderName(): LLMProviderName {
   const raw = process.env.LEVEL2_PROVIDER?.trim().toLowerCase();

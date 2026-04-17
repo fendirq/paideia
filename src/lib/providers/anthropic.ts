@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMMessage, LLMProvider, LLMResponse } from "./types";
+import type { LLMMessage, LLMProvider, LLMResponse } from "./types.ts";
 
 const DEFAULT_PRIMARY = "claude-opus-4-6";
 const DEFAULT_FALLBACK = "claude-sonnet-4-6";

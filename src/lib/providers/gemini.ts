@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import type { LLMMessage, LLMProvider, LLMResponse } from "./types";
+import type { LLMMessage, LLMProvider, LLMResponse } from "./types.ts";
 
 const DEFAULT_PRIMARY = "gemini-3.1-pro-preview";
 const DEFAULT_FALLBACK = "gemini-3-pro-preview";
@@ -13,6 +13,22 @@ export function resolveModels(): string[] {
 
 function supportsAdaptiveThinking(model: string): boolean {
   return model.startsWith("gemini-3") || model.startsWith("gemini-2.5");
+}
+
+/**
+ * Gemini 3.x Pro preview and 2.5 Pro are thinking-only models — the API
+ * rejects `thinkingBudget: 0` with HTTP 400 ("This model only works in
+ * thinking mode"), and calling without any thinkingConfig allows internal
+ * reasoning to consume the entire maxOutputTokens budget before producing
+ * any user-visible text (finish_reason=MAX_TOKENS, content empty).
+ *
+ * For these models we MUST set thinkingBudget to -1 (auto) regardless of
+ * whether the caller requested thinking explicitly. The `input.thinking`
+ * hint is informational only — it cannot turn thinking off on a
+ * thinking-only model. Temperature must also be omitted during thinking.
+ */
+function isThinkingOnlyModel(model: string): boolean {
+  return supportsAdaptiveThinking(model);
 }
 
 function isTimeoutError(err: unknown): boolean {
@@ -61,7 +77,11 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
       for (let i = 0; i < models.length; i++) {
         const model = models[i];
         try {
-          const useThinking = Boolean(input.thinking && supportsAdaptiveThinking(model));
+          const thinkingOnly = isThinkingOnlyModel(model);
+          // On thinking-only models the API requires thinking and rejects
+          // temperature; on older/flash models we honor the caller's hint
+          // and pass temperature through.
+          const useThinking = thinkingOnly || Boolean(input.thinking && supportsAdaptiveThinking(model));
           const response = await client.models.generateContent({
             model,
             contents: [{ role: "user", parts: [{ text: input.prompt }] }],
