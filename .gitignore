@@ -44,3 +44,6 @@ prisma/migrations/migration_lock.toml
 
 # claude code — personal settings
 .claude/settings.local.json
+
+# local scratch / codex review artifacts / qa intermediate output
+/tmp/
