@@ -87,8 +87,6 @@ function archiveRun(scenario: string, runIndex: number): void {
   }
 }
 
-type NumericField = string;
-
 function collectNumericFields(
   runs: GradeReport[],
   variant: GenerationVariant,
