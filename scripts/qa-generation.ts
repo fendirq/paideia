@@ -413,32 +413,68 @@ async function callTogether(prompt: string): Promise<string> {
     throw new Error("TOGETHER_API_KEY is not configured");
   }
 
-  const response = await fetch(TOGETHER_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.TOGETHER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: LEVEL1_MODEL,
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: "Write the essay now." },
-      ],
-      max_tokens: 4096,
-      temperature: 0.7,
-    }),
-  });
+  // Retry on transient Together AI failures — during a multirun validation
+  // Run 2 hit a Together 500 ("server_error") mid-stream. 3 attempts with
+  // exponential backoff clears the common transient-server-error class
+  // without masking genuine auth/quota failures.
+  const MAX_ATTEMPTS = 3;
+  const BASE_DELAY_MS = 1000;
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(`Together request failed: ${response.status} ${await response.text()}`);
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(TOGETHER_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.TOGETHER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: LEVEL1_MODEL,
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: "Write the essay now." },
+          ],
+          max_tokens: 4096,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const bodyText = await response.text();
+        const err = new Error(`Together request failed: ${response.status} ${bodyText}`);
+        // Retry on 5xx server errors and 429 rate limiting; not on 4xx auth/client.
+        const retryable = response.status === 429 || response.status >= 500;
+        if (retryable && attempt < MAX_ATTEMPTS) {
+          lastError = err;
+          const delay = BASE_DELAY_MS * 2 ** (attempt - 1);
+          console.warn(`Together attempt ${attempt}/${MAX_ATTEMPTS} failed (${response.status}); retrying in ${delay}ms`);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        throw err;
+      }
+
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      return sanitizeEssayOutput(data.choices?.[0]?.message?.content ?? "");
+    } catch (err) {
+      // Network-layer failures (fetch threw) are retryable on the same tier
+      // as 5xx; auth/quota/body-parse errors above already re-threw.
+      if (err instanceof TypeError && attempt < MAX_ATTEMPTS) {
+        lastError = err;
+        const delay = BASE_DELAY_MS * 2 ** (attempt - 1);
+        console.warn(`Together network error attempt ${attempt}/${MAX_ATTEMPTS}; retrying in ${delay}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
   }
 
-  const data = await response.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  return sanitizeEssayOutput(data.choices?.[0]?.message?.content ?? "");
+  throw lastError ?? new Error("Together request exhausted retries without a final error");
 }
 
 
