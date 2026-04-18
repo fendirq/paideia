@@ -92,12 +92,28 @@ export const authOptions: NextAuthOptions = {
       const stale = !neverFetched && Date.now() - token.roleCheckedAt! > ROLE_REFRESH_MS;
       const roleIsNull = token.role === null || token.role === undefined;
       if (token.userId && (neverFetched || stale || roleIsNull)) {
-        const dbUser = await db.user.findUnique({
-          where: { id: token.userId as string },
-          select: { role: true },
-        });
-        token.role = dbUser?.role ?? null;
-        token.roleCheckedAt = Date.now();
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.userId as string },
+            select: { role: true },
+          });
+          token.role = dbUser?.role ?? null;
+          token.roleCheckedAt = Date.now();
+        } catch (err) {
+          // A transient DB failure (connection pool exhausted on cold
+          // start, brief Neon outage, etc.) must not cascade into a
+          // global 401 by blanking the role. Keep whatever role was
+          // already on the token and retry on the next JWT refresh.
+          // On the very first JWT refresh (neverFetched && no prior
+          // role) we have nothing to keep — in that case surfacing the
+          // error is the right call since the token is unusable.
+          console.error("auth.jwt: role refresh from DB failed", {
+            userId: token.userId,
+            neverFetched,
+            err,
+          });
+          if (neverFetched) throw err;
+        }
       }
       return token;
     },
