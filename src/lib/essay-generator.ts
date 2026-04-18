@@ -742,16 +742,13 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
   }
 
   return `${isNarrative
-    ? `NARRATIVE-VOICE REFERENCE — these are this student's prior personal narrative essays on unrelated topics:
+    ? `NARRATIVE VOICE REFERENCE — you will work from the structured voice profile below, NOT from the student's raw prior essays.
 
-${refSamples}
+This is deliberate: narrative voice is easy to describe abstractly (sentence rhythm, sensory channel, dialogue habits, attention patterns) but raw sample text causes structural plagiarism. Gemini's attention on concrete sample sentences overrides abstract instructions "not to copy" — we avoid that trap by keeping the samples out of your context.
 
-CRITICAL — for a narrative essay, the samples are a TONE study, NOT a template:
-- Scenes, images, dialogue lines, and specific sensory details in the samples are OFF-LIMITS. Do not echo them, restructure them, invert them, or map them onto a new subject. If the samples describe a laundromat bell, sewing machine, backstage theater, and a father's thermos, you must pick a COMPLETELY DIFFERENT subject and generate original scenes.
-- The only things you may inherit from the samples: the student's sentence cadence (short-short-long rhythms if they use them), their level of sensory attention, their habit of letting dialogue carry moments, their general tonal register. These are inherited as DEFAULTS for a new scene you invent from scratch.
-- Every concrete detail in your essay must be one YOU make up from the assignment prompt, not one borrowed from a sample. Opening move, ending move, the kind of person the narrator talks to, the setting — all must be new.
-- If you find yourself writing a sentence whose skeleton matches a sample sentence ("X was the only way to describe it"; "[object] had two moods"; "Everything in that place made a noise"), STOP and rewrite using different syntax. Matching sentence skeletons IS plagiarism for creative work.
-- A narrative essay that templates the samples fails the assignment outright, regardless of voice authenticity. Original scenes are the bar.`
+Your job: read the voice profile below, the self-report, and the assignment prompt. Then invent an original scene with its own subject, opening move, cast, setting, and ending. The subject must not be something the student has written about before (the profile may hint at their past topics — avoid them).
+
+Write in the student's voice as described. Let the voice live in sentence cadence, word choice, sensory attention, and analytical stance. Do NOT try to reproduce specific images, phrases, or paragraph structures you might have seen before — those are not part of this prompt.`
     : `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
 
 ${refSamples}
