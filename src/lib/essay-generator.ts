@@ -723,6 +723,12 @@ ${refSamples}
 
 Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.
 
+CRITICAL — the samples are VOICE references, NOT content sources:
+- Do NOT reuse specific sentences, dialogue lines, images, scenes, or concrete details from the samples. Borrow voice, rhythm, and analytical habits only.
+- Every sentence you write must be NEW prose composed for this assignment. Changing a noun from "dress" to "part" or "laundromat" to "garage" is not originality — it is plagiarism.
+- If you catch yourself templating a sample's structure (same opening move, same dialogue rhythm, same ending beat), STOP and write a different version in the same voice. Voice is in the syntax and word choice, not the furniture of the scene.
+- This rule is non-negotiable. A generated essay that templates the samples fails the assignment even if the voice feels similar.
+
 ---
 
 WRITER'S PROFILE (analyst's notes on this student's patterns):
@@ -878,6 +884,8 @@ export function buildLevel2AuditPrompt(
   return `STUDENT'S REAL WRITING — this is the reference standard:
 
 ${refSamples}
+
+CRITICAL — the samples above are VOICE references, NOT content. When you rewrite, do NOT import specific sentences, dialogue lines, images, or scenes from the samples into the essay. Borrow voice, rhythm, and analytical habits only. If you see sample language in the current essay, REPLACE it with original prose in the same voice rather than tolerating it. Copy-paste with noun swaps is plagiarism, not voice-matching.
 
 ---
 
