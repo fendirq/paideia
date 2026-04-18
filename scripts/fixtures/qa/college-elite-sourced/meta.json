@@ -1,0 +1,49 @@
+{
+  "label": "college-elite-sourced",
+  "targetWordCount": 1300,
+  "teacherProfile": {
+    "gradeLevel": "college junior",
+    "gradeOther": "",
+    "losesPointsFor": [
+      "dropped quotations",
+      "vague source attribution",
+      "descriptive rather than analytical body paragraphs"
+    ],
+    "losesPointsOther": ""
+  },
+  "selfAssessment": {
+    "gradeRange": "A-/A",
+    "gradeRangeOther": "",
+    "revisionLevel": "I do multiple revision passes and usually restructure paragraphs",
+    "revisionOther": "",
+    "evidenceApproach": "I build paragraphs around evidence and then explain what the evidence changes",
+    "evidenceOther": "",
+    "conclusionApproach": "I restate the main claim more sharply after considering the counterargument",
+    "conclusionOther": "",
+    "wordCountTendency": "I usually land close to the assigned length",
+    "wordCountOther": "",
+    "writingHabits": [
+      "I reuse a few transition patterns",
+      "I sometimes over-explain after quotations"
+    ],
+    "writingHabitsOther": "",
+    "quoteIntroStyle": [
+      "As al-Tabari writes",
+      "A later historian argues"
+    ],
+    "quoteIntroOther": "",
+    "overusedPhrases": [
+      "at the same time",
+      "that matters because"
+    ],
+    "overusedPhrasesOther": "",
+    "selfEditFocus": [
+      "tightening source integration",
+      "cutting repetition",
+      "strengthening topic sentences"
+    ],
+    "selfEditOther": "",
+    "timeSpentOn": "body paragraph evidence and commentary",
+    "timeSpentOther": ""
+  }
+}
