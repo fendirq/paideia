@@ -1,5 +1,6 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import { PORTAL_COOKIE_NAME, verifyPortalToken } from "@/lib/portal-auth";
 
 export default withAuth(
   function proxy(req) {
@@ -14,8 +15,8 @@ export default withAuth(
     const isPortalRoute = pathname.startsWith("/portal") || pathname.startsWith("/api/portal");
     const isPortalEntry = pathname === "/portal/access" || pathname === "/api/portal/verify-code";
     if (isPortalRoute && !isPortalEntry) {
-      const portalCookie = req.cookies.get("portal_access");
-      if (portalCookie?.value !== "granted") {
+      const portalCookie = req.cookies.get(PORTAL_COOKIE_NAME);
+      if (!verifyPortalToken(portalCookie?.value)) {
         if (pathname.startsWith("/api/")) {
           return NextResponse.json({ error: "Portal access required" }, { status: 403 });
         }
