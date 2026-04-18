@@ -32,7 +32,13 @@ import type {
   LegacyGenerateOptions,
 } from "@/lib/essay-generator";
 
-export const maxDuration = 300;
+// Bumped from 300 to 600s. The Level 2 pipeline can run up to ~7-10 passes
+// on complex sourced assignments (plan + draft + critique + audit +
+// expansion + evidence + attribution + compliance + trim + source-flow).
+// With Gemini thinking-mode adding 30-60s per call, a 300s budget was too
+// tight — codex-review flagged worst-case series exceeding maxDuration.
+// 600s gives room for a full pipeline under typical conditions with buffer.
+export const maxDuration = 600;
 
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // Level 1 model is env-driven so DeepSeek V3 vs Kimi (or any Together-hosted
@@ -40,14 +46,20 @@ const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // production behavior.
 const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
-// Timeouts sized for Gemini thinking-mode: each call burns a fixed
-// thinking budget (see providers/gemini.ts) on top of the visible-output
-// budget, so wall-clock latency can reach 2-3x what Opus 4.6 took.
-// Headroom added after a multirun validation timed out at 90s on draft.
-const LEVEL2_PLAN_TIMEOUT_MS = 120_000;
-const LEVEL2_DRAFT_TIMEOUT_MS = 240_000;
-const LEVEL2_CRITIQUE_TIMEOUT_MS = 120_000;
-const LEVEL2_REVISION_TIMEOUT_MS = 180_000;
+// Per-stage timeouts sized for Gemini thinking-mode (see providers/gemini.ts
+// for the thinking-budget cap). Kept intentionally modest so the full
+// pipeline worst-case stays under maxDuration with buffer.
+//   Typical stage latency on gemini-3.1-pro-preview:
+//     plan:     20-60s  (light context, short output)
+//     draft:    40-120s (heavy context, long output)
+//     critique: 20-40s  (medium context, short output)
+//     revision: 40-90s  (medium context, long output)
+// The timeouts below give ~1.5x typical so transient slowness doesn't
+// spuriously abort, but total pipeline stays well under maxDuration.
+const LEVEL2_PLAN_TIMEOUT_MS = 90_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 150_000;
+const LEVEL2_CRITIQUE_TIMEOUT_MS = 60_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 120_000;
 
 interface GenerateBody {
   assignment: string;
@@ -353,9 +365,13 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
 
     // Step 2: Sample-first draft
     const writingPrompt = buildLevel2WritingPrompt(opts, outline);
+    const isNarrativeDraft = isNarrativeAssignment(opts.assignment, opts.requirements);
+    const draftSystem = isNarrativeDraft
+      ? `You are ghostwriting a personal narrative / creative nonfiction essay in this student's recognizable voice, but at a polished A-range craft floor. Match the student's voice described in the profile — sentence cadence, sensory channel, dialogue habits — while inventing an entirely new scene, subject, and sequence of images. Creative nonfiction rewards scene construction and sensory specificity, not thesis and evidence; do not force an analytical structure onto narrative material.${opts.sourceContext ? " Craft scaffolds may be referenced lightly if useful but are not required evidence." : ""}`
+      : `You are ghostwriting an essay in this student's recognizable voice, but at a polished A-range quality floor. Study their writing samples as style references. Match their vocabulary preferences, sentence habits, and tone, but do not copy their weakest mistakes. The essay must be grammatically strong, thesis-driven, well-supported, and clearly argued.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`;
     const essayMsg = await provider.createLevel2Message({
       prompt: writingPrompt,
-      system: `You are ghostwriting an essay in this student's recognizable voice, but at a polished A-range quality floor. Study their writing samples as style references. Match their vocabulary preferences, sentence habits, and tone, but do not copy their weakest mistakes. The essay must be grammatically strong, thesis-driven, well-supported, and clearly argued.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
+      system: draftSystem,
       maxTokens: 5000,
       temperature: 0.55,
       timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,

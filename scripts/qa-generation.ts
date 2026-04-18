@@ -41,13 +41,15 @@ const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // checkpoint for longer-context assignments).
 const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
-// Timeouts sized for Gemini thinking-mode (see providers/gemini.ts).
-// 2-3x bigger than the Opus-era values; a multirun validation timed out
-// at 90s during Level 2 sourced draft generation.
-const LEVEL2_PLAN_TIMEOUT_MS = 120_000;
-const LEVEL2_DRAFT_TIMEOUT_MS = 240_000;
-const LEVEL2_REVISION_TIMEOUT_MS = 180_000;
-const JUDGE_TIMEOUT_MS = 180_000;
+// Per-stage timeouts sized for Gemini thinking-mode (see providers/gemini.ts).
+// Kept in sync with src/app/api/portal/generate/route.ts so QA harness and
+// production use identical budgets. Mild 1.5x headroom over typical stage
+// latency; not so big that a full pipeline exceeds 600s maxDuration in
+// production.
+const LEVEL2_PLAN_TIMEOUT_MS = 90_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 150_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 120_000;
+const JUDGE_TIMEOUT_MS = 120_000;
 
 // Provider is resolved lazily at call time so scripts that only run
 // Level 1 (Together AI) don't require GEMINI_API_KEY / ANTHROPIC_API_KEY.
@@ -529,7 +531,9 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     extractText(
       await provider.createLevel2Message({
         prompt: buildLevel2WritingPrompt(opts, outline),
-        system: `You are ghostwriting in the student's recognizable voice, but at a polished A-range quality floor. Match the student's style signatures without reproducing weak grammar or underdeveloped reasoning.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
+        system: isNarrative
+          ? `You are ghostwriting a personal narrative / creative nonfiction essay in this student's voice. Match the voice described in the profile — cadence, sensory channel, dialogue habits — while inventing an entirely new scene and subject. Creative nonfiction rewards scene construction and sensory specificity, not thesis and evidence; do not force analytical structure onto narrative material.${opts.sourceContext ? " Craft scaffolds may be referenced lightly if useful but are not required evidence." : ""}`
+          : `You are ghostwriting in the student's recognizable voice, but at a polished A-range quality floor. Match the student's style signatures without reproducing weak grammar or underdeveloped reasoning.${opts.sourceContext ? " Use the approved source material directly." : " Without a source packet, keep the factual specificity at the level of a well-prepared student rather than a textbook or historian."}`,
         maxTokens: 5000,
         temperature: 0.55,
         timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
@@ -597,7 +601,8 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
         baseEssay = expanded;
       }
     } catch {
-      baseEssay = revised || draft;
+      // Pass failure is non-fatal; keep current baseEssay so earlier
+      // successful passes are preserved (codex-review P2).
     }
   }
 
@@ -628,7 +633,8 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
         baseEssay = evidencePass;
       }
     } catch {
-      baseEssay = revised || draft;
+      // Pass failure is non-fatal; keep current baseEssay so earlier
+      // successful passes are preserved (codex-review P2).
     }
 
     if (opts.sourceContext || bounds.max) {
@@ -651,7 +657,7 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
           baseEssay = attribution;
         }
       } catch {
-        baseEssay = revised || draft;
+        // Pass failure is non-fatal; keep current baseEssay.
       }
     }
 
@@ -675,7 +681,8 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
         baseEssay = compliance;
       }
     } catch {
-      baseEssay = revised || draft;
+      // Pass failure is non-fatal; keep current baseEssay so earlier
+      // successful passes are preserved (codex-review P2).
     }
   }
 
@@ -702,7 +709,7 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
         baseEssay = trimmed;
       }
     } catch {
-      baseEssay = baseEssay;
+      // Pass failure is non-fatal; keep current baseEssay.
     }
   }
 
@@ -732,7 +739,7 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
         baseEssay = flowed;
       }
     } catch {
-      baseEssay = baseEssay;
+      // Pass failure is non-fatal; keep current baseEssay.
     }
   }
 

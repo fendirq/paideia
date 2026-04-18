@@ -6,8 +6,12 @@ export type { LLMMessage, LLMResponse, LLMProvider, LLMProviderName } from "./ty
 
 export function resolveProviderName(): LLMProviderName {
   const raw = process.env.LEVEL2_PROVIDER?.trim().toLowerCase();
-  if (raw === "gemini") return "gemini";
-  return "anthropic";
+  if (raw === "anthropic") return "anthropic";
+  // Default to Gemini post-migration. Environments that never set
+  // LEVEL2_PROVIDER should still work as long as GEMINI_API_KEY is
+  // configured. Anthropic stays available as an explicit opt-in for
+  // emergency fallback via the dormant provider wrapper.
+  return "gemini";
 }
 
 export function getProvider(name: LLMProviderName = resolveProviderName()): LLMProvider {

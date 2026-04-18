@@ -36,7 +36,12 @@ describe("provider factory", () => {
   });
 
   describe("resolveProviderName", () => {
-    it("defaults to anthropic when LEVEL2_PROVIDER is unset", () => {
+    it("defaults to gemini when LEVEL2_PROVIDER is unset", () => {
+      expect(resolveProviderName()).toBe("gemini");
+    });
+
+    it("returns anthropic when LEVEL2_PROVIDER=anthropic", () => {
+      process.env.LEVEL2_PROVIDER = "anthropic";
       expect(resolveProviderName()).toBe("anthropic");
     });
 
@@ -46,18 +51,18 @@ describe("provider factory", () => {
     });
 
     it("is case-insensitive", () => {
-      process.env.LEVEL2_PROVIDER = "GEMINI";
-      expect(resolveProviderName()).toBe("gemini");
-    });
-
-    it("falls back to anthropic on unknown values", () => {
-      process.env.LEVEL2_PROVIDER = "ollama";
+      process.env.LEVEL2_PROVIDER = "ANTHROPIC";
       expect(resolveProviderName()).toBe("anthropic");
     });
 
-    it("ignores surrounding whitespace", () => {
-      process.env.LEVEL2_PROVIDER = "  gemini  ";
+    it("defaults to gemini on unknown values", () => {
+      process.env.LEVEL2_PROVIDER = "ollama";
       expect(resolveProviderName()).toBe("gemini");
+    });
+
+    it("ignores surrounding whitespace", () => {
+      process.env.LEVEL2_PROVIDER = "  anthropic  ";
+      expect(resolveProviderName()).toBe("anthropic");
     });
   });
 
