@@ -10,7 +10,6 @@ import {
   inferWordCountBounds,
   normalizeSourceLinks,
   type ResolvedSource,
-  type SourceFetchFailure,
 } from "@/lib/source-context";
 import { fetchSourceContext } from "@/lib/source-fetch";
 import {
@@ -180,25 +179,34 @@ export async function POST(req: Request) {
   let sourceContext = "";
   if (normalizedSourceLinks.length > 0 || sourceText?.trim()) {
     let fetchedSources: ResolvedSource[] = [];
-    const sourceFailures: SourceFetchFailure[] = [];
     if (normalizedSourceLinks.length > 0) {
       const result = await fetchSourceContext(normalizedSourceLinks);
-      fetchedSources = result.resolved;
-      sourceFailures.push(...result.failures);
-      if (sourceFailures.length > 0) {
+      // Any fetch failure is a hard 400. Silently dropping one URL
+      // from a 3-URL packet would let generation proceed against an
+      // incomplete source set — the model could miss required
+      // evidence or citations the user expected to cover. The per-URL
+      // isolation in fetchSourceContext still pays off here by
+      // enumerating EVERY failed URL with its specific reason, so the
+      // user can fix them all in one pass instead of one at a time.
+      if (result.failures.length > 0) {
         console.warn("portal.generate: source fetch had failures", {
           userId: session.user.id,
-          failures: sourceFailures,
+          failures: result.failures,
         });
+        const detail = result.failures.map((f) => `${f.url}: ${f.reason}`).join("; ");
+        return NextResponse.json(
+          {
+            error: `Couldn't read ${result.failures.length} of ${normalizedSourceLinks.length} source link${normalizedSourceLinks.length > 1 ? "s" : ""} (${detail}). Fix the URL${result.failures.length > 1 ? "s" : ""} or paste source notes manually.`,
+          },
+          { status: 400 },
+        );
       }
+      fetchedSources = result.resolved;
     }
     sourceContext = formatSourceContextForPrompt(fetchedSources, sourceText);
     if (!sourceContext.trim()) {
-      const detail = sourceFailures.length > 0
-        ? ` (${sourceFailures.map((f) => `${f.url}: ${f.reason}`).join("; ")})`
-        : "";
       return NextResponse.json(
-        { error: `Unable to read the provided source links${detail}. Try a different link or paste source notes manually.` },
+        { error: "Unable to read the provided source material. Try a different link or paste source notes manually." },
         { status: 400 },
       );
     }
