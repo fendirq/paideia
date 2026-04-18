@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { buildStyleAnalysisPrompt } from "@/lib/essay-generator";
+import { getProvider } from "@/lib/providers";
 import { Prisma } from "@/generated/prisma/client";
-import Anthropic from "@anthropic-ai/sdk";
 
 export const maxDuration = 90;
 
@@ -22,26 +22,34 @@ interface AggregateBody {
 }
 
 async function analyzeStyle(samples: { label: string; content: string }[]): Promise<Prisma.InputJsonValue | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || !samples.length) return null;
+  if (!samples.length) return null;
+
+  let provider;
+  try {
+    provider = getProvider();
+  } catch {
+    // No LLM provider configured — skip style analysis rather than 500.
+    return null;
+  }
 
   const prompt = buildStyleAnalysisPrompt(samples);
-  const anthropic = new Anthropic({ apiKey });
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8000,
-      temperature: 0.2,
+    const response = await provider.createLevel2Message({
+      prompt,
       system: "You are a forensic writing analyst. Extract granular patterns from student writing samples. Every claim must cite specific words, phrases, or patterns directly from the text. Return only valid JSON.",
-      messages: [{ role: "user", content: prompt }],
-    }, { signal: AbortSignal.timeout(55_000) });
-
-    let content = response.content.length > 0 && response.content[0].type === "text"
-      ? response.content[0].text : "";
+      maxTokens: 8000,
+      temperature: 0.2,
+      timeoutMs: 90_000,
+      stageLabel: "style-analysis",
+      thinking: true,
+    });
 
     // Strip markdown code fences if present
-    content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    const content = response.text
+      .replace(/^```(?:json)?\s*\n?/i, "")
+      .replace(/\n?```\s*$/i, "")
+      .trim();
 
     const parsed = JSON.parse(content);
     return parsed as Prisma.InputJsonValue;

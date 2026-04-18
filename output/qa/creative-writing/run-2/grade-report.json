@@ -1,0 +1,134 @@
+{
+  "fixture": "creative-writing",
+  "timestamp": "2026-04-18T03:31:27.434Z",
+  "provider": {
+    "level1": {
+      "name": "together",
+      "model": "deepseek-ai/DeepSeek-V3"
+    },
+    "level2": {
+      "name": "gemini",
+      "model": "gemini-3.1-pro-preview"
+    },
+    "judge": {
+      "name": "gemini",
+      "model": "gemini-3.1-pro-preview"
+    }
+  },
+  "generations": [
+    {
+      "variant": "level1",
+      "sourced": false,
+      "essay": "The bell above the laundromat door did not know how to ring quietly. It was a little metal clatter, more metal than music. Every Friday after school, I pushed the door open and heard it, the sound announcing another evening of waiting. The room smelled like warm cotton and detergent, a kind of clean that was almost personal. The dryers sighed. The washers hummed. The floor was that speckled kind of tile that looks wet even when it’s dry.\n\nMy mother and I had a routine. We arrived with two baskets, one for lights and one for darks. She brought a thermos of coffee and a book of crossword puzzles. I brought headphones but almost never used them. There was something useful about the noise in that place, a rhythm you could fall into. By late afternoon the light came in through the big front window, thick and slow like honey.\n\nMrs. Rossi worked the counter. She had been there forever, my mother said, and knew every machine by its mood. “This one’s a little loud on the spin cycle,” she’d say, or “Don’t use number seven unless you want your clothes to come out damp.” She wore sweaters with small, careful stitches at the collar and kept her reading glasses on a chain around her neck.\n\nOne evening, our dryer stopped mid-cycle. The drum went quiet. The hum cut off. I looked at my mother, but she was already heading toward the counter. Mrs. Rossi came over with a screwdriver and a tired sigh. She knelt, opened a small metal door at the base, and reached inside. “Lint trap’s fine,” she said. “It’s the belt. It gets lazy sometimes.”\n\nShe tugged something. The machine shuddered once, then started again, louder than before. “There,” she said, wiping her hands on her jeans. “It just needed a reminder.” As she walked back to the counter, she added, “Machines forget what they’re for if you don’t use them right.”\n\nI used to think she meant the laundry machines. Now I think she meant all of us.\n\nDuring breaks between cycles, my mother and I sat on the orange plastic chairs and didn’t talk much. Sometimes she’d read a crossword clue out loud. Sometimes I’d watch the clothes tumble behind the round window. At one point she said, “You know, your grandmother used to hang everything on the line. Said the sun gave the towels a better smell.” I tried to picture it—white sheets snapping in the wind, the wooden pins like small, stubborn hands. But our yard was too small. So we came here instead.\n\nWhat I remember most is the sound of the change machine when someone put in a bill. A hollow glug, then coins dropping into the metal tray. Quarters for the machines. Nickels for the vending machine that sold soda that tasted like thin, sweet metal. One night a man came in with a single duffel bag. He stood by the door for a minute like he was waiting for permission. Mrs. Rossi nodded toward the washers. “Number three’s free,” she said. “Gentle cycle if you’ve got anything delicate.”\n\nHe didn’t answer, just moved to the machine and started loading clothes. When he was done, he sat near the window and stared at his hands. My mother finished her puzzle. I watched the second hand on the wall clock sweep its slow circle. Then Mrs. Rossi walked over and put two quarters on the table near his elbow. “For the dryer,” she said. “It likes to be fed.” He looked up, surprised. Nodded. Did not smile, but something in his shoulders softened.\n\nWhen our laundry was done, we folded everything warm from the dryer. My mother smoothed the wrinkles from my shirts. I matched socks. The room was quiet except for the rustle of fabric and the distant sound of traffic outside. “Ready?” she asked. I nodded. We carried the baskets out into the night air.\n\nI didn’t go to that laundromat forever. Eventually we got our own machine. It was quieter. More efficient. It did not need a belt reminded. But sometimes I missed the sound of other people’s laundry spinning. The way Mrs. Rossi knew which machine was having an off day. The way the room held everyone’s Friday evenings in its warm, humming belly.\n\nThe room was a machine for returning. Maybe that is why I liked it more as I got older. Not because of the clean clothes, but because of the waiting. The small, patient rituals. The way Mrs. Rossi treated every machine—and every person—as if they had a story hidden in their seams.\n\nNow when I do laundry in my own quiet apartment, I think about that bell above the door. How it did not know how to ring softly. How it announced you whether you were ready or not. And I think about the dryers sighing, the washers humming, the quarters dropping like little metal promises. Most of all, I think about how some places teach you how to wait. And how to listen for what comes after the waiting.",
+      "wordCount": 849,
+      "heuristics": {
+        "heuristicAiResistance": 6,
+        "heuristicAuthenticity": 8,
+        "maxRepeatedOpenerRun": 4,
+        "maxTransitionReuse": 1,
+        "sentenceStdDev": 7.1
+      },
+      "judge": {
+        "aiDetectionResistance": 5,
+        "sampleAccuracy": 3,
+        "rubricAccuracy": 4,
+        "evidenceHandling": 7,
+        "overallWriting": 5,
+        "voiceNaturalness": 5,
+        "sourceIntegration": 10,
+        "academicQuality": 5,
+        "overallVerdict": "The essay completely fails the length requirement, coming in at 849 words against a strict 1100-1400 word range. Worse, rather than generating a new lived experience that mimics the author's stylistic voice, the AI simply plagiarized setting, characters, and direct quotes from the provided samples (e.g., 'more metal than music,' 'The room was a machine for returning,' 'hollow glug'). This results in a Frankenstein text rather than an original creative nonfiction essay.",
+        "strengths": [
+          "Captures the sensory detail and pacing style of the original samples.",
+          "Follows the correct formatting and paragraphing structures."
+        ],
+        "weaknesses": [
+          "Drastically under the minimum word count of 1100 words.",
+          "Plagiarizes exact phrases and entire premises from the reference samples instead of applying the voice to a new topic.",
+          "Lacks original narrative discovery, relying instead on heavily recycled 'lessons' from the prompts."
+        ],
+        "priorityFixes": [
+          "Expand the word count to meet the 1100-1400 word requirement.",
+          "Generate a completely new personal narrative topic instead of reusing the laundromat setting from Sample 1.",
+          "Ensure zero exact phrases from the training samples ('machine for returning', 'more metal than music') appear in the generated text."
+        ]
+      }
+    },
+    {
+      "variant": "level2",
+      "sourced": false,
+      "essay": "When I went down the wooden stairs into my grandfather's basement workshop, the heavy air hit me right away. It smelled like brass polish, dry sawdust, and the metallic bite of machine oil. The stairs always creaked on the fourth step, a loud groan that announced my arrival before I even reached the bottom. It was a strange space that felt completely disconnected from the bright house above. My grandmother would be upstairs watching television, the sunlight pouring over the carpet, but down here it was always twilight. The cinderblock walls were lined with pegboards holding tiny pliers, tweezers, and little jars of screws organized by sizes I could not even see. On the back table, wooden clock bodies waited for attention. Some were missing faces entirely, looking like blank wooden skulls. I used to think the room itself was a kind of machine, constantly humming beneath the floorboards. Mostly I liked just standing on the bottom step, letting my eyes adjust to the dim light. It felt almost sacred. A workshop. A church. A place to hold your breath.\n\nMy grandfather was already down there, of course. He spent most of his retirement hunched over that workbench, wearing a canvas apron that looked stiff with age and grease. He did not play music. He did not leave a small radio on for background noise like my dad did when working in the garage. He just sat under a swinging bulb, completely still. When I walked over to him, he was looking at a heavy antique mantle clock sitting dead center on his large wooden bench. The wood was scratched deeply on one side, and the glass over the face had a diagonal crack that caught the overhead light. My grandfather told me a neighbor had brought it over in a cardboard box, apologizing for the dust. The broken clock did not want to be touched by anyone. It sat there while my grandfather adjusted his glasses and studied its base, brushing away a layer of dirt with his thumb. Objects usually carry their own attitudes when they're broken or left behind. Because of course, a clock that can't keep time is just an empty box. It felt angry about being useless. Stubborn. Silent. A grudge in a wood case.\n\nSomewhere in the back of the workshop, dozens of other clocks ticked endlessly against the walls. There were tall grandfather clocks waiting for new weights, heavy brass carriage clocks, and small travel alarms. They created a noise that filled every corner of the space. It wasn't a steady rhythm. It was a collision of metal gears and swinging pendulums that chimed at all the wrong times. Every few minutes, a random bell would strike, or a wooden bird would snap out of a door and retreat. I used to think the noise would drive a normal person absolutely crazy. You could never find a quiet second to think. But my grandfather moved through it like he was walking through a gentle rain. He just listened for a minute before picking up a small screwdriver.\n\n\"It sounds like panic,\" I said once, putting my hands over my ears.\n\nMy grandfather didn't look up from the dial. \"You have to let them complain first,\" he said quietly. \n\nHe heard it all. The pauses. The dragging beats. The friction of metal wanting oil.\n\nBy late afternoon, we finally started taking the broken clock apart. We worked side by side at the heavy bench while the ticking surrounded our slow labor. I remember watching him undo the tiny brass screws, laying them out in a perfect row on a white rag. He placed each piece left to right so the machine could remember how to go back together. Gear. Washer. Pin. I asked if he needed me to write down a map of the pieces, because the pile of metal looked completely impossible to memorize. I thought one sneeze would ruin the entire afternoon.\n\n\"No,\" he said, handing me a small gear to clean with a stiff brush. \"They know where they belong. We just have to remind them.\"\n\nThis was the kind of thing he said constantly, half instruction and half philosophy. He didn't treat clocks like broken toys or puzzles. He treated them like they were holding their breath and needed permission to exhale. I sat on a wooden stool and scrubbed the teeth of a brass wheel until my fingers smelled like solvent. The afternoon stretched out.\n\nThe process was incredibly slow. My grandfather had thick fingers that looked like they belonged on a construction site, but they moved with shocking precision. Sometimes he would hold a single piece under his magnifying glass for ten minutes, just looking at a worn edge. He applied oil with a tool that looked like a sewing needle, leaving just a microscopic drop on a pivot. He showed me how too much oil would just attract dust and stop the whole thing again. At one point, a tiny spring jumped from his tweezers and vanished onto the concrete floor. We spent twenty minutes on our hands and knees with a flashlight looking for it. When I finally found it resting near the leg of the stool, he did not cheer. He just held out his hand.\n\n\"Good,\" he said. \"Now it stops hiding.\"\n\nI watched him drop the spring back into place. It clicked. It was a tiny sound, barely a snap, but in a room full of noise, that one click felt huge. It meant the tension was right again. It meant the gear would catch. I realized then that my grandfather wasn't just replacing parts. He was learning the specific language of this exact clock. He was figuring out where it hurt. A spring. A gear. A tiny drop of oil.\n\n\"Time isn't just math,\" he told me later, wiping his hands on a clean section of the rag. \"Usually it's patience.\"\n\nWhen he finally set the pendulum on its hook and gave it a small push, the clock hesitated. The brass disc swung left, then right, and caught the rhythm. It was a solid, deep sound. It cut right through the random noise of the basement. It fit the room perfectly. My grandfather closed the glass door over the face, taking care not to press on the crack. The clock still looked old, maybe even tired, but it was awake. I still think about that afternoon when I look at the old clocks sitting on shelves today. I realize now that repairing them wasn't really about fixing a machine at all. It was about paying attention to something until it learned how to speak again. It was about giving an empty room a heartbeat. A routine. A rescue. A hand at the back of a heavy box.",
+      "wordCount": 1135,
+      "heuristics": {
+        "heuristicAiResistance": 9,
+        "heuristicAuthenticity": 10,
+        "maxRepeatedOpenerRun": 4,
+        "maxTransitionReuse": 1,
+        "sentenceStdDev": 6.65
+      },
+      "judge": {
+        "aiDetectionResistance": 7,
+        "sampleAccuracy": 4,
+        "rubricAccuracy": 6,
+        "evidenceHandling": 8,
+        "overallWriting": 5,
+        "voiceNaturalness": 3,
+        "sourceIntegration": 10,
+        "academicQuality": 6,
+        "overallVerdict": "The essay closely follows the prompt and hits the word count, but it is entirely derivative of the provided writing samples. It acts as a 'Mad Libs' template, lifting the exact syntactic structures, pacing, and specific stylistic quirks of the samples and simply swapping in clock-repair terminology.",
+        "strengths": [
+          "Meets the target word count.",
+          "Successfully incorporates concrete sensory details (brass polish, dry sawdust).",
+          "Maintains a clear narrative arc with scene-based pacing."
+        ],
+        "weaknesses": [
+          "Plagiarizes the stylistic structures of the provided samples. For example, 'A routine. A rescue. A hand at the back of a heavy box' directly copies Sample 2's 'A hem. A pin. A hand at your back making a thing sit right.'",
+          "Lifts dialogue structures verbatim: 'Time isn't just math... Usually it's patience' is a direct copy of Sample 3's 'People think performance is what matters. Usually it's timing.'",
+          "The voice feels incredibly artificial because it is mechanically pasting together the pacing and sentence variations of four distinct student samples."
+        ],
+        "priorityFixes": [
+          "Write an original narrative rather than doing a find-and-replace on the student samples.",
+          "Develop a unique rhythm and ending reflection instead of mimicking the exact paragraph-level beats of the reference texts.",
+          "Use the samples to understand the *vibe* and *level* of the student, not as a rigid syntactic blueprint."
+        ]
+      }
+    },
+    {
+      "variant": "level2-sourced",
+      "sourced": true,
+      "essay": "The back room of Arthur's mower shop always smelled like stale gasoline and wet dust. I used to think the smell belonged to the machines themselves. Maybe it was leaking slowly out of cracked fuel lines and rusted carburetors that we stacked on the wooden workbench like bones. Next to them were glass jars of assorted screws, some floating in dirty amber oil to keep from rusting. But the real lung of the little room was the red cast-iron air compressor sitting in the corner. It was a nervous roommate. It had a peeling yellow sticker on its side, and a thick black hose coiled around its base like a sleeping snake. Whenever the pressure dropped too low, the compressor did not ask for permission to turn on. Instead, it rattled the floorboards with a sudden, violent shudder that forced us to stop talking. The heavy wrenches on the metal table would vibrate. The dust motes would suddenly dance in the slanted window light. It sounded like an angry metallic heartbeat. Mostly I liked how it sounded when the tank was finally full. The heavy motor would choke off. The pressure valve released a sharp hiss. A heavy sigh. Then, silence.\n\nBy late afternoon on most weekdays, I stood next to Arthur and scraped dried grass off mower decks. I started working there when I was fifteen, mostly sweeping the concrete floor and organizing the pegboard of heavy wrenches that always seemed to magically rearrange itself overnight. The push brooms had stiff, frayed bristles that made a hollow scuffing noise against the cement. Over time, Arthur let me use the air hose to blow the dust out of clogged engine filters. He didn't talk much. He was a tall, stooped man who wore faded blue work shirts with his name embroidered in white cursive above the pocket. He worked with a strange, heavy rhythm. He leaned over the bench with his reading glasses slipping down his nose while the compressor hummed quietly in the background to keep time. If a bolt was stripped, he did not throw a fit. He just breathed out through his nose and reached for the vice grips. I remember asking him once how he knew which way to tilt a flooded engine without spilling the carburetor bowl. He wiped his hands on a rag and pointed with his chin. \"Water falls,\" he said. \"Gasoline hides.\" It almost felt like a perfectly closed loop where broken things simply came in and walked out fixed. Or maybe I just wanted it to be. Just an exchange. Dirt for clean. Broken for turning.\n\nTuesdays were usually for walk-behinds. Thursdays were for chainsaws. The rhythm of the week was dictated by whatever suburban machinery had surrendered to tall grass or bad oil. Sometimes a customer would come in angry, slapping a plastic engine cover on the front counter. They usually claimed they had done nothing wrong. The machine just died. Arthur never argued with them. He just nodded, tagged the handle with a wire tie, and wheeled it back to us. \"People lie to mechanics and doctors,\" he told me one rainy afternoon, sliding a socket onto a silver ratchet. The rain sounded like handfuls of gravel thrown against the aluminum roof. \"The spark plug does not lie.\" He hooked the socket onto the plug and pulled. The ratchet made a rapid clicking noise. Click-click-click. Fast and sharp. He held up the plug, its tip blackened and fouled with thick soot. \"Too much choke,\" he said. He tossed it into the metal trash can. It hit the bottom with a bright ping. He treated the tools like extensions of his own hands. A wrench was not just a piece of steel. It was a way to ask a small engine a question.\n\nOne evening during my second summer, a landscaper brought in a commercial tiller that had seized up entirely. The landscaper was a sunburned guy who paced back and forth, jingling his truck keys, until Arthur politely suggested he go get a coffee. Once the front door clicked shut, the real work started. The machine was massive, caked in dried red clay, and smelled vaguely like rotting leaves. Its iron tines were locked. The engine rope would not pull even a quarter inch. Arthur spent almost an hour tapping the engine block with a rubber mallet. He was trying to coax the rusted metal apart without cracking the delicate casing, and I stood quietly by the parts bin and watched. He used a small spray can of penetrating oil. He sprayed the seams, waited, and tapped again. Every time he struck the metal, a hollow clink echoed around the empty room. It sounded kind of like a bell heard from underwater. He moved around the machine in a slow circle. Tap. Pause. Tap. He was not trying to break it. He was listening to the resonance. When iron is stuck, the sound is dead. When it starts to give, the pitch changes. It gets lighter. Almost hopeful. He finally set the heavy mallet down, wiped his grease-stained hands on a gray rag, and looked at the stubborn machine. \"You can't force iron,\" he said quietly. \"You just have to remind it it can move.\" Not a rule. Just a fact.\n\nI tried to fix a weed trimmer myself the very next week. I wanted to prove I had picked up some of his magic. It was a bright orange Echo, light but stubborn. The kind of machine that always seemed to flood if you looked at it wrong. I pulled the starter cord until my shoulder ached and the plastic handle left a red crease across my palm. The engine sputtered, coughed a puff of blue smoke, and died again. I grabbed a flathead screwdriver, ready to rip the carburetor apart, feeling a hot spike of frustration. The screwdriver slipped and scratched the plastic casing. Arthur was sweeping near the front door. He did not look up from his broom, but the scuffing stopped. \"You're angry at the string,\" he called out to the front window. \"But the problem is the spark.\" I let go of the handle. I stopped trying to force it. I took out the spark plug, wiped the carbon off the tip, put it back, and pulled the cord gently. The trimmer fired up with a high, buzzing scream. Arthur went back to sweeping. He didn't say I did a good job. He didn't have to. The machine was running. That was the only praise the room recognized. A clean idle. A steady hum.\n\nWhat I remember most about that shop wasn't the smell of the gas or the dark grease permanently wedged under my fingernails. It was the waiting. So much of the labor was just listening to the machines, waiting for the metal to cool or the compressor to fill. Waiting for the chemical bath to eat through years of baked-on carbon. Waiting for the penetrating oil to creep into the invisible threads of a rusted bolt. Sometimes we sat on overturned paint buckets while we waited. We drank bitter coffee from styrofoam cups. We did not speak. The street traffic outside sounded distant, muffled by the cinderblock walls. I still think about that when a room goes totally quiet. People treat silence like it is empty. Like a void that needs to be frantically filled with music or talking or panic. But in Arthur's shop, silence was a tool we used to figure out what was broken. It was the space where you could hear the subtle hiss of a leaky valve. The tiny drip of a loose fuel line. The room was a machine for listening. Maybe that is why I remember it so clearly. I do not fix mowers anymore. My hands are usually clean. But I still carry that heavy rhythm with me. Some places just teach you how to hear things. The useful things. The quiet things.",
+      "wordCount": 1330,
+      "heuristics": {
+        "heuristicAiResistance": 9,
+        "heuristicAuthenticity": 10,
+        "maxRepeatedOpenerRun": 4,
+        "maxTransitionReuse": 1,
+        "sentenceStdDev": 6.16
+      },
+      "judge": {
+        "aiDetectionResistance": 8,
+        "sampleAccuracy": 9,
+        "rubricAccuracy": 10,
+        "evidenceHandling": 10,
+        "overallWriting": 9,
+        "voiceNaturalness": 8,
+        "sourceIntegration": 10,
+        "academicQuality": 9,
+        "overallVerdict": "The essay is an extremely faithful, almost uncanny imitation of the student's voice. It successfully captures the student's signature moves: personifying objects, centering a mentor who speaks in aphorisms, and building meaning through sensory attention. However, it relies slightly too heavily on the exact formulas of the samples.",
+        "strengths": [
+          "Masterful use of concrete sensory details (stale gas, clicking ratchets, heavy mallets).",
+          "Pacing and sentence structure closely match the student's preference for short, punchy, declarative sentences.",
+          "The dialogue feels natural and aligns perfectly with the mentor figures in the samples."
+        ],
+        "weaknesses": [
+          "Directly copies the rhetorical structure of Sample 1 ('The room was a machine for returning' becomes 'The room was a machine for listening').",
+          "Over-relies on 'He/The/It' sentence openers, leading to some mechanical choppiness in the middle paragraphs."
+        ],
+        "priorityFixes": [
+          "Revise the phrase 'The room was a machine for listening' to arrive at the essay's meaning more organically without copying the student's exact template.",
+          "Vary sentence openers in the paragraph where Arthur works on the tiller to avoid the repetitive 'He [did X]' structure."
+        ]
+      }
+    }
+  ]
+}

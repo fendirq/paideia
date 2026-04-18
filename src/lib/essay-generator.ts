@@ -664,6 +664,29 @@ The outline should include:
 Keep it structural. Do NOT include voice instructions, style notes, phrase placements, or writing tips. Structure only.`;
 }
 
+/**
+ * Detect narrative/creative assignments from rubric + prompt keywords. For
+ * creative writing, the samples are full-text scenes with specific imagery;
+ * "match the voice" easily collapses into "template the specific scenes."
+ * Phase 3 stress test surfaced this — creative-writing scored overall 4/10
+ * with mad-libs-style plagiarism while argumentative fixtures scored 8-9.
+ */
+export function isNarrativeAssignment(assignment: string, requirements?: string): boolean {
+  const text = `${assignment}\n${requirements ?? ""}`.toLowerCase();
+  const signals = [
+    "personal narrative",
+    "creative nonfiction",
+    "narrative essay",
+    "memoir",
+    "scene construction",
+    "scene vs summary",
+    "sensory detail",
+    "lived experience",
+    "first-person narrative",
+  ];
+  return signals.some((signal) => text.includes(signal));
+}
+
 // ─── Level 2 Writing Prompt (sample-first generation) ───
 
 export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
@@ -671,6 +694,7 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
 
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
+  const isNarrative = isNarrativeAssignment(assignment, requirements);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -717,11 +741,19 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
     selfReportedLines.push(`- They spend the most time polishing: ${timeSpent}`);
   }
 
-  return `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
+  return `${isNarrative
+    ? `NARRATIVE VOICE REFERENCE — you will work from the structured voice profile below, NOT from the student's raw prior essays.
+
+This is deliberate: narrative voice is easy to describe abstractly (sentence rhythm, sensory channel, dialogue habits, attention patterns) but raw sample text causes structural plagiarism. Gemini's attention on concrete sample sentences overrides abstract instructions "not to copy" — we avoid that trap by keeping the samples out of your context.
+
+Your job: read the voice profile below, the self-report, and the assignment prompt. Then invent an original scene with its own subject, opening move, cast, setting, and ending. The subject must not be something the student has written about before (the profile may hint at their past topics — avoid them).
+
+Write in the student's voice as described. Let the voice live in sentence cadence, word choice, sensory attention, and analytical stance. Do NOT try to reproduce specific images, phrases, or paragraph structures you might have seen before — those are not part of this prompt.`
+    : `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
 
 ${refSamples}
 
-Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.
+Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.`}
 
 ---
 
@@ -747,7 +779,33 @@ ${outline}
 
 ---
 
-CRITICAL GUIDELINES — follow these in order of priority:
+${isNarrative ? `NARRATIVE CRAFT GUIDELINES — follow these in priority order (thesis-and-evidence rules DO NOT apply here):
+
+1. SCENE OVER SUMMARY (MANDATORY):
+Ground the essay in at least 2-3 concrete scenes. Show what happened, not what it meant. Scenes need time, place, action, and at least one sensory detail per paragraph. Do NOT lead paragraphs with thesis statements or analytical claims.
+
+2. VOICE FINGERPRINT (MANDATORY):
+${fingerprint.voice.contractions ? "- Contractions: the student uses them naturally. Keep that rhythm where it fits." : "- Match the student's formality level without forcing contractions."}
+${fingerprint.voice.toneDescription ? `- Tone: ${fingerprint.voice.toneDescription}. Preserve that register.` : ""}
+Narrative voice lives in sentence cadence, sensory attention, and dialogue handling — not in analytical transitions. Do NOT use "that matters because," "this shows," or "in other words" — those belong in argumentative writing.
+
+3. SENTENCE VARIETY:
+Vary sentence length for readability and rhythm. Avoid 3+ consecutive sentences of similar length.
+
+4. ORIGINAL IMAGES AND DIALOGUE (MANDATORY):
+Every concrete detail (object, setting, dialogue line) must be invented for this assignment. Do NOT reuse images, scenes, or dialogue structures that echo the student's prior work.
+
+5. NO ANALYTICAL SCAFFOLDING:
+Narrative essays do NOT need a thesis, body paragraphs with evidence-explanation-significance, or a restated-thesis conclusion. Let meaning emerge from scene and detail. Over-explaining the "lesson" breaks immersion and tanks the craft score.
+
+6. TARGET: ~${wordCount} words.
+
+AVOID THESE NARRATIVE FAILURE MODES:
+- Breaking the fourth wall to cite class notes, the rubric, or craft expectations
+- Starting or ending with a generic reflection like "I learned that..." or "This experience taught me..."
+- Over-qualified metaphors ("it was, in some ways, like...") — commit to the image
+
+Write the essay now. Return ONLY the essay text, no commentary or headers.` : `CRITICAL GUIDELINES — follow these in order of priority:
 
 1. PARAGRAPH STRUCTURE (MANDATORY):
 Each body paragraph MUST contain ${fingerprint.structure.avgParagraphLength} sentences (±1). Follow: "${fingerprint.structure.bodyParagraphPattern}". ${getLevel2ParagraphGuidance(wordCount)} Count your sentences per paragraph before finishing.
@@ -794,7 +852,7 @@ This must read like the strongest, most educated version of this writer.
 AVOID THESE AI-DETECTOR RED FLAGS:
 "delve into", "it's important to note", "in today's society", "furthermore", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament", "serves as a powerful", "devastating portrait", "compelling narrative"
 
-Write the essay now. Return ONLY the essay text, no commentary or headers.`;
+Write the essay now. Return ONLY the essay text, no commentary or headers.`}`;
 }
 
 // ─── Level 2 Critique Prompt (pass 3 — mismatch diagnosis) ───
@@ -871,13 +929,24 @@ export function buildLevel2AuditPrompt(
   samples: Sample[],
   critiqueNotes?: string,
   sourceContext?: string,
+  assignment?: string,
+  requirements?: string,
 ): string {
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
+  const isNarrative = isNarrativeAssignment(assignment ?? "", requirements);
 
-  return `STUDENT'S REAL WRITING — this is the reference standard:
+  const referenceBlock = isNarrative
+    ? `STUDENT'S VOICE PROFILE (narrative mode — raw samples withheld to prevent structural plagiarism):
 
-${refSamples}
+${narrative}
+
+For narrative assignments we do NOT show you the student's raw prior essays. Rewrite based on the voice profile above and on what the current essay is already doing well. If a sentence in the current essay looks like it was lifted from something elsewhere, REPLACE it with an original sentence in the same cadence — do not "fix" it by pulling toward external text.`
+    : `STUDENT'S REAL WRITING — this is the reference standard:
+
+${refSamples}`;
+
+  return `${referenceBlock}
 
 ---
 

@@ -1,0 +1,55 @@
+{
+  "label": "creative-writing",
+  "targetWordCount": 1200,
+  "teacherProfile": {
+    "gradeLevel": "college first-year creative writing seminar",
+    "gradeOther": "",
+    "losesPointsFor": [
+      "telling instead of showing",
+      "generic language",
+      "no sensory detail",
+      "summary instead of scene"
+    ],
+    "losesPointsOther": ""
+  },
+  "selfAssessment": {
+    "gradeRange": "B+/A-",
+    "gradeRangeOther": "",
+    "revisionLevel": "I write in messy drafts, then read the essay out loud and cut the lines that sound fake",
+    "revisionOther": "",
+    "evidenceApproach": "I do not think in terms of formal evidence; I build around scenes, repeated images, and small objects that can carry meaning",
+    "evidenceOther": "",
+    "conclusionApproach": "I usually end by circling back to an image or sound instead of stating a clean lesson",
+    "conclusionOther": "",
+    "wordCountTendency": "I usually land close to the target, but I overwrite certain passages when I get attached to an image",
+    "wordCountOther": "",
+    "writingHabits": [
+      "I start paragraphs with a sensory detail before I explain why it matters",
+      "I struggle with scene pacing and sometimes summarize too fast between vivid moments",
+      "I overuse metaphor when I get nervous",
+      "I like wistful endings even when the piece might need a sharper stop"
+    ],
+    "writingHabitsOther": "",
+    "quoteIntroStyle": [
+      "In the craft essay we read",
+      "One line from workshop that stuck with me was"
+    ],
+    "quoteIntroOther": "",
+    "overusedPhrases": [
+      "for a second",
+      "I still think about",
+      "not exactly",
+      "like it had a pulse"
+    ],
+    "overusedPhrasesOther": "",
+    "selfEditFocus": [
+      "cutting the prettiest line if it is doing no work",
+      "making sure scenes are actually on the page",
+      "trimming metaphors that feel too decorated",
+      "reading for rhythm out loud"
+    ],
+    "selfEditOther": "",
+    "timeSpentOn": "openings, paragraph rhythm, and the last few lines",
+    "timeSpentOther": ""
+  }
+}
