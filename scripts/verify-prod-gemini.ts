@@ -14,7 +14,13 @@ async function main(): Promise<void> {
   console.log("ANTHROPIC_API_KEY present:", Boolean(process.env.ANTHROPIC_API_KEY));
   console.log("Resolved provider:", resolveProviderName());
 
-  const provider = getProvider();
+  // Always instantiate Gemini explicitly — this script exists to validate
+  // GEMINI_API_KEY specifically. Falling through to resolveProviderName()
+  // would silently build Anthropic in any env where LEVEL2_PROVIDER is
+  // unset or still set to "anthropic", and the smoke test would pass
+  // without touching Gemini at all — a false positive in exactly the
+  // rollout scenario this script is meant to verify.
+  const provider = getProvider("gemini");
   const res = await provider.createLevel2Message({
     system: "You are a terse assistant. Reply in exactly five words.",
     prompt: "Say hello from Gemini.",
