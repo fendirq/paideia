@@ -123,6 +123,17 @@ function passesRevisionLengthFloor(text: string, targetWordCount: number, curren
   return revisedWords >= Math.max(Math.floor(targetWordCount * 0.7), currentWords - 120);
 }
 
+// The trim pass exists specifically to cut content, so the
+// `currentEssay - 120` delta from `passesRevisionLengthFloor` does not
+// apply — a valid trim from, say, 1350 → 1050 would always fail the
+// revision floor and leave the overlong essay in place. Enforce only
+// the absolute floor: rubric minimum (if known) or 70 % of target.
+function passesTrimLengthFloor(text: string, targetWordCount: number, rubricMin: number | null): boolean {
+  const revisedWords = countWords(text);
+  const floor = Math.max(rubricMin ?? 0, Math.floor(targetWordCount * 0.7));
+  return revisedWords >= floor;
+}
+
 function isWithinMaxWords(text: string, maxWords: number | null): boolean {
   return maxWords == null || countWords(text) <= maxWords;
 }
@@ -608,7 +619,7 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
       const trimmedEssay = sanitizeEssayOutput(trimMsg.text);
       if (
         isUsableEssayCandidate(trimmedEssay, opts.wordCount) &&
-        passesRevisionLengthFloor(trimmedEssay, opts.wordCount, baseEssay) &&
+        passesTrimLengthFloor(trimmedEssay, opts.wordCount, bounds.min) &&
         (isWithinMaxWords(trimmedEssay, bounds.max) || countWords(trimmedEssay) < countWords(baseEssay))
       ) {
         baseEssay = trimmedEssay;
