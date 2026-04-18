@@ -86,12 +86,23 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role ?? null;
         token.roleCheckedAt = Date.now();
       }
-      // Refresh role from DB: immediately if null (onboarding), otherwise every 5 min
+      // Refresh role from DB. Two cadences:
+      //   - Role populated and stale: 5-min refresh window — the role
+      //     is valid, we just want to pick up admin/role changes.
+      //   - Role null (post-onboarding, legacy token, or prior
+      //     refresh returned null): retry at 10-second intervals so
+      //     the user recovers role access quickly without hammering
+      //     the DB.
+      // Any refresh attempt — success or failure — stamps
+      // `roleCheckedAt`, so the cooldown applies uniformly and a
+      // brief DB outage can't turn into per-request DB amplification.
       const ROLE_REFRESH_MS = 5 * 60 * 1000;
-      const neverFetched = token.roleCheckedAt === undefined;
-      const stale = !neverFetched && Date.now() - token.roleCheckedAt! > ROLE_REFRESH_MS;
+      const NULL_ROLE_RETRY_MS = 10_000;
       const roleIsNull = token.role === null || token.role === undefined;
-      if (token.userId && (neverFetched || stale || roleIsNull)) {
+      const cooldownMs = roleIsNull ? NULL_ROLE_RETRY_MS : ROLE_REFRESH_MS;
+      const neverFetched = token.roleCheckedAt === undefined;
+      const cooledDown = !neverFetched && Date.now() - token.roleCheckedAt! >= cooldownMs;
+      if (token.userId && (neverFetched || cooledDown)) {
         try {
           const dbUser = await db.user.findUnique({
             where: { id: token.userId as string },
@@ -100,34 +111,19 @@ export const authOptions: NextAuthOptions = {
           token.role = dbUser?.role ?? null;
           token.roleCheckedAt = Date.now();
         } catch (err) {
-          // A transient DB failure (connection pool exhausted on cold
-          // start, brief Neon outage, etc.) must not cascade into a
-          // global 401 by blanking the role. Keep whatever role was
-          // already on the token and retry on the next JWT refresh.
-          // On the very first JWT refresh (neverFetched && no prior
-          // role) we have nothing to keep — in that case surfacing the
-          // error is the right call since the token is unusable.
           console.error("auth.jwt: role refresh from DB failed", {
             userId: token.userId,
             neverFetched,
             roleIsNull,
             err,
           });
+          // On the very first JWT refresh (neverFetched && no prior
+          // role) we have nothing to keep — surface the error so the
+          // token is re-issued. Otherwise keep the cached role and
+          // stamp the cooldown so the next request in the cooldown
+          // window skips this branch entirely.
           if (neverFetched) throw err;
-          if (roleIsNull) {
-            // Null-role recovery: applying the full 5-min cooldown
-            // would keep the middleware rejecting /app/classes and
-            // /app/teacher even after the DB recovers. Use a 10s
-            // cooldown instead — still caps DB amplification during
-            // a sustained outage, but recovers fast once the DB is
-            // back.
-            token.roleCheckedAt = Date.now() - (ROLE_REFRESH_MS - 10_000);
-          } else {
-            // Stale-role refresh failure: the existing role is still
-            // valid; full 5-min cooldown prevents log-flood and DB
-            // amplification during a transient hiccup.
-            token.roleCheckedAt = Date.now();
-          }
+          token.roleCheckedAt = Date.now();
         }
       }
       return token;

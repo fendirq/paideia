@@ -454,11 +454,18 @@ function bestSourceReference(
 /**
  * Extracts the sentence containing the match at `offset` — used to
  * feed surrounding context into `bestSourceReference`.
+ *
+ * The backward search must cover `.`, `!`, `?`, and newline — if we
+ * only split on `.` and `\n`, a citation following a question or
+ * exclamation folds the prior sentence into the scoring corpus, so
+ * `Was the Battle of the Zab decisive? According to the source,
+ * Baghdad...` attributes to the Zab source instead of the Baghdad
+ * one.
  */
 function sentenceContaining(fullText: string, offset: number, matchLength: number): string {
-  const start = fullText.lastIndexOf(".", Math.max(0, offset - 1));
-  const nlStart = fullText.lastIndexOf("\n", Math.max(0, offset - 1));
-  const sentenceStart = Math.max(start, nlStart, -1) + 1;
+  const searchUpTo = Math.max(0, offset - 1);
+  const boundaries = [".", "!", "?", "\n"].map((c) => fullText.lastIndexOf(c, searchUpTo));
+  const sentenceStart = Math.max(...boundaries, -1) + 1;
   const afterMatch = offset + matchLength;
   const endMarks = [".", "!", "?", "\n"].map((c) => fullText.indexOf(c, afterMatch)).filter((i) => i !== -1);
   const sentenceEnd = endMarks.length > 0 ? Math.min(...endMarks) : fullText.length;

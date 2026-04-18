@@ -665,6 +665,27 @@ describe("normalizeSupportedSourceAttribution", () => {
     expect(result).toContain("As al-Tabari shows");
   });
 
+  it("treats ? and ! as sentence boundaries for source scoring", () => {
+    // A question sentence followed by a citation in the next sentence
+    // must not leak the question's topic into the citation's scoring
+    // corpus. Before the fix, `sentenceContaining` only looked
+    // backward for `.` and `\n`, so the Zab-topic question got folded
+    // into the Baghdad-topic citation and mis-attributed.
+    const sourceContext = [
+      "APPROVED SOURCE MATERIAL:",
+      "--- Source 1: al-Tabari packet excerpt ---\nExcerpt on the Khurasani movement.",
+      "--- Source 2: note on the Battle of the Zab ---\nExcerpt on the 750 battle.",
+      "--- Source 3: Baghdad and administrative change ---\nExcerpt on the 762 capital.",
+    ].join("\n\n");
+
+    const essay = "Was the Battle of the Zab truly decisive? According to the source, Baghdad reshaped the empire.";
+    const result = normalizeSupportedSourceAttribution(essay, sourceContext);
+    // The citation follows the question, so the Baghdad source should
+    // be chosen — NOT the Zab source from the preceding question.
+    expect(result).toMatch(/According to (?:the )?Baghdad/i);
+    expect(result).not.toMatch(/According to (?:the )?(?:note on the )?Battle of the Zab/i);
+  });
+
   it("picks the source whose title tokens match the surrounding sentence, not just source 1", () => {
     // Two sources in the packet; sentence 1 is about the Battle of the
     // Zab (should pick the Zab source), sentence 2 is about Baghdad
