@@ -4,7 +4,15 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProvider } from "@/lib/providers";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
-import { fetchSourceContext, formatSourceContextForPrompt, inferRequiredEvidenceCount, inferWordCountBounds, normalizeSourceLinks } from "@/lib/source-context";
+import {
+  fetchSourceContext,
+  formatSourceContextForPrompt,
+  inferRequiredEvidenceCount,
+  inferWordCountBounds,
+  normalizeSourceLinks,
+  type ResolvedSource,
+  type SourceFetchFailure,
+} from "@/lib/source-context";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,
@@ -151,16 +159,28 @@ export async function POST(req: Request) {
   const normalizedSourceLinks = normalizeSourceLinks(sourceLinks);
   let sourceContext = "";
   if (normalizedSourceLinks.length > 0 || sourceText?.trim()) {
-    try {
-      const fetchedSources = normalizedSourceLinks.length > 0
-        ? await fetchSourceContext(normalizedSourceLinks)
-        : [];
-      sourceContext = formatSourceContextForPrompt(fetchedSources, sourceText);
-      if (!sourceContext.trim()) {
-        return NextResponse.json({ error: "Unable to read the provided source links. Try a different link or paste source notes manually." }, { status: 400 });
+    let fetchedSources: ResolvedSource[] = [];
+    const sourceFailures: SourceFetchFailure[] = [];
+    if (normalizedSourceLinks.length > 0) {
+      const result = await fetchSourceContext(normalizedSourceLinks);
+      fetchedSources = result.resolved;
+      sourceFailures.push(...result.failures);
+      if (sourceFailures.length > 0) {
+        console.warn("portal.generate: source fetch had failures", {
+          userId: session.user.id,
+          failures: sourceFailures,
+        });
       }
-    } catch {
-      return NextResponse.json({ error: "Unable to fetch one of the provided source links. Try again or paste the source text manually." }, { status: 400 });
+    }
+    sourceContext = formatSourceContextForPrompt(fetchedSources, sourceText);
+    if (!sourceContext.trim()) {
+      const detail = sourceFailures.length > 0
+        ? ` (${sourceFailures.map((f) => `${f.url}: ${f.reason}`).join("; ")})`
+        : "";
+      return NextResponse.json(
+        { error: `Unable to read the provided source links${detail}. Try a different link or paste source notes manually.` },
+        { status: 400 },
+      );
     }
   }
 
