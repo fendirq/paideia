@@ -758,6 +758,7 @@ async function judgeEssay({
   essay,
   metrics,
   heuristic,
+  sourceContext,
 }: {
   levelLabel: string;
   assignment: string;
@@ -766,8 +767,13 @@ async function judgeEssay({
   essay: string;
   metrics: EssayMetrics;
   heuristic: { aiDetectionResistance: number; authenticity: number };
+  sourceContext?: string;
 }): Promise<JudgeScores> {
   const provider = resolveLlmProvider();
+  const isSourced = Boolean(sourceContext?.trim());
+  const sourceSection = isSourced
+    ? `\nAPPROVED SOURCE PACKET (the student was expected to draw evidence from here only — flag fabricated or non-approved evidence):\n${sourceContext}\n`
+    : "";
   const prompt = `You are QA grading an AI-generated student essay against real student writing samples.
 
 ASSIGNMENT:
@@ -778,7 +784,7 @@ ${rubric}
 
 REAL STUDENT WRITING SAMPLES:
 ${samples.map((sample) => `--- ${sample.label} ---\n${sample.content}`).join("\n\n")}
-
+${sourceSection}
 GENERATED ESSAY (${levelLabel}):
 ${essay}
 
@@ -792,7 +798,7 @@ Grade the generated essay from 1-10 in these categories:
 - evidenceHandling: how well it uses and explains evidence
 - overallWriting: overall quality at the student's actual level
 - voiceNaturalness: does this read as an organic student voice, or mechanical/formal?
-- sourceIntegration: how naturally is source material absorbed vs announced? (If no sources were provided, score 10 by default.)
+- sourceIntegration: ${isSourced ? "how naturally is the APPROVED source material absorbed vs announced? Deduct heavily if the essay cites evidence not in the approved packet, or fabricates source attributions." : "score 10 — no sources provided for this run."}
 - academicQuality: does the argument and analysis meet the academic bar the assignment expects?
 
 Return valid JSON only:
@@ -933,6 +939,7 @@ async function main() {
       essay: level2SourcedEssay,
       metrics: level2SourcedMetrics,
       heuristic: level2SourcedHeuristic,
+      sourceContext: scenario.sourceContext,
     }),
   ]);
 

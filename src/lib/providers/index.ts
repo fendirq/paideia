@@ -7,10 +7,16 @@ export type { LLMMessage, LLMResponse, LLMProvider, LLMProviderName } from "./ty
 export function resolveProviderName(): LLMProviderName {
   const raw = process.env.LEVEL2_PROVIDER?.trim().toLowerCase();
   if (raw === "anthropic") return "anthropic";
-  // Default to Gemini post-migration. Environments that never set
-  // LEVEL2_PROVIDER should still work as long as GEMINI_API_KEY is
-  // configured. Anthropic stays available as an explicit opt-in for
-  // emergency fallback via the dormant provider wrapper.
+  if (raw === "gemini") return "gemini";
+  // When LEVEL2_PROVIDER is unset, auto-detect from available API keys.
+  // This makes the migration transition-safe: existing deployments with
+  // only ANTHROPIC_API_KEY keep working, and new deployments that set
+  // GEMINI_API_KEY before the env variable rolls out also work. Prefer
+  // Gemini when both are present (the migration direction).
+  if (process.env.GEMINI_API_KEY?.trim()) return "gemini";
+  if (process.env.ANTHROPIC_API_KEY?.trim()) return "anthropic";
+  // Neither key present: default to gemini so the missing-key error
+  // message points at the recommended provider.
   return "gemini";
 }
 

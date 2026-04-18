@@ -87,6 +87,23 @@ interface Regression {
   delta: number;
 }
 
+// Heuristic metrics use different semantics (lower-is-better for
+// maxRepeatedOpenerRun and maxTransitionReuse). The delta direction here
+// is "got-worse," so for lower-is-better metrics a positive delta is the
+// regression.
+const LOWER_IS_BETTER = new Set([
+  "maxRepeatedOpenerRun",
+  "maxTransitionReuse",
+]);
+
+function isRegression(baseline: number, current: number, metric: string): boolean {
+  const delta = current - baseline;
+  if (LOWER_IS_BETTER.has(metric)) {
+    return delta >= REGRESSION_DELTA;
+  }
+  return delta <= -REGRESSION_DELTA;
+}
+
 function findRegressions(baseline: GradeReport, current: GradeReport): Regression[] {
   const regressions: Regression[] = [];
 
@@ -94,19 +111,25 @@ function findRegressions(baseline: GradeReport, current: GradeReport): Regressio
     const baselineGen = baseline.generations.find((g) => g.variant === currentGen.variant);
     if (!baselineGen) continue;
 
-    for (const [metric, baselineValue] of Object.entries(baselineGen.judge)) {
-      if (typeof baselineValue !== "number") continue;
-      const currentValue = (currentGen.judge as Record<string, unknown>)[metric];
-      if (typeof currentValue !== "number") continue;
-      const delta = currentValue - baselineValue;
-      if (delta <= -REGRESSION_DELTA) {
-        regressions.push({
-          variant: currentGen.variant,
-          metric: `judge.${metric}`,
-          baseline: baselineValue,
-          current: currentValue,
-          delta,
-        });
+    const sections: Array<{ label: string; baselineBucket: Record<string, unknown>; currentBucket: Record<string, unknown> }> = [
+      { label: "judge", baselineBucket: baselineGen.judge as Record<string, unknown>, currentBucket: currentGen.judge as Record<string, unknown> },
+      { label: "heur", baselineBucket: baselineGen.heuristics as Record<string, unknown>, currentBucket: currentGen.heuristics as Record<string, unknown> },
+    ];
+
+    for (const { label, baselineBucket, currentBucket } of sections) {
+      for (const [metric, baselineValue] of Object.entries(baselineBucket)) {
+        if (typeof baselineValue !== "number") continue;
+        const currentValue = currentBucket[metric];
+        if (typeof currentValue !== "number") continue;
+        if (isRegression(baselineValue, currentValue, metric)) {
+          regressions.push({
+            variant: currentGen.variant,
+            metric: `${label}.${metric}`,
+            baseline: baselineValue,
+            current: currentValue,
+            delta: currentValue - baselineValue,
+          });
+        }
       }
     }
   }

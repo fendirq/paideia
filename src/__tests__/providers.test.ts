@@ -36,12 +36,29 @@ describe("provider factory", () => {
   });
 
   describe("resolveProviderName", () => {
-    it("defaults to gemini when LEVEL2_PROVIDER is unset", () => {
+    it("defaults to gemini when neither LEVEL2_PROVIDER nor API keys are set", () => {
       expect(resolveProviderName()).toBe("gemini");
     });
 
-    it("returns anthropic when LEVEL2_PROVIDER=anthropic", () => {
+    it("auto-detects gemini when only GEMINI_API_KEY is present", () => {
+      process.env.GEMINI_API_KEY = "test";
+      expect(resolveProviderName()).toBe("gemini");
+    });
+
+    it("auto-detects anthropic when only ANTHROPIC_API_KEY is present (transition-safe)", () => {
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+      expect(resolveProviderName()).toBe("anthropic");
+    });
+
+    it("prefers gemini when both API keys are present and LEVEL2_PROVIDER is unset", () => {
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+      process.env.GEMINI_API_KEY = "AQ.test";
+      expect(resolveProviderName()).toBe("gemini");
+    });
+
+    it("explicit LEVEL2_PROVIDER=anthropic overrides key auto-detection", () => {
       process.env.LEVEL2_PROVIDER = "anthropic";
+      process.env.GEMINI_API_KEY = "AQ.test";
       expect(resolveProviderName()).toBe("anthropic");
     });
 
@@ -50,14 +67,15 @@ describe("provider factory", () => {
       expect(resolveProviderName()).toBe("gemini");
     });
 
-    it("is case-insensitive", () => {
+    it("is case-insensitive on explicit LEVEL2_PROVIDER", () => {
       process.env.LEVEL2_PROVIDER = "ANTHROPIC";
       expect(resolveProviderName()).toBe("anthropic");
     });
 
-    it("defaults to gemini on unknown values", () => {
+    it("falls back to key-based detection on unknown LEVEL2_PROVIDER values", () => {
       process.env.LEVEL2_PROVIDER = "ollama";
-      expect(resolveProviderName()).toBe("gemini");
+      process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+      expect(resolveProviderName()).toBe("anthropic");
     });
 
     it("ignores surrounding whitespace", () => {
