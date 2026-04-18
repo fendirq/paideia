@@ -664,6 +664,29 @@ The outline should include:
 Keep it structural. Do NOT include voice instructions, style notes, phrase placements, or writing tips. Structure only.`;
 }
 
+/**
+ * Detect narrative/creative assignments from rubric + prompt keywords. For
+ * creative writing, the samples are full-text scenes with specific imagery;
+ * "match the voice" easily collapses into "template the specific scenes."
+ * Phase 3 stress test surfaced this — creative-writing scored overall 4/10
+ * with mad-libs-style plagiarism while argumentative fixtures scored 8-9.
+ */
+export function isNarrativeAssignment(assignment: string, requirements?: string): boolean {
+  const text = `${assignment}\n${requirements ?? ""}`.toLowerCase();
+  const signals = [
+    "personal narrative",
+    "creative nonfiction",
+    "narrative essay",
+    "memoir",
+    "scene construction",
+    "scene vs summary",
+    "sensory detail",
+    "lived experience",
+    "first-person narrative",
+  ];
+  return signals.some((signal) => text.includes(signal));
+}
+
 // ─── Level 2 Writing Prompt (sample-first generation) ───
 
 export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
@@ -671,6 +694,7 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
 
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
+  const isNarrative = isNarrativeAssignment(assignment, requirements);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -717,7 +741,18 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
     selfReportedLines.push(`- They spend the most time polishing: ${timeSpent}`);
   }
 
-  return `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
+  return `${isNarrative
+    ? `NARRATIVE-VOICE REFERENCE — these are this student's prior personal narrative essays on unrelated topics:
+
+${refSamples}
+
+CRITICAL — for a narrative essay, the samples are a TONE study, NOT a template:
+- Scenes, images, dialogue lines, and specific sensory details in the samples are OFF-LIMITS. Do not echo them, restructure them, invert them, or map them onto a new subject. If the samples describe a laundromat bell, sewing machine, backstage theater, and a father's thermos, you must pick a COMPLETELY DIFFERENT subject and generate original scenes.
+- The only things you may inherit from the samples: the student's sentence cadence (short-short-long rhythms if they use them), their level of sensory attention, their habit of letting dialogue carry moments, their general tonal register. These are inherited as DEFAULTS for a new scene you invent from scratch.
+- Every concrete detail in your essay must be one YOU make up from the assignment prompt, not one borrowed from a sample. Opening move, ending move, the kind of person the narrator talks to, the setting — all must be new.
+- If you find yourself writing a sentence whose skeleton matches a sample sentence ("X was the only way to describe it"; "[object] had two moods"; "Everything in that place made a noise"), STOP and rewrite using different syntax. Matching sentence skeletons IS plagiarism for creative work.
+- A narrative essay that templates the samples fails the assignment outright, regardless of voice authenticity. Original scenes are the bar.`
+    : `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
 
 ${refSamples}
 
@@ -727,7 +762,7 @@ CRITICAL — the samples are VOICE references, NOT content sources:
 - Do NOT reuse specific sentences, dialogue lines, images, scenes, or concrete details from the samples. Borrow voice, rhythm, and analytical habits only.
 - Every sentence you write must be NEW prose composed for this assignment. Changing a noun from "dress" to "part" or "laundromat" to "garage" is not originality — it is plagiarism.
 - If you catch yourself templating a sample's structure (same opening move, same dialogue rhythm, same ending beat), STOP and write a different version in the same voice. Voice is in the syntax and word choice, not the furniture of the scene.
-- This rule is non-negotiable. A generated essay that templates the samples fails the assignment even if the voice feels similar.
+- This rule is non-negotiable. A generated essay that templates the samples fails the assignment even if the voice feels similar.`}
 
 ---
 
