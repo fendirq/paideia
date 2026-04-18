@@ -284,7 +284,7 @@ export async function POST(req: Request) {
     if (level === 1) {
       return streamLevel1(opts);
     } else {
-      return await streamLevel2(opts);
+      return await streamLevel2(opts, userId);
     }
   } else {
     // Legacy fallback — old profile shape, no fingerprint (Level 1 only)
@@ -385,7 +385,19 @@ function streamLevel1(opts: GenerateOptions): Response {
 // provider abstraction handles model selection, retry/fallback, and
 // thinking-mode semantics consistently across vendors.
 
-async function streamLevel2(opts: GenerateOptions): Promise<Response> {
+// Records stages that failed + fell back to a prior essay so the
+// final response can surface this to the client as a header (for
+// operator visibility) — structured log per stage goes to stderr so
+// Vercel runtime logs capture the failure with its root cause.
+function logStageDegradation(stage: string, userId: string, err?: unknown): void {
+  console.error("portal.generate: level 2 stage degraded", {
+    stage,
+    userId,
+    err: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
+  });
+}
+
+async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Response> {
   let provider;
   try {
     provider = getProvider();
@@ -397,6 +409,7 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
   let outline = "";
   let rawEssay = "";
   let critiqueNotes = "";
+  const degradedStages: string[] = [];
 
   try {
     // Step 1: Structural plan
@@ -471,7 +484,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     const critiqueCandidate = critiqueMsg.text.trim();
     critiqueNotes = isValidCritique(critiqueCandidate) ? critiqueCandidate : "";
   } catch (err) {
-    console.warn("Level 2 critique stage failed; continuing without critique notes.", err);
+    logStageDegradation("critique", userId, err);
+    degradedStages.push("critique");
   }
 
   // Step 4: Forensic revision — compare against student's real samples, fix voice mismatches
@@ -498,11 +512,13 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
 
     auditedEssay = sanitizeEssayOutput(auditMsg.text);
   } catch (err) {
-    console.warn("Level 2 revision stage failed; falling back to draft output.", err);
+    logStageDegradation("revision", userId, err);
+    degradedStages.push("revision");
   }
 
   if (auditedEssay && !isUsableEssayCandidate(auditedEssay, opts.wordCount)) {
-    console.warn("Level 2 revision returned malformed content; falling back to draft output.");
+    logStageDegradation("revision-malformed", userId);
+    degradedStages.push("revision");
     auditedEssay = "";
   }
 
@@ -523,7 +539,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = expandedEssay;
       }
     } catch (err) {
-      console.warn("Level 2 expansion stage failed; keeping current essay.", err);
+      logStageDegradation("expansion", userId, err);
+      degradedStages.push("expansion");
     }
   }
 
@@ -555,7 +572,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = evidenceEssay;
       }
     } catch (err) {
-      console.warn("Level 2 evidence stage failed; keeping current essay.", err);
+      logStageDegradation("evidence", userId, err);
+      degradedStages.push("evidence");
     }
 
     if (opts.sourceContext || bounds.max) {
@@ -575,7 +593,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
           baseEssay = attributionEssay;
         }
       } catch (err) {
-        console.warn("Level 2 attribution stage failed; keeping current essay.", err);
+        logStageDegradation("attribution", userId, err);
+        degradedStages.push("attribution");
       }
     }
 
@@ -599,7 +618,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = complianceEssay;
       }
     } catch (err) {
-      console.warn("Level 2 compliance stage failed; keeping current essay.", err);
+      logStageDegradation("compliance", userId, err);
+      degradedStages.push("compliance");
     }
   }
 
@@ -625,7 +645,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = trimmedEssay;
       }
     } catch (err) {
-      console.warn("Level 2 trim stage failed; keeping current essay.", err);
+      logStageDegradation("trim", userId, err);
+      degradedStages.push("trim");
     }
   }
 
@@ -652,7 +673,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = flowedEssay;
       }
     } catch (err) {
-      console.warn("Level 2 source-flow stage failed; keeping current essay.", err);
+      logStageDegradation("source-flow", userId, err);
+      degradedStages.push("source-flow");
     }
   }
 
@@ -678,9 +700,16 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     },
   });
 
-  return new Response(stream, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  };
+  if (degradedStages.length > 0) {
+    // Deduplicate (revision can push twice on malformed vs. failed).
+    headers["X-Paideia-Degraded-Stages"] = Array.from(new Set(degradedStages)).join(",");
+  }
+  return new Response(stream, { headers });
 }
 
 // ─── Legacy: DeepSeek-V3 for old profiles without fingerprint ───
