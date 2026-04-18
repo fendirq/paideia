@@ -81,6 +81,15 @@ function isTimeoutError(err: unknown): boolean {
   return err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
 }
 
+// Distinguishes a client-side disconnect (which is not a failure and
+// should not be logged or surfaced as an error) from a real stream
+// error. A `TimeoutError` is a server-side abort that we DO want to
+// surface; only a plain `AbortError` with no timer is treated as a
+// client cancel.
+function isClientAbort(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -335,12 +344,22 @@ function streamLevel1(opts: GenerateOptions): Response {
         }
 
         await pipeTogetherStream(res.body, controller, encoder);
-      } catch {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Connection failed" })}\n\n`));
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch { /* controller may already be closed by pipeTogetherStream */ }
+      } catch (err) {
+        // Client cancellation is not an error — no frame to emit.
+        // Anything else is a real upstream or streaming failure that
+        // needs an ops signal and a user-visible error frame.
+        if (!isClientAbort(err)) {
+          console.error("portal.generate: level 1 stream failed", {
+            stage: "level1",
+            model: LEVEL1_MODEL,
+            err,
+          });
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Level 1 generation failed. Please try again." })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch { /* controller may already be closed by pipeTogetherStream */ }
+        }
       }
     },
   });
@@ -693,12 +712,19 @@ function streamLegacy(opts: LegacyGenerateOptions): Response {
         }
 
         await pipeTogetherStream(res.body, controller, encoder);
-      } catch {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Connection failed" })}\n\n`));
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch { /* controller may already be closed by pipeTogetherStream */ }
+      } catch (err) {
+        if (!isClientAbort(err)) {
+          console.error("portal.generate: legacy stream failed", {
+            stage: "legacy",
+            model: LEVEL1_MODEL,
+            err,
+          });
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Generation failed. Please try again." })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch { /* controller may already be closed by pipeTogetherStream */ }
+        }
       }
     },
   });
