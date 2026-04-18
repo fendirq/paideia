@@ -19,6 +19,7 @@ import {
   buildLevel2CompliancePrompt,
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
+  isNarrativeAssignment,
   normalizeSupportedSourceAttribution,
   normalizeFingerprint,
   polishLevel2SurfaceVoice,
@@ -501,6 +502,15 @@ async function analyzeStyle(samples: SampleInput[]): Promise<StyleFingerprint> {
 
 async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
   const provider = resolveLlmProvider();
+  // Narrative/creative assignments get a shorter pipeline: skip the
+  // evidence-integration, attribution, compliance, and source-flow passes
+  // which were designed for argumentative writing and inject analytical
+  // scaffolding ("This matters because...", citations, thesis checks) that
+  // breaks narrative immersion. Phase 3 stress test showed these passes
+  // were the dominant driver of creative-writing failure; verdict flagged
+  // "over-explaining the moral with clunky AI-sounding language" and
+  // "breaking the fourth wall to cite class notes."
+  const isNarrative = isNarrativeAssignment(opts.assignment, opts.requirements);
   const outline = sanitizeEssayOutput(
     extractText(
       await provider.createLevel2Message({
@@ -593,74 +603,80 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
 
   const requirementText = `${opts.assignment}\n${opts.requirements ?? ""}`;
   const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
-  try {
-    const evidencePass = sanitizeEssayOutput(
-      extractText(
-        await provider.createLevel2Message({
-          prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
-            requiredEvidenceCount,
-          }),
-          system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
-          maxTokens: 5000,
-          temperature: 0.15,
-          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
-          stageLabel: "evidence",
-        })
-      )
-    );
-    if (passesRevisionLengthFloor(evidencePass, opts.wordCount, baseEssay)) {
-      baseEssay = evidencePass;
-    }
-  } catch {
-    baseEssay = revised || draft;
-  }
-
   const bounds = inferWordCountBounds(requirementText);
-  if (opts.sourceContext || bounds.max) {
+
+  // Skip evidence-integration / attribution / compliance for narrative
+  // assignments — they inject analytical scaffolding ("this matters
+  // because", citations, thesis-forcing) that ruins narrative immersion.
+  if (!isNarrative) {
     try {
-      const attribution = sanitizeEssayOutput(
+      const evidencePass = sanitizeEssayOutput(
         extractText(
           await provider.createLevel2Message({
-            prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
-              maxWords: bounds.max,
+            prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
+              requiredEvidenceCount,
             }),
-            system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
+            system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
             maxTokens: 5000,
-            temperature: 0.12,
+            temperature: 0.15,
             timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
-            stageLabel: "attribution",
+            stageLabel: "evidence",
           })
         )
       );
-      if (countWords(attribution) > 0) {
-        baseEssay = attribution;
+      if (passesRevisionLengthFloor(evidencePass, opts.wordCount, baseEssay)) {
+        baseEssay = evidencePass;
       }
     } catch {
       baseEssay = revised || draft;
     }
-  }
 
-  try {
-    const compliance = sanitizeEssayOutput(
-      extractText(
-        await provider.createLevel2Message({
-          prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
-            minWords: bounds.min,
-            maxWords: bounds.max,
-          }),
-          system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
-          maxTokens: 5000,
-          temperature: 0.15,
-          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
-          stageLabel: "compliance",
-        })
-      )
-    );
-    if (countWords(compliance) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))) {
-      baseEssay = compliance;
+    if (opts.sourceContext || bounds.max) {
+      try {
+        const attribution = sanitizeEssayOutput(
+          extractText(
+            await provider.createLevel2Message({
+              prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
+                maxWords: bounds.max,
+              }),
+              system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
+              maxTokens: 5000,
+              temperature: 0.12,
+              timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+              stageLabel: "attribution",
+            })
+          )
+        );
+        if (countWords(attribution) > 0) {
+          baseEssay = attribution;
+        }
+      } catch {
+        baseEssay = revised || draft;
+      }
     }
-  } catch {
-    baseEssay = revised || draft;
+
+    try {
+      const compliance = sanitizeEssayOutput(
+        extractText(
+          await provider.createLevel2Message({
+            prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
+              minWords: bounds.min,
+              maxWords: bounds.max,
+            }),
+            system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
+            maxTokens: 5000,
+            temperature: 0.15,
+            timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+            stageLabel: "compliance",
+          })
+        )
+      );
+      if (countWords(compliance) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))) {
+        baseEssay = compliance;
+      }
+    } catch {
+      baseEssay = revised || draft;
+    }
   }
 
   if (bounds.max && countWords(baseEssay) > bounds.max) {
@@ -690,7 +706,9 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     }
   }
 
-  if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
+  // Source-flow pass is argumentative-only — it smooths "according to the
+  // source"-style attributions that don't belong in narrative.
+  if (!isNarrative && opts.sourceContext && needsSourceFlowPass(baseEssay)) {
     try {
       const flowed = sanitizeEssayOutput(
         extractText(

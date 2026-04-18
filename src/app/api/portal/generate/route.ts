@@ -18,6 +18,7 @@ import {
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
   buildLegacyLevel1Prompt,
+  isNarrativeAssignment,
   normalizeSupportedSourceAttribution,
   normalizeFingerprint,
   polishLevel2SurfaceVoice,
@@ -459,73 +460,80 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     }
   }
 
-  // Step 6: Evidence integration pass — ensure concrete evidence and analysis actually land
+  // Steps 6-8: Evidence / Attribution / Compliance passes are skipped for
+  // narrative assignments. These passes were designed for argumentative
+  // essays and inject analytical scaffolding ("this matters because",
+  // citations, rubric-keyword-forcing) that breaks narrative immersion.
+  // Phase 3 stress test confirmed: with these passes on, creative-writing
+  // scored 4/10; skipping them for narrative is the pipeline-level fix.
   const requirementText = `${opts.assignment}\n${opts.requirements ?? ""}`;
   const requiredEvidenceCount = inferRequiredEvidenceCount(requirementText);
-  try {
-    const evidenceMsg = await provider.createLevel2Message({
-      prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
-        requiredEvidenceCount,
-      }),
-      system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
-      maxTokens: 5000,
-      temperature: 0.15,
-      timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
-      stageLabel: "evidence",
-    });
-    const evidenceEssay = sanitizeEssayOutput(evidenceMsg.text);
-    if (isUsableEssayCandidate(evidenceEssay, opts.wordCount) && passesRevisionLengthFloor(evidenceEssay, opts.wordCount, baseEssay)) {
-      baseEssay = evidenceEssay;
-    }
-  } catch (err) {
-    console.warn("Level 2 evidence stage failed; keeping current essay.", err);
-  }
-
-  // Step 7: Attribution pass — make source use explicit and trim sourced essays to the ceiling
   const bounds = inferWordCountBounds(requirementText);
-  if (opts.sourceContext || bounds.max) {
+  const isNarrative = isNarrativeAssignment(opts.assignment, opts.requirements);
+
+  if (!isNarrative) {
     try {
-      const attributionMsg = await provider.createLevel2Message({
-        prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
-          maxWords: bounds.max,
+      const evidenceMsg = await provider.createLevel2Message({
+        prompt: buildLevel2EvidenceIntegrationPrompt(baseEssay, opts, {
+          requiredEvidenceCount,
         }),
-        system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
+        system: `You are strengthening the evidence and analysis in a student-voice essay. Preserve the voice, but make every paragraph concrete and clearly explained.${opts.sourceContext ? " Use the approved source material directly when improving support." : " Without sources, keep the details plausible for a prepared student and avoid historian-level precision."}`,
         maxTokens: 5000,
-        temperature: 0.12,
+        temperature: 0.15,
         timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
-        stageLabel: "attribution",
+        stageLabel: "evidence",
       });
-      const attributionEssay = sanitizeEssayOutput(attributionMsg.text);
-      if (isUsableEssayCandidate(attributionEssay, opts.wordCount)) {
-        baseEssay = attributionEssay;
+      const evidenceEssay = sanitizeEssayOutput(evidenceMsg.text);
+      if (isUsableEssayCandidate(evidenceEssay, opts.wordCount) && passesRevisionLengthFloor(evidenceEssay, opts.wordCount, baseEssay)) {
+        baseEssay = evidenceEssay;
       }
     } catch (err) {
-      console.warn("Level 2 attribution stage failed; keeping current essay.", err);
+      console.warn("Level 2 evidence stage failed; keeping current essay.", err);
     }
-  }
 
-  // Step 8: Compliance pass — tighten thesis/evidence/word-count compliance without losing voice
-  try {
-    const complianceMsg = await provider.createLevel2Message({
-      prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
-        minWords: bounds.min,
-        maxWords: bounds.max,
-      }),
-      system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
-      maxTokens: 5000,
-      temperature: 0.15,
-      timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
-      stageLabel: "compliance",
-    });
-    const complianceEssay = sanitizeEssayOutput(complianceMsg.text);
-    if (
-      isUsableEssayCandidate(complianceEssay, opts.wordCount) &&
-      countWords(complianceEssay) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))
-    ) {
-      baseEssay = complianceEssay;
+    if (opts.sourceContext || bounds.max) {
+      try {
+        const attributionMsg = await provider.createLevel2Message({
+          prompt: buildLevel2AttributionPrompt(baseEssay, opts, {
+            maxWords: bounds.max,
+          }),
+          system: "You are making source use explicit in a student-voice essay. Preserve the essay's strength, but make the evidence feel clearly grounded and trim excess length if needed.",
+          maxTokens: 5000,
+          temperature: 0.12,
+          timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+          stageLabel: "attribution",
+        });
+        const attributionEssay = sanitizeEssayOutput(attributionMsg.text);
+        if (isUsableEssayCandidate(attributionEssay, opts.wordCount)) {
+          baseEssay = attributionEssay;
+        }
+      } catch (err) {
+        console.warn("Level 2 attribution stage failed; keeping current essay.", err);
+      }
     }
-  } catch (err) {
-    console.warn("Level 2 compliance stage failed; keeping current essay.", err);
+
+    try {
+      const complianceMsg = await provider.createLevel2Message({
+        prompt: buildLevel2CompliancePrompt(baseEssay, opts, {
+          minWords: bounds.min,
+          maxWords: bounds.max,
+        }),
+        system: `You are fixing assignment compliance issues in a student-voice essay. Preserve the voice, but make the essay clearly satisfy the prompt and rubric.${opts.sourceContext ? " Keep the evidence tied to the approved sources." : " Keep the evidence student-plausible instead of textbook-like."}`,
+        maxTokens: 5000,
+        temperature: 0.15,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "compliance",
+      });
+      const complianceEssay = sanitizeEssayOutput(complianceMsg.text);
+      if (
+        isUsableEssayCandidate(complianceEssay, opts.wordCount) &&
+        countWords(complianceEssay) >= Math.min(countWords(baseEssay), bounds.min ?? countWords(baseEssay))
+      ) {
+        baseEssay = complianceEssay;
+      }
+    } catch (err) {
+      console.warn("Level 2 compliance stage failed; keeping current essay.", err);
+    }
   }
 
   // Step 9: Hard ceiling trim — if we still exceed the max, force a focused trim pass
@@ -554,8 +562,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     }
   }
 
-  // Step 10: Source flow pass — smooth sourced attribution without reopening the whole essay
-  if (opts.sourceContext && needsSourceFlowPass(baseEssay)) {
+  // Step 10: Source flow pass — skipped for narrative (attribution ≠ narrative)
+  if (!isNarrative && opts.sourceContext && needsSourceFlowPass(baseEssay)) {
     try {
       const flowMsg = await provider.createLevel2Message({
         prompt: buildLevel2SourceFlowPrompt(baseEssay, opts, {
