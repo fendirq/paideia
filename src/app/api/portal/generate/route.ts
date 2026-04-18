@@ -381,7 +381,7 @@ function streamLevel1(opts: GenerateOptions): Response {
 }
 
 // ─── Level 2: premium pipeline (plan + draft + critique + revision) ───
-// Provider is resolved via LEVEL2_PROVIDER env (default: anthropic). The
+// Provider is resolved via LEVEL2_PROVIDER env (default: gemini). The
 // provider abstraction handles model selection, retry/fallback, and
 // thinking-mode semantics consistently across vendors.
 

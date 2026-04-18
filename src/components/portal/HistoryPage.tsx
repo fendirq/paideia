@@ -27,6 +27,7 @@ export function HistoryPage({ subject }: HistoryPageProps) {
   const [selected, setSelected] = useState<FullEssay | null>(null);
   const [loadingEssay, setLoadingEssay] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const subjectLabel = subject.charAt(0).toUpperCase() + subject.slice(1);
 
@@ -34,19 +35,28 @@ export function HistoryPage({ subject }: HistoryPageProps) {
     fetch(`/api/portal/generations?subject=${subject}`)
       .then((r) => r.json())
       .then((d) => setEssays(d.essays ?? []))
-      .catch(() => {})
+      .catch((err) => {
+        console.error("portal.history: essay list fetch failed", err);
+        setLoadError("Couldn't load history. Refresh to retry.");
+      })
       .finally(() => setLoading(false));
   }, [subject]);
 
   const openEssay = useCallback(async (id: string) => {
     setLoadingEssay(true);
+    setLoadError(null);
     try {
       const res = await fetch(`/api/portal/generations/${id}`);
       if (res.ok) {
         const { essay } = await res.json();
         setSelected(essay);
+      } else {
+        setLoadError("Couldn't open that essay.");
       }
-    } catch {}
+    } catch (err) {
+      console.error("portal.history: essay fetch failed", err);
+      setLoadError("Network error opening essay. Try again.");
+    }
     setLoadingEssay(false);
   }, []);
 
@@ -147,6 +157,10 @@ export function HistoryPage({ subject }: HistoryPageProps) {
             New
           </Link>
         </div>
+
+        {loadError && (
+          <p className="text-red-400/80 text-sm text-center" role="alert">{loadError}</p>
+        )}
 
         {/* Search */}
         <div className="relative">
