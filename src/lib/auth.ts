@@ -84,7 +84,16 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.userId = user.id;
         token.role = user.role ?? null;
-        token.roleCheckedAt = Date.now();
+        // Only stamp `roleCheckedAt` when we actually have a role.
+        // Onboarding issues a JWT with role=null and RoleSelector
+        // then calls /api/auth/session immediately after /api/onboarding
+        // to pick up the new DB role. Stamping here when role=null
+        // would trip the NULL_ROLE_RETRY_MS cooldown below and leave
+        // the user stuck on the null role for 10s — long enough to
+        // bounce /app → /onboarding on the very next request.
+        if (token.role !== null) {
+          token.roleCheckedAt = Date.now();
+        }
       }
       // Refresh role from DB. Two cadences:
       //   - Role populated and stale: 5-min refresh window — the role

@@ -199,11 +199,25 @@ export async function POST(req: Request) {
     }
   }
 
-  // `warning` surfaces the recoverable failure reason so the UI can show
-  // the user an amber banner (profile saved, but Level 2 voice match is
-  // degraded) instead of the silent-fingerprint-loss trap loop where
-  // Level 2 generation later refuses with "complete your writing
-  // profile first."
+  // For Level 2 profiles the fingerprint is required — generate/route.ts
+  // hard-rejects Level 2 when profile.styleFingerprint is missing. A 200
+  // here with hasFingerprint=false would let AggregateWizard redirect
+  // the user away; they'd then hit the same trap-loop the P1-1 fix was
+  // meant to prevent. Force a 500 with a specific code so the wizard
+  // keeps the user on-page and they can retry.
+  if (profileLevel === 2 && !styleOutcome.fingerprint) {
+    return NextResponse.json(
+      {
+        error: `Style analysis could not complete (${styleOutcome.failureReason ?? "unknown reason"}). Your profile is saved, but Level 2 voice matching requires the fingerprint. Please try again.`,
+        code: "LEVEL2_FINGERPRINT_REQUIRED",
+      },
+      { status: 500 },
+    );
+  }
+
+  // Level 1 profiles work without a fingerprint. Surface the `warning`
+  // field so the UI can still show an amber banner if analysis failed
+  // but profile-save succeeded, while allowing the happy-path redirect.
   const response: {
     success: true;
     hasFingerprint: boolean;
@@ -213,7 +227,7 @@ export async function POST(req: Request) {
     hasFingerprint: !!styleOutcome.fingerprint,
   };
   if (!styleOutcome.fingerprint && styleOutcome.failureReason) {
-    response.warning = `Profile saved, but style analysis could not complete (${styleOutcome.failureReason}). Level 2 voice matching will be limited until you retry the profile update.`;
+    response.warning = `Profile saved, but style analysis could not complete (${styleOutcome.failureReason}).`;
   }
   return NextResponse.json(response);
 }
