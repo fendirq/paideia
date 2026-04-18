@@ -113,6 +113,12 @@ export const authOptions: NextAuthOptions = {
             err,
           });
           if (neverFetched) throw err;
+          // Stamp `roleCheckedAt` so the next `ROLE_REFRESH_MS` window
+          // gates further retries. Without this stamp, every authed
+          // request during the outage would immediately re-enter this
+          // branch and re-query the failing DB — turning a brief
+          // hiccup into an error-log flood and DB amplification.
+          token.roleCheckedAt = Date.now();
         }
       }
       return token;

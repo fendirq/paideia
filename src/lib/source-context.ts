@@ -293,8 +293,17 @@ async function assertPublicUrl(url: string): Promise<void> {
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error("only http/https URLs are allowed");
   }
-  const hostname = parsed.hostname.toLowerCase();
-  if (!hostname) throw new Error("URL missing hostname");
+  const hostnameRaw = parsed.hostname.toLowerCase();
+  if (!hostnameRaw) throw new Error("URL missing hostname");
+
+  // URL.hostname returns IPv6 literals wrapped in brackets
+  // (e.g. "[2606:4700:4700::1111]"). `net.isIP` rejects the bracketed
+  // form as 0, which would cause legitimate public IPv6 URLs to fall
+  // through to DNS and be rejected as "hostname did not resolve".
+  // Strip the brackets before any IP/hostname classification.
+  const hostname = hostnameRaw.startsWith("[") && hostnameRaw.endsWith("]")
+    ? hostnameRaw.slice(1, -1)
+    : hostnameRaw;
 
   // Obvious private-name fast path (skip DNS when we can).
   if (hostname === "localhost" || hostname === "ip6-localhost") {

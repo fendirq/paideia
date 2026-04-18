@@ -69,12 +69,13 @@ export function verifyPortalToken(value: string | undefined): boolean {
   if (!Number.isFinite(issuedAt) || issuedAt <= 0) return false;
   if (Date.now() - issuedAt > COOKIE_MAX_AGE_MS) return false;
 
-  let sigBuf: Buffer;
-  try {
-    sigBuf = Buffer.from(signature, "hex");
-  } catch {
-    return false;
-  }
+  // `Buffer.from(s, "hex")` silently truncates at the first non-hex
+  // character and does NOT throw on malformed input. Without a strict
+  // format check a cookie like `<ts>.<valid-hmac>xyz` or
+  // `<ts>.<valid-hmac>.junk` would decode to the valid prefix and pass
+  // timingSafeEqual. HMAC-SHA256 is always 64 lowercase hex chars.
+  if (!/^[0-9a-f]{64}$/i.test(signature)) return false;
+  const sigBuf = Buffer.from(signature, "hex");
   if (sigBuf.length === 0) return false;
 
   const { primary, additional } = resolveSigningKeys();

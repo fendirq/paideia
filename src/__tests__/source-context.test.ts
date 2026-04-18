@@ -144,6 +144,34 @@ describe("fetchSourceContext (SSRF + per-URL isolation)", () => {
     expect(result.failures.every((f) => /private-zone/i.test(f.reason))).toBe(true);
   });
 
+  it("does not reject public IPv6 literal URLs (URL.hostname brackets)", async () => {
+    // URL.hostname wraps IPv6 literals in brackets ("[2606:...]"); without
+    // stripping, `net.isIP` fails, DNS lookup fails on the bracketed
+    // form, and public IPv6 sources would be blocked. This exercises
+    // the bracket-stripping added to assertPublicUrl.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      return new Response(
+        "<html><head><title>v6 site</title></head><body><p>body</p></body></html>",
+        { status: 200, headers: { "content-type": "text/html" } },
+      );
+    });
+    const result = await fetchSourceContext(["http://[2606:4700:4700::1111]/"]);
+    expect(result.resolved.length).toBe(1);
+    expect(result.failures).toEqual([]);
+  });
+
+  it("rejects private IPv6 literal URLs in bracketed form", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const result = await fetchSourceContext([
+      "http://[::1]/",
+      "http://[fc00::1]/",
+      "http://[fe80::1]/",
+    ]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.resolved).toEqual([]);
+    expect(result.failures.length).toBe(3);
+  });
+
   it("isolates a single failing URL from the rest of the batch", async () => {
     // First URL resolves 404; second succeeds with HTML.
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {

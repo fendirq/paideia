@@ -85,6 +85,20 @@ describe("portal token signing", () => {
     const zeroSig = "0".repeat(64);
     expect(verifyPortalToken(`${ts}.${zeroSig}`)).toBe(false);
   });
+
+  it("rejects a valid hmac with trailing junk (Buffer.from hex truncation)", () => {
+    const token = buildPortalToken();
+    // Real signature plus a dot + junk. Buffer.from("...deadbeef.junk", "hex")
+    // silently truncates at ".", so without a strict format check the
+    // decoded bytes would equal the legitimate signature and the token
+    // would pass. The strict /^[0-9a-f]{64}$/i regex must reject this.
+    expect(verifyPortalToken(`${token}.trailing`)).toBe(false);
+    // Same idea for a single extra non-hex char at the end of the hmac.
+    const [ts, sig] = token.split(".");
+    expect(verifyPortalToken(`${ts}.${sig}x`)).toBe(false);
+    // And for uppercase-hex mixed with junk.
+    expect(verifyPortalToken(`${ts}.${sig.toUpperCase()}z`)).toBe(false);
+  });
 });
 
 describe("validatePortalCode (pre-existing behavior)", () => {
