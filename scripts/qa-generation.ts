@@ -565,7 +565,7 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
     revised = sanitizeEssayOutput(
       extractText(
         await provider.createLevel2Message({
-          prompt: buildLevel2AuditPrompt(draft, opts.fingerprint, opts.samples, critiqueNotes, opts.sourceContext),
+          prompt: buildLevel2AuditPrompt(draft, opts.fingerprint, opts.samples, critiqueNotes, opts.sourceContext, opts.assignment, opts.requirements),
           system: `You are a writing forensics expert. Rewrite the essay so a teacher who knows the student's real work would believe they wrote it. Preserve the student's recognizable voice, but make the essay polished, coherent, well-supported, and strong enough to satisfy an A-range assignment standard.${opts.sourceContext ? " Ground the essay in the approved sources." : " Keep no-source essays concrete, but do not let them drift into textbook-level precision."}`,
           maxTokens: 5000,
           temperature: 0.2,

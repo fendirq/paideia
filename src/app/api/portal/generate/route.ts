@@ -416,6 +416,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     opts.samples,
     critiqueNotes,
     opts.sourceContext,
+    opts.assignment,
+    opts.requirements,
   );
 
   let auditedEssay = "";

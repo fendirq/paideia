@@ -909,15 +909,26 @@ export function buildLevel2AuditPrompt(
   samples: Sample[],
   critiqueNotes?: string,
   sourceContext?: string,
+  assignment?: string,
+  requirements?: string,
 ): string {
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
+  const isNarrative = isNarrativeAssignment(assignment ?? "", requirements);
 
-  return `STUDENT'S REAL WRITING — this is the reference standard:
+  const referenceBlock = isNarrative
+    ? `STUDENT'S VOICE PROFILE (narrative mode — raw samples withheld to prevent structural plagiarism):
+
+${narrative}
+
+For narrative assignments we do NOT show you the student's raw prior essays. Rewrite based on the voice profile above and on what the current essay is already doing well. If a sentence in the current essay looks like it was lifted from something elsewhere, REPLACE it with an original sentence in the same cadence — do not "fix" it by pulling toward external text.`
+    : `STUDENT'S REAL WRITING — this is the reference standard:
 
 ${refSamples}
 
-CRITICAL — the samples above are VOICE references, NOT content. When you rewrite, do NOT import specific sentences, dialogue lines, images, or scenes from the samples into the essay. Borrow voice, rhythm, and analytical habits only. If you see sample language in the current essay, REPLACE it with original prose in the same voice rather than tolerating it. Copy-paste with noun swaps is plagiarism, not voice-matching.
+CRITICAL — the samples above are VOICE references, NOT content. When you rewrite, do NOT import specific sentences, dialogue lines, images, or scenes from the samples into the essay. Borrow voice, rhythm, and analytical habits only. If you see sample language in the current essay, REPLACE it with original prose in the same voice rather than tolerating it. Copy-paste with noun swaps is plagiarism, not voice-matching.`;
+
+  return `${referenceBlock}
 
 ---
 
