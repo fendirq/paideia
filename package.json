@@ -46,6 +46,7 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
     "stripe": "^22.0.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2"

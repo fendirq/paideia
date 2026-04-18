@@ -5,7 +5,6 @@ import { db } from "@/lib/db";
 import { getProvider } from "@/lib/providers";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
 import {
-  fetchSourceContext,
   formatSourceContextForPrompt,
   inferRequiredEvidenceCount,
   inferWordCountBounds,
@@ -13,6 +12,7 @@ import {
   type ResolvedSource,
   type SourceFetchFailure,
 } from "@/lib/source-context";
+import { fetchSourceContext } from "@/lib/source-fetch";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,

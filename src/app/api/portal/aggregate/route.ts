@@ -182,12 +182,20 @@ export async function POST(req: Request) {
         data: { styleFingerprint: styleOutcome.fingerprint },
       });
     } catch (err) {
+      // Returning 200 here would drop the user through
+      // AggregateWizard.save()'s `res.ok` redirect with NO fingerprint
+      // persisted — the next Level 2 generation would then reject with
+      // "Level 2 requires a style fingerprint" (the trap-loop bug
+      // P1-1 was meant to prevent, inverted). 500 keeps the user on
+      // the wizard so they can retry.
       console.error("portal.aggregate: persisting fingerprint failed", { userId, err });
-      return NextResponse.json({
-        success: true,
-        hasFingerprint: false,
-        warning: "Style analysis ran, but we couldn't save its output. Please retry.",
-      });
+      return NextResponse.json(
+        {
+          error: "Style analysis ran, but we couldn't save its output. Please try again.",
+          code: "FINGERPRINT_PERSIST_FAILED",
+        },
+        { status: 500 },
+      );
     }
   }
 
