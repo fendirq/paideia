@@ -49,3 +49,12 @@ export function emptyReport(fixture: string): GradeReport {
 export function findVariant(report: GradeReport, variant: GenerationVariant): GenerationResult | undefined {
   return report.generations.find((g) => g.variant === variant);
 }
+
+export function formatProviderSlot(
+  report: Partial<GradeReport>,
+  level: keyof GradeReport["provider"],
+): string {
+  const slot = report.provider?.[level];
+  if (!slot?.name && !slot?.model) return "unknown";
+  return `${slot?.name || "unknown"}/${slot?.model || "unknown"}`;
+}

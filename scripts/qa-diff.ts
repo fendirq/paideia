@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { checkJudgeScores, checkHeuristics, mergeResults, formatBreach, type ThresholdCheckResult } from "./qa-lib/threshold-check.ts";
-import type { GradeReport, GenerationResult } from "./qa-lib/grade-report.ts";
+import { formatProviderSlot, type GradeReport, type GenerationResult } from "./qa-lib/grade-report.ts";
 
 // Noise tolerance for judge scores. A drop >= REGRESSION_DELTA from baseline
 // on a metric that baseline was passing counts as a regression, even if the
@@ -170,8 +170,8 @@ function main(): void {
 
   console.log(`qa-diff: baseline=${path.relative(process.cwd(), baselinePath)} current=${path.relative(process.cwd(), currentPath)}`);
   console.log(`  fixture: ${current.fixture}`);
-  console.log(`  baseline provider: ${baseline.provider.level2.name}/${baseline.provider.level2.model}`);
-  console.log(`  current provider:  ${current.provider.level2.name}/${current.provider.level2.model}`);
+  console.log(`  baseline provider: ${formatProviderSlot(baseline, "level2")}`);
+  console.log(`  current provider:  ${formatProviderSlot(current, "level2")}`);
   console.log();
 
   let allPass = true;
