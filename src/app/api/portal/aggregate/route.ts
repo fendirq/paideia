@@ -21,19 +21,35 @@ interface AggregateBody {
   selfAssessment: Prisma.InputJsonValue;
 }
 
-async function analyzeStyle(samples: { label: string; content: string }[]): Promise<Prisma.InputJsonValue | null> {
-  if (!samples.length) return null;
+interface AnalyzeStyleOutcome {
+  fingerprint: Prisma.InputJsonValue | null;
+  // Populated when style analysis failed for a recoverable reason so the
+  // caller can tell the difference between "no samples to analyze"
+  // (fingerprint null, reason undefined) and "Gemini rejected the
+  // request" (fingerprint null, reason set). Drives the UI warning.
+  failureReason?: string;
+}
+
+async function analyzeStyle(
+  samples: { label: string; content: string }[],
+  userId: string,
+): Promise<AnalyzeStyleOutcome> {
+  if (!samples.length) return { fingerprint: null };
 
   let provider;
   try {
     provider = getProvider();
-  } catch {
-    // No LLM provider configured — skip style analysis rather than 500.
-    return null;
+  } catch (err) {
+    console.error("portal.aggregate: LLM provider not configured", { userId, err });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis provider not configured",
+    };
   }
 
   const prompt = buildStyleAnalysisPrompt(samples);
 
+  let raw: string;
   try {
     const response = await provider.createLevel2Message({
       prompt,
@@ -44,17 +60,42 @@ async function analyzeStyle(samples: { label: string; content: string }[]): Prom
       stageLabel: "style-analysis",
       thinking: true,
     });
+    raw = response.text;
+  } catch (err) {
+    console.error("portal.aggregate: style analysis provider call failed", { userId, err });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis provider call failed",
+    };
+  }
 
-    // Strip markdown code fences if present
-    const content = response.text
-      .replace(/^```(?:json)?\s*\n?/i, "")
-      .replace(/\n?```\s*$/i, "")
-      .trim();
+  // Strip markdown code fences if present
+  const content = raw
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
 
+  if (!content) {
+    console.error("portal.aggregate: style analysis returned empty response", { userId });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis returned empty response",
+    };
+  }
+
+  try {
     const parsed = JSON.parse(content);
-    return parsed as Prisma.InputJsonValue;
-  } catch {
-    return null;
+    return { fingerprint: parsed as Prisma.InputJsonValue };
+  } catch (err) {
+    console.error("portal.aggregate: style analysis returned non-JSON", {
+      userId,
+      preview: content.slice(0, 200),
+      err,
+    });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis returned non-JSON output",
+    };
   }
 }
 
@@ -124,24 +165,49 @@ export async function POST(req: Request) {
         })),
       });
     });
-  } catch {
+  } catch (err) {
+    console.error("portal.aggregate: profile save transaction failed", { userId, err });
     return NextResponse.json({ error: "Failed to save profile. Please try again." }, { status: 500 });
   }
 
-  // Run style analysis in parallel (non-blocking for the save)
-  // but we wait for it so the user sees "Analyzing..." state
-  const fingerprint = await analyzeStyle(
-    samples.map((s) => ({ label: s.label, content: s.content }))
+  const styleOutcome = await analyzeStyle(
+    samples.map((s) => ({ label: s.label, content: s.content })),
+    userId,
   );
 
-  if (fingerprint) {
-    await db.writingProfile.update({
-      where: { userId },
-      data: { styleFingerprint: fingerprint },
-    });
+  if (styleOutcome.fingerprint) {
+    try {
+      await db.writingProfile.update({
+        where: { userId },
+        data: { styleFingerprint: styleOutcome.fingerprint },
+      });
+    } catch (err) {
+      console.error("portal.aggregate: persisting fingerprint failed", { userId, err });
+      return NextResponse.json({
+        success: true,
+        hasFingerprint: false,
+        warning: "Style analysis ran, but we couldn't save its output. Please retry.",
+      });
+    }
   }
 
-  return NextResponse.json({ success: true, hasFingerprint: !!fingerprint });
+  // `warning` surfaces the recoverable failure reason so the UI can show
+  // the user an amber banner (profile saved, but Level 2 voice match is
+  // degraded) instead of the silent-fingerprint-loss trap loop where
+  // Level 2 generation later refuses with "complete your writing
+  // profile first."
+  const response: {
+    success: true;
+    hasFingerprint: boolean;
+    warning?: string;
+  } = {
+    success: true,
+    hasFingerprint: !!styleOutcome.fingerprint,
+  };
+  if (!styleOutcome.fingerprint && styleOutcome.failureReason) {
+    response.warning = `Profile saved, but style analysis could not complete (${styleOutcome.failureReason}). Level 2 voice matching will be limited until you retry the profile update.`;
+  }
+  return NextResponse.json(response);
 }
 
 export async function GET() {
