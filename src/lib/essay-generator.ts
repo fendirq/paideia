@@ -779,7 +779,33 @@ ${outline}
 
 ---
 
-CRITICAL GUIDELINES — follow these in order of priority:
+${isNarrative ? `NARRATIVE CRAFT GUIDELINES — follow these in priority order (thesis-and-evidence rules DO NOT apply here):
+
+1. SCENE OVER SUMMARY (MANDATORY):
+Ground the essay in at least 2-3 concrete scenes. Show what happened, not what it meant. Scenes need time, place, action, and at least one sensory detail per paragraph. Do NOT lead paragraphs with thesis statements or analytical claims.
+
+2. VOICE FINGERPRINT (MANDATORY):
+${fingerprint.voice.contractions ? "- Contractions: the student uses them naturally. Keep that rhythm where it fits." : "- Match the student's formality level without forcing contractions."}
+${fingerprint.voice.toneDescription ? `- Tone: ${fingerprint.voice.toneDescription}. Preserve that register.` : ""}
+Narrative voice lives in sentence cadence, sensory attention, and dialogue handling — not in analytical transitions. Do NOT use "that matters because," "this shows," or "in other words" — those belong in argumentative writing.
+
+3. SENTENCE VARIETY:
+Vary sentence length for readability and rhythm. Avoid 3+ consecutive sentences of similar length.
+
+4. ORIGINAL IMAGES AND DIALOGUE (MANDATORY):
+Every concrete detail (object, setting, dialogue line) must be invented for this assignment. Do NOT reuse images, scenes, or dialogue structures that echo the student's prior work.
+
+5. NO ANALYTICAL SCAFFOLDING:
+Narrative essays do NOT need a thesis, body paragraphs with evidence-explanation-significance, or a restated-thesis conclusion. Let meaning emerge from scene and detail. Over-explaining the "lesson" breaks immersion and tanks the craft score.
+
+6. TARGET: ~${wordCount} words.
+
+AVOID THESE NARRATIVE FAILURE MODES:
+- Breaking the fourth wall to cite class notes, the rubric, or craft expectations
+- Starting or ending with a generic reflection like "I learned that..." or "This experience taught me..."
+- Over-qualified metaphors ("it was, in some ways, like...") — commit to the image
+
+Write the essay now. Return ONLY the essay text, no commentary or headers.` : `CRITICAL GUIDELINES — follow these in order of priority:
 
 1. PARAGRAPH STRUCTURE (MANDATORY):
 Each body paragraph MUST contain ${fingerprint.structure.avgParagraphLength} sentences (±1). Follow: "${fingerprint.structure.bodyParagraphPattern}". ${getLevel2ParagraphGuidance(wordCount)} Count your sentences per paragraph before finishing.
@@ -826,7 +852,7 @@ This must read like the strongest, most educated version of this writer.
 AVOID THESE AI-DETECTOR RED FLAGS:
 "delve into", "it's important to note", "in today's society", "furthermore", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament", "serves as a powerful", "devastating portrait", "compelling narrative"
 
-Write the essay now. Return ONLY the essay text, no commentary or headers.`;
+Write the essay now. Return ONLY the essay text, no commentary or headers.`}`;
 }
 
 // ─── Level 2 Critique Prompt (pass 3 — mismatch diagnosis) ───

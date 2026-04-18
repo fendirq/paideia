@@ -119,6 +119,11 @@ function findRegressions(baseline: GradeReport, current: GradeReport): Regressio
     for (const { label, baselineBucket, currentBucket } of sections) {
       for (const [metric, baselineValue] of Object.entries(baselineBucket)) {
         if (typeof baselineValue !== "number") continue;
+        // Skip sourceIntegration regression detection on unsourced variants —
+        // judgeEssay returns a default score that isn't meaningful there, and
+        // checkJudgeScores deliberately skips it. A false regression here
+        // would block pass-clean diffs (codex-review P2).
+        if (label === "judge" && metric === "sourceIntegration" && !baselineGen.sourced) continue;
         const currentValue = currentBucket[metric];
         if (typeof currentValue !== "number") continue;
         if (isRegression(baselineValue, currentValue, metric)) {
