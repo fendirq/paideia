@@ -44,3 +44,14 @@ The `LEVEL1_MODEL` env var is driven by config and supports swapping between Dee
 ## Greptile PR review not yet active
 
 `.greptile` config is committed and will take effect once the Greptile GitHub App is installed on the repository (`github.com/apps/greptile`). Until then, Codex review is the primary AI-side PR gate.
+
+## `college-elite-sourced` fixture — noisy signals
+
+The 5th QA fixture (`scripts/fixtures/qa/college-elite-sourced/`) was cherry-picked in PR #20 to complete the 5-fixture suite the design spec targets. It works, but Codex review surfaced two fixture-quality P2s that degrade its signal relative to the other four:
+
+1. **Self-assessment profile contradicts samples.** `meta.json` lists `quoteIntroStyle` and `overusedPhrases` that do not appear in any of the four samples. The Level 2 Writing prompt (`buildLevel2WritingPrompt`) injects these as habits the student "typically" does, so on this fixture the generator is being told to imitate patterns absent from the ground truth — voice-fidelity scoring is measuring a contradictory profile.
+2. **Two samples are short fragments.** The fixture targets a 1200–1400 word essay, but `sample-3.txt` (~190 words) and `sample-4.txt` (~250 words) are short-answer length. `buildLevel1Prompt` uses the two shortest samples as inline references, so Level 1 studies fragments instead of full-essay structure on this scenario.
+
+**Operator guidance.** Treat `college-elite-sourced` judge scores as directional, not authoritative, until the profile/sample alignment is rewritten. The other four fixtures remain the gating set.
+
+**Fix path.** Rewrite `sample-3.txt` and `sample-4.txt` to full-essay length (~900–1100 words each) and update `meta.json.selfAssessment.quoteIntroStyle` / `overusedPhrases` to reference phrases that actually appear in the sample corpus.
