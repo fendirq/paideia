@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createHmac } from "crypto";
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import {
   buildPortalToken,
@@ -57,7 +58,6 @@ describe("portal token signing", () => {
     const pastTimestamp = Date.now() - eightDaysMs;
     // Forge a token with the real signature but an expired timestamp.
     // This exercises the expiry branch without altering the secret.
-    const { createHmac } = require("crypto");
     const hmac = createHmac("sha256", process.env.NEXTAUTH_SECRET!);
     hmac.update(`portal-access|${pastTimestamp}`);
     const expired = `${pastTimestamp}.${hmac.digest("hex")}`;
@@ -67,7 +67,6 @@ describe("portal token signing", () => {
   it("accepts tokens signed by NEXTAUTH_SECRET_PREVIOUS during rotation", () => {
     process.env.NEXTAUTH_SECRET = "new-primary-secret-32-chars-long";
     process.env.NEXTAUTH_SECRET_PREVIOUS = "test-primary-secret-32-chars-long";
-    const { createHmac } = require("crypto");
     const ts = Date.now().toString();
     const hmac = createHmac("sha256", "test-primary-secret-32-chars-long");
     hmac.update(`portal-access|${ts}`);
