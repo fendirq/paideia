@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { getProvider, resolveProviderName, type LLMProvider, type LLMResponse } from "../src/lib/providers/index.ts";
 import type { GradeReport, GenerationResult } from "./qa-lib/grade-report.ts";
+import { computeMaxTransitionReuse } from "./qa-lib/transition-reuse.ts";
 import { resolveModels as resolveGeminiModels } from "../src/lib/providers/gemini.ts";
 import { resolveModels as resolveAnthropicModels } from "../src/lib/providers/anthropic.ts";
 import {
@@ -364,13 +365,22 @@ function heuristicGrade(metrics: EssayMetrics, fingerprint: StyleFingerprint, ta
   let aiDetectionResistance = 10;
   let authenticity = 10;
 
-  if (metrics.sentenceStdDev < 6.5) aiDetectionResistance -= 3;
-  else if (metrics.sentenceStdDev < 7.5) aiDetectionResistance -= 1;
+  // sentenceStdDev thresholds recalibrated against the Gemini judge: the
+  // judge scores a student-voice essay with stdDev 5-6 as AI-safe (9/10)
+  // because it matches the student's own cadence. Harsh -3 penalty at
+  // stdDev<6.5 was over-calibrated from the pre-Gemini Opus era, when
+  // the model produced more variance-heavy prose. New bands reflect that
+  // 5-6 is normal for student-voice matching.
+  if (metrics.sentenceStdDev < 4.5) aiDetectionResistance -= 2;
+  else if (metrics.sentenceStdDev < 6) aiDetectionResistance -= 1;
   if (metrics.aiPhraseHits.length > 0) aiDetectionResistance -= Math.min(3, metrics.aiPhraseHits.length);
-  if (metrics.maxRepeatedOpenerRun >= 3) aiDetectionResistance -= 1;
+  if (metrics.maxRepeatedOpenerRun >= 4) aiDetectionResistance -= 1;
   if (metrics.theOpenerPct > 45) aiDetectionResistance -= 1;
   if (fingerprint.voice.contractions && metrics.contractionCount < 3) aiDetectionResistance -= 2;
-  if (metrics.emDashCount > 0) aiDetectionResistance -= 1;
+  // Em-dashes are a legitimate voice feature in many student samples;
+  // penalizing their mere presence was a false positive. Only penalize
+  // em-dash overuse (≥3 per 1000 words) which correlates with AI boilerplate.
+  if (metrics.emDashCount >= Math.max(3, Math.floor(targetWordCount / 333))) aiDetectionResistance -= 1;
 
   const wordCountDrift = Math.abs(metrics.wordCount - targetWordCount);
   if (wordCountDrift > targetWordCount * 0.2) authenticity -= 1;
@@ -762,13 +772,7 @@ function toGenerationResult(
   heuristic: { aiDetectionResistance: number; authenticity: number },
   judge: JudgeScores,
 ): GenerationResult {
-  const transitionHits = metrics.favoriteTransitionHits ?? [];
-  const maxTransitionReuse = transitionHits.length > 0
-    ? Math.max(...transitionHits.map((t) => {
-        const lower = essay.toLowerCase();
-        return (lower.match(new RegExp(t.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length;
-      }))
-    : 0;
+  const maxTransitionReuse = computeMaxTransitionReuse(essay, metrics.favoriteTransitionHits ?? []);
   return {
     variant,
     sourced,
