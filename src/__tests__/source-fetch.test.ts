@@ -1,5 +1,22 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Mock node:dns/promises so these tests don't depend on live DNS egress
+// (required for sandboxed CI and Codex-style review environments). The
+// stub is fixture-aware: example.com resolves to a public address,
+// everything else throws ENOTFOUND — matching what the real guard
+// would do in a strict network sandbox.
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async (hostname: string) => {
+    if (hostname === "example.com") {
+      return [{ address: "93.184.216.34", family: 4 }]; // example.com's public v4
+    }
+    const err = new Error("ENOTFOUND") as NodeJS.ErrnoException;
+    err.code = "ENOTFOUND";
+    throw err;
+  }),
+}));
+
 import { fetchSourceContext, isPrivateIp } from "@/lib/source-fetch";
 
 describe("isPrivateIp (SSRF guard)", () => {
@@ -28,7 +45,16 @@ describe("isPrivateIp (SSRF guard)", () => {
     expect(isPrivateIp("::")).toBe(true);
     expect(isPrivateIp("fc00::1")).toBe(true);
     expect(isPrivateIp("fd00::1")).toBe(true);
+    // Full fe80::/10 link-local range — fe8X, fe9X, feaX, febX.
+    // The prior pattern only blocked fe80:/fec0:, leaving fe81, fe90,
+    // febf, etc. as "public" (Codex fourth-pass P1).
     expect(isPrivateIp("fe80::1")).toBe(true);
+    expect(isPrivateIp("fe81::1")).toBe(true);
+    expect(isPrivateIp("fe90::1")).toBe(true);
+    expect(isPrivateIp("febf::1")).toBe(true);
+    // Deprecated site-local fec0::/10 — fecX, fedX, feeX, fefX.
+    expect(isPrivateIp("fec0::1")).toBe(true);
+    expect(isPrivateIp("feff::1")).toBe(true);
     expect(isPrivateIp("ff02::1")).toBe(true);
     expect(isPrivateIp("::ffff:127.0.0.1")).toBe(true); // v4-mapped loopback
     expect(isPrivateIp("::ffff:192.168.1.1")).toBe(true);

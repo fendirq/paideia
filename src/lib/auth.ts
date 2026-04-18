@@ -110,15 +110,24 @@ export const authOptions: NextAuthOptions = {
           console.error("auth.jwt: role refresh from DB failed", {
             userId: token.userId,
             neverFetched,
+            roleIsNull,
             err,
           });
           if (neverFetched) throw err;
-          // Stamp `roleCheckedAt` so the next `ROLE_REFRESH_MS` window
-          // gates further retries. Without this stamp, every authed
-          // request during the outage would immediately re-enter this
-          // branch and re-query the failing DB — turning a brief
-          // hiccup into an error-log flood and DB amplification.
-          token.roleCheckedAt = Date.now();
+          if (roleIsNull) {
+            // Null-role recovery: applying the full 5-min cooldown
+            // would keep the middleware rejecting /app/classes and
+            // /app/teacher even after the DB recovers. Use a 10s
+            // cooldown instead — still caps DB amplification during
+            // a sustained outage, but recovers fast once the DB is
+            // back.
+            token.roleCheckedAt = Date.now() - (ROLE_REFRESH_MS - 10_000);
+          } else {
+            // Stale-role refresh failure: the existing role is still
+            // valid; full 5-min cooldown prevents log-flood and DB
+            // amplification during a transient hiccup.
+            token.roleCheckedAt = Date.now();
+          }
         }
       }
       return token;

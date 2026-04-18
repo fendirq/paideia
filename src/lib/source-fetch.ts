@@ -80,7 +80,12 @@ export function isPrivateIp(ip: string): boolean {
     const lower = ip.toLowerCase();
     if (lower === "::" || lower === "::1") return true;
     if (lower.startsWith("fc") || lower.startsWith("fd")) return true; // unique local (fc00::/7)
-    if (lower.startsWith("fe80:") || lower.startsWith("fec0:")) return true; // link-local / deprecated site-local
+    // Link-local is the full fe80::/10 block — the high 10 bits are
+    // 1111111010, which in hex prefixes covers fe80 through febf.
+    // The prior `fe80:`/`fec0:` check missed fe8X-febX for X > 0, so
+    // addresses like fe81::1, fe90::1, febf::1 were treated as
+    // public. Plus the deprecated site-local fec0::/10 (fec0-feff).
+    if (/^fe[89ab]/.test(lower) || /^fe[cdef]/.test(lower)) return true;
     if (lower.startsWith("ff")) return true;                                 // multicast
     if (lower.startsWith("::ffff:")) {
       // IPv4-mapped: validate the embedded v4 form
