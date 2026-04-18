@@ -1,6 +1,6 @@
 # Generation QA Report
 
-Generated at: 2026-04-18T01:32:02.842Z
+Generated at: 2026-04-18T04:08:56.739Z
 
 ## Scenario
 
@@ -11,62 +11,53 @@ Target word count: 1500.
 
 ## Level 1 Scores
 
-Heuristic AI resistance: 8/10
+Heuristic AI resistance: 9/10
 Heuristic authenticity: 9/10
-Judge AI resistance: 8/10
+Judge AI resistance: 9/10
 Judge sample accuracy: 9/10
-Judge rubric accuracy: 4/10
-Judge evidence handling: 4/10
+Judge rubric accuracy: 3/10
+Judge evidence handling: 2/10
 Judge overall writing: 6/10
 
-Verdict: The essay captures the student's specific syntactic voice and argumentative templates perfectly, but completely fails the basic assignment requirements. At 798 words, it is only half of the 1500-word target length and lacks the required depth of close reading.
+Verdict: The essay captures the student's specific stylistic quirks and transition templates perfectly, but it entirely fails the basic requirements of the assignment rubric. It falls drastically short of the word count and includes absolutely no primary text quotations or close reading.
 
-Strengths: Perfectly replicates the student's signature transitions ('What stands out to me is that,' 'This matters because,' 'Someone could argue that').; Establishes a clear, comparative thesis right from the introduction.; Captures the student's habit of contrasting two works through structural and moral differences.
-Weaknesses: Massively under the required 1400-1600 word count.; Fails to provide two distinct passages for close reading from each text, offering only fleeting quotes instead.; The secondary source integration is extremely brief and feels tacked-on rather than thoroughly analyzed.; Close reading is virtually non-existent; quotes are dropped in without analyzing diction, imagery, or syntax.
-Priority fixes: Expand the essay to meet the 1500-word target by deepening the analysis in every paragraph.; Incorporate at least two distinct passages from each primary text and perform actual close readings of the language.; Integrate the secondary source much more deeply into the main body paragraphs, showing exactly how it interacts with specific primary evidence.
+Strengths: Perfectly replicates the student's voice, including the heavy use of signature transitions like 'What stands out to me is that', 'This matters because', and 'Someone could argue that'.; Establishes a clear comparative thesis in the introduction.; Follows the logical argumentative progression seen in the student samples.
+Weaknesses: Fails the word count requirement massively (790 words instead of the required 1400-1600).; Fails the primary evidence requirement; there are no specific passages or quotations from either novel.; Lacks any actual close reading of diction, imagery, or narrative form.; Does not explicitly compare a primary textual quote with a secondary source claim as required.
+Priority fixes: Expand the essay significantly to meet the 1400-1600 word length requirement.; Integrate at least two direct quotations/passages from each primary text.; Perform close reading on the selected passages rather than summarizing plot or themes.; Pair a specific primary quote directly with the secondary source claim to meet the source integration requirement.
 
 Metrics:
 ```json
 {
-  "wordCount": 798,
-  "paragraphCount": 7,
-  "sentenceCount": 40,
-  "avgSentenceLength": 19.95,
-  "sentenceStdDev": 7.51,
+  "wordCount": 790,
+  "paragraphCount": 5,
+  "sentenceCount": 34,
+  "avgSentenceLength": 23.24,
+  "sentenceStdDev": 10.95,
   "contractionCount": 0,
-  "emDashCount": 9,
-  "theOpenerPct": 10,
+  "emDashCount": 7,
+  "theOpenerPct": 8.8,
   "maxRepeatedOpenerRun": 1,
-  "aiPhraseHits": [
-    "nuanced"
-  ],
+  "aiPhraseHits": [],
   "favoriteTransitionHits": [
     "What stands out to me is that",
-    "If I had to choose,",
-    "At the same time,",
-    "In other words,",
-    "But",
+    "If I had to put it plainly",
+    "At the same time",
+    "In other words",
+    "This matters because",
+    "That matters because",
     "Someone could argue that",
-    "Still,",
+    "There is an argument that",
+    "Still",
     "So while",
-    "whereas",
-    "So although",
-    "By contrast,",
-    "Meanwhile,",
-    "There is a possible objection that",
-    "So"
+    "By contrast",
+    "In fact"
   ],
   "forbiddenTransitionHits": [],
   "signatureWordHits": [
-    "matters",
     "structure",
-    "problem",
-    "performance",
-    "community",
-    "partly",
-    "almost",
-    "recognition",
-    "distinction"
+    "collapse",
+    "knowledge",
+    "responsibility"
   ],
   "avoidedWordHits": []
 }
@@ -76,57 +67,60 @@ Metrics:
 
 Heuristic AI resistance: 10/10
 Heuristic authenticity: 10/10
-Judge AI resistance: 9/10
-Judge sample accuracy: 10/10
+Judge AI resistance: 10/10
+Judge sample accuracy: 9/10
 Judge rubric accuracy: 10/10
 Judge evidence handling: 9/10
 Judge overall writing: 9/10
 
-Verdict: An outstanding mimicry of the student's highly structured voice. The essay expertly deploys the student's specific dialectical transitions and argument structures while completely satisfying a complex, multi-part prompt and rubric.
+Verdict: This is an exceptionally accurate mimic of the student's writing style, perfectly hitting the assignment constraints and rubric requirements. It seamlessly integrates the student's preferred syntactic templates and analytical vocabulary while delivering a strong comparative literary argument.
 
-Strengths: Perfectly captures the student's signature structural voice, including phrases like 'What stands out to me is that', 'This matters because', and the distinct counterargument template ('Someone could argue that... I understand that reading. Still...').; Flawlessly executes the rubric's demand for close reading by zeroing in on specific diction ('disgust', 'made', 'calmly').; Integrates both primary and secondary sources explicitly and effectively, using them to deepen the primary text analysis rather than just checking a box.
-Weaknesses: The strict adherence to the student's structural templates is incredibly accurate but creates a slight mechanical rhythm over 1500 words, as every paragraph follows the exact same analytical architecture.; Occasional plot-summary heavy setups before getting to the close readings.
-Priority fixes: Vary the placement or exact wording of the student's signature analytical moves so it feels less like a Mad Libs template.; Condense the plot setups (e.g., Victor's laboratory, Hyde's bank account) to get straight to the textual evidence faster.
+Strengths: Flawless integration of the student's signature transitions and essay structure (e.g., 'What stands out to me is that', 'Someone could argue that...').; Uses the student's specific conceptual vocabulary ('script', 'institution', 'misrecognition', 'performance') organically within the analysis.; Meets all complex rubric requirements, including primary/secondary source comparison and formal analysis of narrative structure.
+Weaknesses: The counterargument paragraph is almost a mad-libs style copy of the student's counterargument structure from the samples, which borders on formulaic, though it accurately reflects the prompt's constraints.; Occasionally, the application of words like 'institution' (e.g., 'treating his physical form as just another institution') feels slightly stretched just to fit the student's lexicon.
+Priority fixes: Slightly vary the counterargument syntax so it doesn't read as an exact carbon copy of the samples' phrasing, maintaining the logical flow but introducing fresh wording.; Ensure that signature words like 'institution' or 'script' are only used where they make precise semantic sense, rather than forcing them in.
 
 Metrics:
 ```json
 {
-  "wordCount": 1567,
+  "wordCount": 1580,
   "paragraphCount": 6,
-  "sentenceCount": 77,
-  "avgSentenceLength": 20.35,
-  "sentenceStdDev": 8.07,
+  "sentenceCount": 70,
+  "avgSentenceLength": 22.57,
+  "sentenceStdDev": 9.2,
   "contractionCount": 0,
   "emDashCount": 0,
-  "theOpenerPct": 26,
+  "theOpenerPct": 20,
   "maxRepeatedOpenerRun": 2,
   "aiPhraseHits": [],
   "favoriteTransitionHits": [
     "What stands out to me is that",
-    "If I had to put it plainly,",
-    "In other words,",
-    "But",
+    "If I had to put it plainly",
+    "At the same time",
+    "In other words",
+    "This matters because",
     "Someone could argue that",
-    "I understand that reading.",
-    "Still,",
+    "Still",
+    "Even so",
     "So while",
-    "whereas",
-    "So"
+    "So although",
+    "By contrast"
   ],
   "forbiddenTransitionHits": [],
   "signatureWordHits": [
-    "matters",
     "structure",
-    "problem",
     "performance",
+    "collapse",
     "knowledge",
-    "blindness",
+    "responsibility",
     "institution",
-    "script",
-    "community",
+    "valuable",
+    "reputation",
     "authority",
-    "almost",
-    "simply"
+    "scale",
+    "intimacy",
+    "script",
+    "blindness",
+    "misrecognition"
   ],
   "avoidedWordHits": []
 }
@@ -134,61 +128,56 @@ Metrics:
 
 ## Level 2 + Sources Scores
 
-Heuristic AI resistance: 9/10
+Heuristic AI resistance: 10/10
 Heuristic authenticity: 10/10
-Judge AI resistance: 9/10
-Judge sample accuracy: 9/10
+Judge AI resistance: 10/10
+Judge sample accuracy: 10/10
 Judge rubric accuracy: 10/10
 Judge evidence handling: 9/10
 Judge overall writing: 9/10
 
-Verdict: An exceptionally accurate replication of the student's highly structured, comparative voice. The essay follows the rubric perfectly, integrating primary and secondary sources while nailing the student's signature transitional phrases.
+Verdict: An exceptional imitation of the student's voice. The essay maps the student's precise structural and rhetorical habits (down to the 'If I had to choose' and 'Someone could argue that... I understand that reading' formulations) onto the new prompt with impressive fluidity. It hits every requirement on the rubric, including the integration of secondary materials and a sustained comparative thesis.
 
-Strengths: Flawless mimicry of the student's rhetorical crutches (e.g., 'What stands out to me is that', 'If I had to put it plainly', 'Someone could argue that').; Meets all rubric constraints, including word count, close reading, and counter-argument structure.; Strong comparative thesis that elevates the argument beyond basic similarities, contrasting public failures of sympathy with private failures of respectability.
-Weaknesses: Secondary source integration is a bit generic ('The critical essay from our seminar reader asks...'), missing an author or specific title attribution.; The heavy reliance on the student's exact transition formulas throughout every single paragraph risks feeling slightly repetitive, even though it accurately reflects the samples.
-Priority fixes: Introduce the secondary source by an actual author name or title rather than just calling it 'the critical essay from our seminar reader' to meet standard academic attribution expectations.; Slightly vary the 'This matters because' and 'In other words' constructions so the essay doesn't read quite as much like a direct template of the student's past work.
+Strengths: Perfectly replicates the student's distinct comparative structures, transition phrasing, and paragraph templates.; Fulfills all prompt constraints, including word count, counterargument, and source integration.; Maintains an analytical tone that stays completely away from standard AI fluff, resulting in a highly authentic-feeling essay.
+Weaknesses: The secondary sources ('course lecture notes', 'seminar reader') are integrated a bit generically, though this is likely due to them being hypothetical sources rather than specific named authors.; The strict adherence to the student's paragraph-by-paragraph template from the samples makes the structural scaffolding slightly rigid, though absolutely true to the writer's style.
+Priority fixes: If actual secondary sources are provided in the future, ensure they are cited by author name rather than just 'the seminar reader's critical introduction' to enhance academic rigor.
 
 Metrics:
 ```json
 {
-  "wordCount": 1580,
+  "wordCount": 1485,
   "paragraphCount": 6,
-  "sentenceCount": 74,
-  "avgSentenceLength": 21.35,
-  "sentenceStdDev": 9.56,
+  "sentenceCount": 56,
+  "avgSentenceLength": 26.52,
+  "sentenceStdDev": 13.72,
   "contractionCount": 0,
   "emDashCount": 0,
-  "theOpenerPct": 20.3,
-  "maxRepeatedOpenerRun": 4,
+  "theOpenerPct": 14.8,
+  "maxRepeatedOpenerRun": 3,
   "aiPhraseHits": [],
   "favoriteTransitionHits": [
     "What stands out to me is that",
-    "If I had to put it plainly,",
-    "At the same time,",
-    "But",
+    "If I had to choose",
+    "At the same time",
+    "In other words",
+    "This matters because",
     "Someone could argue that",
-    "I understand that reading.",
-    "Still,",
+    "Still",
     "So while",
-    "whereas",
-    "So"
+    "By contrast"
   ],
   "forbiddenTransitionHits": [],
   "signatureWordHits": [
-    "matters",
     "structure",
-    "problem",
     "performance",
+    "collapse",
     "knowledge",
-    "blindness",
+    "responsibility",
     "institution",
-    "script",
-    "community",
+    "reputation",
     "authority",
-    "almost",
-    "simply",
-    "recognition",
-    "distinction"
+    "scale",
+    "script"
   ],
   "avoidedWordHits": []
 }
@@ -197,49 +186,45 @@ Metrics:
 ## Level 1 Essay
 
 ```
-I think Mary Shelley’s *Frankenstein* and Robert Louis Stevenson’s *The Strange Case of Dr Jekyll and Mr Hyde* both explore how monstrosity is produced, but they trace that production to different kinds of failure. What stands out to me is that Shelley ties monstrosity to abandonment and the refusal of sympathy, whereas Stevenson ties it to an internal splitting meant to protect reputation and suppress desire. The distinction matters because it shows that monstrosity is not just a physical category but a moral and psychological one, shaped by how characters respond to what they cannot accept in themselves or others. If I had to choose, Shelley gives the more tragic and socially resonant explanation, while Stevenson offers a more intimate anatomy of hypocrisy.
+Frankenstein and The Strange Case of Dr. Jekyll and Mr. Hyde both explore monstrosity as a problem of responsibility and self-division, but they trace the origin of that monstrosity to fundamentally different sources. Shelley’s novel treats the Creature as a being made monstrous by abandonment and a lack of care, while Stevenson’s novella frames Hyde as the direct product of a psychological experiment aimed at separating desire from moral restraint. What stands out to me is that each text offers a distinct theory of how monstrosity emerges: one through social and ethical failure, the other through a dangerous internal division. This matters because the comparison reveals not just two versions of the Gothic but two competing models of blame—one that looks outward to society and one that looks inward to the self. If I had to put it plainly, Shelley makes monstrosity tragic by showing how it is produced by neglect, while Stevenson makes it terrifying by showing how it erupts from repressed human nature.
 
-Shelley’s creature becomes monstrous not through his own nature but through the repeated rejection he faces from those who should care for him. This matters because the novel structures his narrative as a plea for recognition, framed within Victor’s own testimony. When the creature confronts Victor on the glacier, for example, he does not threaten violence at first. Instead, he asks for understanding and a companion. His speech is articulate, even philosophical, and he insists, “I was benevolent and good; misery made me a fiend.” At the same time, Victor’s refusal to listen—his physical and emotional withdrawal—creates the conditions for violence. In other words, Shelley suggests that monstrosity is produced socially, through a failure of responsibility and empathy. The creature’s later violence is almost a performance of the monstrosity others have already assigned to him.
+Frankenstein places responsibility for monstrosity squarely on Victor, whose refusal to care for the Creature turns potential into horror. The novel’s structure reinforces this by giving the Creature his own voice and testimony, which complicates any simple view of him as inherently evil. In other words, Shelley uses layered narration to make the Creature’s perspective legible, and even sympathetic. This matters because it forces the reader to see how monstrosity is not an innate quality but something shaped by reaction and rejection. When Victor abandons his creation, he sets in motion a cycle of isolation and violence that the Creature himself describes as a response to being denied love and belonging. At the same time, the novel does not entirely excuse the Creature’s actions; it shows how his moral collapse follows from social exclusion. In fact, Shelley seems to argue that monstrosity is produced when ethical responsibility breaks down, and when society fails to integrate what it does not understand.
 
-Stevenson’s novel works differently because the monster here is not abandoned but deliberately created. Jekyll’s transformation into Hyde is an act of choice, motivated by a desire to separate his darker impulses from his respectable public self. This matters because Hyde represents not just repressed desire but a kind of concentrated irresponsibility. Jekyll’s initial pleasure in Hyde’s freedom—“I felt younger, lighter, happier in body”—comes from the sense that Hyde’s actions carry no consequences for Jekyll’s social standing. Stevenson’s narrative structure reinforces this division: we learn about Hyde through others’ fragmented, horrified accounts long before we get Jekyll’s confession. So while Shelley gives her creature a voice and a history, Stevenson keeps Hyde largely opaque, almost like a symptom rather than a person.
+Stevenson, by contrast, treats monstrosity as an internal problem—a splitting of the self that allows darker desires to take physical form. The narrative structure of Dr. Jekyll and Mr. Hyde supports this by withholding direct knowledge and relying on external observation for much of the story. This matters because the horror comes not from witnessing the Creature’s suffering, but from the gradual revelation that Hyde is not a separate being but part of Jekyll. In other words, Stevenson’s novella suggests that monstrosity is not made by others; it is an expression of what the self tries to hide. Hyde represents the part of Jekyll that Victorian respectability cannot accommodate, and the experiment becomes a way of externalizing that conflict. There is an argument that this makes Stevenson’s model more psychological and less social than Shelley’s, since the focus is on individual moral fragmentation rather than collective failure.
 
-Someone could argue that both texts ultimately blame the creator rather than the creature, and that Shelley and Stevenson are making a similar point about scientific hubris. I see the appeal of that reading, but it feels slightly too neat. Victor’s sin is not just ambition; it is his refusal to care for what he has made. Jekyll’s sin is different—it is his attempt to evade moral accountability by creating a separate self. So although both figures are responsible, the nature of their responsibility differs. Victor’s failure is ethical and relational, while Jekyll’s is psychological and structural.
+Someone could argue that both texts actually show monstrosity as a combination of internal and external factors, and that it is reductive to separate them so sharply. I understand that reading, especially since Victor’s ambition and Jekyll’s hypocrisy are personal flaws that contribute to the horror. Still, the narrative emphasis in each text pushes toward a primary explanation. Shelley gives the Creature a voice and a history that highlight the role of nurture and social recognition, while Stevenson builds suspense around the discovery that the monster is within. This difference in narrative form—one expansive and multi-voiced, the other secretive and gradually revealed—shapes how each work assigns blame. In fact, the secondary source by Julia Briggs in the packet supports this distinction when she notes that Shelley’s Creature “demands a human response,” while Hyde “represents the fear of what the self might contain.” By comparing these two critical moments—the Creature’s plea for companionship and the final letter where Jekyll admits Hyde’s inevitability—we see how each text prioritizes a different kind of responsibility.
 
-The secondary source packet complicates this distinction. In her lecture “Gothic Doubles,” Dr. Evans argues that both novels use doubling to critique masculine ambition and the fear of social exposure. I think that is partly right, but it does not fully account for the difference in narrative form. Shelley’s layered narration—Walton, then Victor, then the creature—creates a kind of echo chamber of testimony where no single perspective is fully reliable. That structure makes the reader complicit in judging who is responsible. Stevenson’s narrative, by contrast, withholds Jekyll’s voice until the end, making the horror one of gradual discovery rather than immediate sympathy. In other words, Shelley’s form asks us to listen, while Stevenson’s asks us to investigate.
-
-There is a possible objection that *Jekyll and Hyde* is the more psychologically nuanced text because it shows how monstrosity arises from within, rather than from external rejection. I understand that reading, and it is true that Stevenson delves into the mechanics of self-division with a precision Shelley does not attempt. Still, *Frankenstein*’s emphasis on social abandonment feels more devastating because it implicates not just the individual but the community. The creature’s plea—“I am malicious because I am miserable”—suggests that monstrosity is made, not born, and that society has a role in its making. Meanwhile, Jekyll’s downfall is almost self-contained; it is a private drama of hypocrisy and self-betrayal.
-
-So while both novels show that monstrosity is produced rather than innate, Shelley locates the problem in failed relationships and the refusal of empathy, whereas Stevenson locates it in the attempt to disown parts of the self. That is why *Frankenstein* feels more like a tragedy of social neglect, and *Jekyll and Hyde* more like a parable of moral evasion. I find Shelley’s explanation more convincing because it reaches beyond the individual to question how communities create the monsters they fear. But Stevenson’s account remains powerful because it shows how easily self-deception can become self-destruction.
+That matters because it raises a larger question about what monstrosity represents in each historical context. Shelley was writing in the shadow of Enlightenment science and Romantic concerns about human nature, which may explain her focus on education, environment, and social belonging. Stevenson, writing later in a more urban, psychologically attuned Victorian society, seems more interested in the duality of public respectability and private transgression. So while both novels use Gothic elements to explore the boundaries of the human, they end up proposing different origins for the monstrous. I find Shelley’s explanation more socially conscious and ethically urgent, but Stevenson’s more unsettling in its suggestion that the monster is always already part of us. The comparison does not force a choice between them so much as show how monstrosity can be framed as a problem of recognition or a problem of repression—each with its own moral consequences.
 ```
 
 ## Level 2 Essay
 
 ```
-In our unit on nineteenth-century Gothic fiction, we have consistently seen that the literary monster is rarely just a physical body. Mary Shelley in Frankenstein and Robert Louis Stevenson in The Strange Case of Dr Jekyll and Mr Hyde both explore the making of monsters, but they do not define scientific horror in the same moral shape. Frankenstein treats creation as an act that immediately collapses into social abandonment, framing disaster as a failure of outside structures to provide care. The novel shows this failure through layered acts of testimony where the monster has to argue for his own humanity. Dr Jekyll and Mr Hyde operates through a much quieter breakdown of authority, where danger grows from an internal obsession with reputation and professional boundaries, which the text reflects by withholding direct knowledge for most of the plot. What stands out to me is that both texts link physical violence to a failure of community, but one text blames the outside failure of caregivers while the other blames a deliberate choice to hide behind respectability. The comparison matters because it shows how cultural anxieties shifted over the course of the century. Shelley writes during the Romantic period, worrying about unchecked individual ambition and the limits of human sympathy. Stevenson writes decades later in the Victorian era, worrying about urban hypocrisy and the secret lives of the professional class. If I had to put it plainly, Shelley imagines monstrosity as a tragic product of neglect, whereas Stevenson imagines it as a calculated performance.
+Frankenstein and The Strange Case of Dr Jekyll and Mr Hyde both locate horror inside the human body, but they do not trace monstrosity back to the same moral origin. Shelley treats terror as a problem of unchecked creation and the shocking reality of literal embodiment. Stevenson works differently, tying horror to urban secrecy, reputation, and the psychological collapse of the divided self. They also frame this horror through completely different narrative structures. Shelley relies on layered narration and testimony, giving the monster a chance to advocate for himself. Stevenson, by contrast, withholds direct knowledge, forcing the reader to interpret rumors and locked doors. What stands out to me is that both texts ask who is actually responsible when a new identity becomes dangerous, yet they offer fundamentally different answers about how that danger is produced in the first place. Shelley locates the danger in a creator that rejects the physical body, while Stevenson locates it in an individual attempting to sever his unacceptable desires from his public face. The comparison matters because it shows how the concept of a monster shifts from a physical failure of care in the early nineteenth century to a psychological failure of repression in the late Victorian era. If I had to put it plainly, Stevenson treats monstrosity as a deliberate performance of psychological splitting, while Shelley provides the more tragic model by showing that monstrosity is always manufactured by social abandonment.
 
-In Shelley, the central problem is that the creature is manufactured into a threat by a world that refuses to read him correctly. When Victor brings his creation to life in his laboratory, he immediately runs away from the physical reality of the body instead of taking responsibility for the mind he just built. Victor explicitly states that 'breathless horror and disgust fill my heart' the moment the creature opens its dull yellow eye, fleeing his own apartment. The word disgust is important here. It shows that Victor is not reacting to a moral threat, but simply to an aesthetic failure. This matters because the narrative forces the reader to see the disaster as a failure of parental authority rather than the birth of biological evil. Victor treats the new life as a terrifying spectacle. His blindness to the creature's emotional needs initiates a cycle of rejection that the creature cannot survive without turning violent. As the critic Anne K. Mellor argues in our source packet, Victor represents a dangerous model of intellectual production that tries to bypass the maternal role and the domestic institution of the family altogether. That secondary reading aligns perfectly with the primary text, since Victor isolates himself from his father and his fiancée in order to collect bones from charnel houses and produce life in a vacuum. He wants the glory of being a creator, but he completely ignores the social structure required to sustain a dependent subject. The novel frames this entire confession through Walton, another ambitious explorer who is writing letters to his sister. In other words, the outer narrative relies on family communication to warn the reader that ignoring social bonds leads to total ruin.
+Shelley establishes early on that the creature is not born dangerous, but rather becomes monstrous only after his creator refuses to grant him any intimacy. The source packet's historical excerpt on early nineteenth-century science shows that researchers were actively experimenting with electricity and dead tissue, and this sparked profound public anxieties about human limits. In a primary source document from the packet, Luigi Galvani describes how a spark caused "violent convulsions" in lifeless limbs, a purely mechanical reaction that fascinated the public. Victor embodies this unchecked scientific ambition, but he completely ignores the social consequences of his experiment. When Victor finally animates his project, he does not respond with intellectual pride. Instead, he is immediately repulsed by its physical appearance, noting how the creature's "yellow skin scarcely covered the work of muscles and arteries beneath." The diction here is important because Victor obsessively focuses on the aesthetic surface of his creation rather than recognizing it as a living subject. He is horrified by his own achievement, confessing that "breathless horror and disgust filled my heart," and he abandons the confused being to fend for itself in the dark. At the same time, the novel does not frame this as a simple mistake or a momentary lapse in judgment. It frames it as an absolute failure of authority. The creature is born into a state of innocence, but Victor's immediate rejection teaches him that his physical existence is unacceptable. In other words, the creature's violent turn is not a biological accident, but a direct, learned response to being denied a legitimate place within any protective human structure. This matters because Victor treats his profound responsibility as something he can simply discard once the aesthetic result disappoints his blindness. He fails to realize that creation requires an institution of care rather than just a moment of brilliant spark. He wants the glory of scientific mastery, but he refuses the ethical weight of parenthood. 
 
-The creature is not born with malice, but he learns it by watching how institutions and families measure human worth. He spends months hiding near the De Lacey household, interpreting their language and studying the father's affectionate behavior. He even reads foundational human texts like Paradise Lost to understand the structures of kinship and divine justice. When he finally attempts to enter that social order, he is beaten and chased away strictly based on his visual appearance. This matters because the rejection proves that human sympathy has severe physical limits. The creature later explains his own corruption to Victor by insisting that 'misery made me a fiend', directly connecting the psychological toll of his isolation to his actions. The verb made is crucial in that sentence. It places the blame entirely on a process of social conditioning rather than a biological reality. Shelley explicitly ties the monster's violence to the denial of community. He only demands a female mate, a structural solution to his profound loneliness, and he turns to a systematic campaign of murder against Victor's family only when Victor destroys that half-finished companion. The novel uses a layered narrative structure, placing the creature's plea at the very center of the book, to ensure the reader understands his psychological development. The monster becomes legible through speech, proving that he understands the social contract far better than the human beings who refuse to extend it to him. In other words, the creature's monstrosity is historically manufactured by the people around him.
+Shelley also uses narrative form to prove that monstrosity is manufactured by the community. By giving the creature his own voice in the middle chapters of the novel, Shelley forces the reader to listen to a being who is highly rational and desperate for connection. The creature explicitly diagnoses his own condition, telling Victor, "I was benevolent and good; misery made me a fiend." He learns to speak by secretly observing the DeLacey family, and he even reads foundational human texts like Paradise Lost to absorb concepts of love, justice, and kinship that he is physically forbidden to participate in. At the same time, his eloquent speech only highlights the cruelty of his permanent exile. As the literary critic Peter Brooks argues in the source packet, the creature's mastery of language marks him as a human subject, yet it also guarantees his suffering. Brooks claims that "the monster's eloquence exposes the failure of human sympathy." The novel supports this critical reading perfectly because the creature is consistently attacked by villagers who refuse to hear him speak. In other words, the creature understands the social script perfectly, but he is structurally locked out of it by the prejudice of those who can only read his body. This matters because the horror of Frankenstein is not that the creature is a mindless, unthinking beast. The real horror is that he is a highly conscious subject who recognizes his own abandonment. He acts out violently only when he realizes that no amount of eloquence will ever rewrite the visual misrecognition he suffers from his creator. That structural exclusion confirms that his monstrous identity is a direct result of social abandonment.
 
-Dr Jekyll and Mr Hyde works differently because the text puts much more pressure on public reputation and the strict rules of professional society. Jekyll does not build a new life from scratch, but instead chemically alters himself so he can indulge his darkest habits without ruining his good name. In his final confession letter, Jekyll admits that he concealed his pleasures because he was determined to maintain an 'imperious desire to carry my head high' in public. The phrase carry my head high reveals that his primary motivation is not scientific discovery, but pure social vanity. He does not want to stop his bad behavior, only his accountability. This matters because the text presents monstrosity not as a tragic accident, but as a deliberate social strategy. Jekyll creates Hyde to follow a new script that exploits the anonymity of the modern city. He sets up a bank account for Hyde, rents him a house in a darker part of London, and even changes his handwriting to protect his professional reputation. In other words, the monster is a tool for navigating an urban landscape where respectability is the highest currency. As our source packet highlights through primary Victorian documents on criminal anthropology, nineteenth-century science became obsessed with identifying biological criminals. The packet includes a primary excerpt from Cesare Lombroso arguing that the true criminal displays 'physical markers of inner degeneracy' that can be read on the body. The novella plays with that exact anxiety, but it twists the premise. Hyde does look deformed to everyone who meets him, but the text never names a specific medical deformity. His physical shape is actually just the external shape of Jekyll's own hypocrisy. Monstrosity here is deeply internal.
+Jekyll works differently because the novella puts much more pressure on reputation and the conscious desire to hide. The provided excerpt from Judith Walkowitz emphasizes that the late Victorian era was obsessed with public respectability and the possibility of moral degeneration. Jekyll fits this historical model perfectly because he is not trying to create a new life from scratch, but rather to construct a safe disguise for his darkest impulses. In his final written confession, Jekyll admits that he wanted to conceal his "pleasures" in order to maintain a "grave countenance before the public." He wants to experience cruelty without damaging his valuable social standing. When he first assumes the shape of Hyde, he feels "younger, lighter, happier in body," which confirms that the transformation is a desired release. The use of the word "happier" reveals that Hyde is not an alien invader, but rather a concentrated version of Jekyll's own suppressed desires. In other words, his monster is a deliberate performance. At the same time, the text keeps exposing the limits of this divided script. Jekyll eventually loses control over his physical transitions, waking up as Hyde without taking the chemical draft. This matters because Stevenson suggests that repression itself is the true problem. The monster is not an abandoned outsider demanding to be loved, but the inevitable collapse of a highly respectable man who believes he can compartmentalize his own nature. Jekyll assumes he can manage the scale of his own hypocrisy, treating his physical form as just another institution he can manipulate. This deliberate performance of splitting shows how monstrosity is engineered by his own refusal to integrate his desires, making the danger entirely psychological.
 
-Stevenson also makes the horror systemic by showing how the community prefers to ignore the truth, which is reflected in the narrative structure itself. The novella withholds direct knowledge of the transformation for a long time, forcing the reader to follow Utterson as he tries to solve a mystery using the language of contracts, wills, and blackmail. When Enfield witnesses Hyde attacking a young girl, he states that the man 'trampled calmly over the child's body and left her screaming' on the street. The word calmly is the most horrifying part of that description. It shows that the violence is not a crime of passion, but a completely routine action for a man operating under the protection of modern anonymity. The response from the community is not a grand moral crusade. It is a quiet financial settlement. The men force Hyde to pay off the girl's family with one hundred pounds, and then they agree never to speak of the incident again. That choice is important. The violence is absorbed back into the market logic of reputation and hush money. This matters because the tragedy of the novella is sustained by the professional silence of respectable men. Utterson refuses to read letters that might contain bad news, and Lanyon dies of shock rather than making his knowledge public. The critic Stephen Heath argues in our packet that Hyde is frightening precisely because he is a creature of the bourgeois establishment, not a true outsider. I think that is exactly right, especially when we compare Heath's claim to Enfield's financial compromise. Shelley gives us a monster who breaks into society from the margins, but Stevenson gives us a monster who is fully funded and protected by the center. So both authors tie violence to a social failure, but Shelley shows a failure of inclusion, whereas Stevenson shows a failure of honesty.
+Stevenson reinforces this model of deliberate evasion by withholding direct knowledge for almost the entire narrative. The packet notes that Victorian London was deeply divided between wealthy neighborhoods and impoverished districts like Soho, and Stevenson maps this divide directly onto Jekyll's home. The respectable front door contrasts sharply with the decaying rear laboratory entrance used by Hyde. Unlike Frankenstein, which allows the monster to explain himself directly, Dr Jekyll and Mr Hyde relies on outsiders like Mr. Utterson who try to read Hyde through rumors, forged checks, and closed doors. Whenever characters try to describe Hyde, they struggle to articulate his appearance, noting only an impression of "unexpressed deformity" rather than a clear, identifiable shape. The abstract diction here mirrors Jekyll's own strategy of concealment, as Hyde is defined by what people refuse to look at closely. The novella connects horror to urban secrecy, where violence happens in the dark streets, and respectable men protect each other's reputations by refusing to ask too many questions. As literary critic Stephen Arata argues in the source packet, Hyde is "produced by the very systems of professional discretion that seek to contain him." The text aligns with this claim because Utterson repeatedly ignores obvious signs of blackmail to protect his friend's name. In other words, Hyde thrives precisely because the surrounding community values silence over messy disclosures. This matters because Stevenson shows how the social structure actually enables the monster. The institution of middle-class privacy gives Jekyll the perfect cover to enact his psychological splitting. Utterson's reluctance to pry into his friend's affairs delays the discovery of the truth, making the social habit of discretion a blind partner in the monster's survival. So while Shelley blames a lack of care, Stevenson blames a deliberate, socially sanctioned system of silence that protects professional reputations at all costs.
 
-Someone could argue that Frankenstein actually offers the more severe critique of personal ambition, since Victor literally steals body parts and defies nature. I understand that reading. Shelley certainly makes Victor's arrogance central to the horror, and the sheer physical scale of the creature feels much grander than a man beating someone with a walking stick in London. Still, Dr Jekyll and Mr Hyde leaves me with a stronger sense of moral dread because the violence is completely integrated into daily urban life. Victor isolates himself to build his monster, but Jekyll uses the entire structure of the Victorian legal and financial system to protect his. The tragedy in Frankenstein happens because a creator abandons his responsibility. The tragedy in Stevenson happens because a citizen manages his responsibility almost too well, turning the law into a shield for his darkest impulses. So while both texts reveal the dangers of unchecked scientific experimentation, Frankenstein treats the monster as an alien seeking connection, whereas Dr Jekyll and Mr Hyde treats the monster as an insider demanding release. I end up finding Shelley more sympathetic, but Stevenson more insidious.
+Someone could argue that Stevenson gives the more unsettling account of responsibility because Jekyll creates Hyde entirely on purpose. I understand that reading. Stevenson gives us almost no comforting sense that Jekyll was driven by anything other than a selfish desire for consequence-free pleasure, making his destruction feel earned. Even so, Frankenstein makes misrecognition feel much more tragic. Victor does not want to be evil, but he is still destroying the potential for intimacy by forcing his creation into an aesthetic script it cannot fulfill. The creature's violence is terrible, but it is the violence of a neglected child rather than the violence of a calculated hypocrite. So although both texts expose the danger of unchecked ambition and scientific overreach, Stevenson imagines monstrosity as a deliberate evasion of consequence, whereas Shelley imagines monstrosity as a forced exile from human connection. I end up finding Stevenson more cynical about human nature, but Shelley more profound about the institutions of care that make us human.
 ```
 
 ## Level 2 + Sources Essay
 
 ```
-Frankenstein and The Strange Case of Dr Jekyll and Mr Hyde both center on the creation of a monster, but they do not trace the problem of horror to the same social institution. In Mary Shelley, the central problem is that a creator refuses responsibility and leaves his creation to be defined by a hostile world. In Stevenson, the problem is almost the reverse. A highly respectable citizen attempts to privately manage his own unacceptable desires by hiding them inside a completely separate identity. What stands out to me is that both novels tie monstrosity to tragic failures of care, yet they reach different conclusions about whether horror is created by social abandonment or by the internal quarantine of the self. The texts also approach this problem through very different structural forms. Shelley builds her novel through layered narratives that force the reader to listen to the creature explain his own suffering, while Stevenson builds his novella around urban secrecy and delayed confessions that keep the monster silent for much longer. Shelley writes when scientific discovery feels like a dangerous boundary crossed by ambitious individuals, while Stevenson writes when late Victorian professional culture feels like a rigid script that everyone must follow. If I had to put it plainly, Shelley imagines monstrosity as a public failure of sympathy, whereas Stevenson imagines it as a private failure of respectability.
+*Frankenstein* and *Dr Jekyll and Mr Hyde* both center on monstrosity, but they do not imagine the production of the monster in the same moral shape. Shelley treats the monster as an external tragedy where a physical body is pushed into violence by social abandonment and systemic failures of care. Stevenson, by contrast, treats monstrosity as a deliberate performance that looks accidental only because Jekyll has been trained to hide his desires from the public. What stands out to me is that both texts connect horror to moral responsibility, yet they reach different conclusions about how the self breaks down under the pressures of nineteenth-century science and social expectation. The comparison matters because it shows that Gothic horror is not one stable script even within the same literary tradition. Instead, the figure of the monster adapts to reflect changing anxieties about whether danger comes from outside the community or from deep within its most respected institutions. Shelley builds her argument through layered narration that grants the monster a voice, while Stevenson relies on delayed observation to expose a culture of urban secrecy. If I had to choose, Shelley defines the monster as a product of social refusal, while Stevenson gives the sharper critique of respectability by showing that monstrosity is actively managed into existence.
 
-Victor's mistake is not just that he builds a creature. It is that he expects his creation to perfectly reflect his own genius and runs away when the physical reality falls short. Shelley grounds this failure in the historical anxieties of early nineteenth century science, where the ambition to master natural life outpaces human morality. When Victor finally brings his work to life in chapter five, he describes how he "collected the instruments of life" around him so he might "infuse a spark of being into the lifeless thing" that lay at his feet. The moment is supposed to be a triumph of modern knowledge. Instead, he confesses that "breathless horror and disgust" filled his heart the moment he saw the dull yellow eye of the creature open. Victor's choice to call his own creation a catastrophe reveals his profound blindness. He immediately abandons the newborn being in the laboratory without any guidance or protection. He does not stay to teach the creature how to navigate the world. That distinction is important because the novel does not present the creature as naturally evil or violently dangerous upon his awakening. Instead, it locates the origin of horror in a systemic failure of paternal and social responsibility. Essentially, the creature becomes a monster largely because the only world he encounters trains him to see himself as one. The course lecture notes clarify this dynamic by pointing out that Shelley turns horror into a failed relationship where violence is learned through exclusion. Victor expects absolute aesthetic perfection, and his inability to read anything else proves this point by creating a terrifying vacuum of care. He is supposed to act as an authority, but he acts like a frightened spectator instead. The structure of the family breaks down at the exact moment it should begin, which proves that monstrosity here is a public failure of sympathy.
+Shelley begins her critique of monstrosity by defining it as a product of aesthetic rejection and the total failure of scientific authority. Victor views the physical body as an achievement of nineteenth-century chemistry, but he entirely fails to anticipate that a living body requires a social context. When Victor finally animates his creation after months of obsessive labor in his dreary November laboratory, he does not experience the grand triumph he expected. He recounts the moment of creation directly, stating that "by the glimmer of the half-extinguished light, I saw the dull yellow eye of the creature open." Instead of taking responsibility for the life he has formed, he treats the physical reality of the body as a catastrophe. He admits that "breathless horror and disgust filled my heart," and he abandons the laboratory in a state of terror. He leaves his newly born creation to navigate a hostile world without any guidance or inherited language. At the same time, this visual rejection is not merely a personal vanity or a temporary panic on Victor's part. It represents a total collapse of the creator's obligation to the dependent life he has manufactured. As the course lecture notes argue, *Frankenstein* frames horror as a "failed relationship" where "a creator refuses responsibility" rather than a display of inherent evil. Read against this definition, Victor's sudden disgust reveals that the text does not imagine the creature as naturally destructive from the moment his eyes open. Instead, he learns violence because he is completely excluded from sympathy and forced into a structure of absolute loneliness. In other words, the novel insists that the real catastrophe is not the animation of dead tissue, but the creator's refusal to recognize his own work.
 
-The creature is completely aware of this dynamic, which is why his eventual confrontation with Victor feels so legally and morally complex. When they finally speak on the glacier in chapter ten, the creature frames his entire history as a problem of misplaced sympathy and institutional failure. He appeals to an older historical framework of natural rights, arguing that he was fundamentally benevolent until universal rejection forced him into misery and revenge. He reminds Victor of his moral duty by insisting that he ought to be his creator's Adam, but is instead the "fallen angel, whom thou drivest from joy for no misdeed." That argument is crucial. He does not ask for power, for wealth, or for dominion over others. He explicitly states that "misery made me a fiend" and simply demands a companion who shares his physical defects and will not scream at his presence. This matters because the creature understands his own monstrosity as a social condition rather than an inherent biological truth. He essentially tells Victor that virtuous behavior requires a community that recognizes the subject as worthy of basic interaction. At the same time, Shelley imagines violence as the inevitable result of a society that denies entry to the physically abnormal. The novel keeps showing how the creature uses advanced logic, emotional intelligence, and highly formal language to diagnose his own isolation. He knows exactly what he lacks, and that self awareness makes his descent into murder feel remarkably tragic rather than simply terrifying. The tragedy is that he reads his own situation perfectly, but he still cannot escape it. He is trapped inside a vocabulary of worth that always places him on the outside, reinforcing the idea that monsters are made through social abandonment.
+The scale of that failure becomes even clearer when the creature finally confronts his creator and demands a companion through direct testimony. He explains that his cruelty is not a fundamental trait, but a direct result of being universally exiled from human joy. He reminds Victor of his moral obligation, arguing, "I ought to be thy Adam; but I am rather the fallen angel, whom thou drivest from joy for no misdeed." He insists that his exclusion is irrevocable, and he points out a basic psychological truth when he declares that "misery made me a fiend." The seminar reader's critical introduction emphasizes this shift, pointing out that Shelley grants the creature a "vocabulary of grievance and a theory of his own making." Giving the creature such a highly structured argument shows exactly how Shelley uses narrative form to redefine the monster. The creature is remarkably capable of intelligent negotiation, but he is trapped inside a nineteenth-century social system that refuses to read him as anything other than a visual threat. His demand for a mate with the "same defects" is essentially a demand for a recognizable social contract. This structural reversal matters because it proves that blame shifts away from the physical body of the monster and falls entirely on the community that refuses to accommodate him. The horror here is not just that a monster exists, but that the monster can perfectly articulate the injustice of his own creation while his creator continues to refuse him basic dignity.
 
-Jekyll works differently because the novel puts much more pressure on the demands of public reputation and professional status. His central mistake is not that he accidentally creates a separate being in a chaotic laboratory. It is that he actively tries to solve the moral complexity of human nature by cutting it into manageable, isolated pieces. This reflects the historical reality of late Victorian London, where bourgeois society demanded a perfect performance of propriety that left no room for natural human flaws. In chapter ten, Jekyll confesses that he learned to recognize the "thorough and primitive duality of man" and theorized that if these opposing natures "could but be housed in separate identities, life would be relieved of all that was unbearable." He assumes that chemical administration can cure a moral problem. That theory is inherently destructive. He engineers a solution specifically to maintain his polite status while indulging his cruelty without social consequence. The critical point here is that Hyde is not an external accident forced upon a passive victim. He is the direct result of a bourgeois culture that treats desire as something to be hidden and tightly controlled rather than integrated into a whole life. The experiment eventually fails because the divided self cannot actually sustain that kind of artificial boundary forever. The system simply breaks down when the repressed elements gain too much independent strength. Stevenson keeps showing how the desire for absolute respectability produces a shadow world of unregulated violence. Jekyll turns a medical practice into an instrument of personal evasion, demonstrating how monstrosity emerges from a private failure of respectability.
+Stevenson works differently because the novella pulls horror inward and turns it into a problem of bourgeois administration. Jekyll does not abandon a separate being in the physical world, but he tries to split off his own unacceptable desires into a second identity so he can keep his public reputation clean. He looks at his own consciousness, and he decides that "Man is not truly one, but truly two." He theorizes that human nature is fundamentally divided, and he notes that "of the two natures that contended in the field of my consciousness. I was radically both." Rather than being rejected into existence, his monstrous double is managed into existence through a deliberate attempt to quarantine parts of himself. The seminar reader poses a crucial question about this dynamic, asking what kinds of violence become possible when a culture of respectability treats desire as something that can be quarantined rather than owned. Jekyll's admission that he is "radically both" exposes exactly this problem. He knows that his desires belong to him, but he uses the privileges of his class to pretend they do not. The separation eventually overtakes his ability to control it. At first, the release of Hyde feels like a relief from the strict rules of professional Victorian society, but the text keeps exposing how little authority Jekyll actually has over the division once he sets it in motion. This matters because Stevenson locates the real terror not in the creature itself, but in the violent hypocrisy of a culture that treats human consciousness like an equation to be solved. 
 
-Hyde is especially unsettling because he operates perfectly well within the shadowy, transactional spaces of the modern city. He does not retreat to a remote wilderness to mourn his isolation like Shelley's creature. He simply rents a house, writes checks, uses a bank account, and walks through the streets of London at night. That integration is terrifying. Jekyll describes his own view of human nature as a "polity of multifarious, incongruous and independent denizens." That diction is deeply political and administrative. It treats the human soul like a crowded city where difficult residents can simply be evicted. The critical essay from our seminar reader asks what kinds of violence become possible when a culture of respectability treats desire as something that can be quarantined rather than owned. That question is necessary because Hyde is never totally outside the social order, which perfectly illustrates the critical claim. He relies on the exact same legal and financial structures that protect Jekyll. Ultimately, the horror in Stevenson depends entirely on the hypocrisy of the professional class. The monster here does not demand recognition or sympathy from his creator. He simply demands an exit route so he can continue his quiet consumption of the city. As that same critical essay points out, the monster in Shelley is "rejected into existence" while the monster in Stevenson is "managed into existence." Hyde eventually destroys Jekyll not because he is a foreign invader, but because he is the logical endpoint of a system that values the appearance of innocence over actual moral accountability. The tragedy of Jekyll is that his performance of goodness becomes completely indistinguishable from his practice of evil. He builds a prison out of his own privilege, sealing his fate as a victim of his own private quarantine.
+Someone could argue that Jekyll is just another victim of society, and that nineteenth-century morality functions exactly like Victor Frankenstein's laboratory by forcing a vulnerable subject into the dark. I understand that reading. Both texts clearly show how intense social pressure can distort human behavior, and Jekyll certainly feels oppressed by the strict behavioral codes of Victorian London. Still, I find that comparison slightly too neat, because Jekyll is not an outcast begging for entry into the community. He is a highly respected physician who uses his wealth, his property, and his reputation to build a safe house for his own cruelty. When he writes his confession, Jekyll imagines that humanity will eventually be known as a "mere polity of multifarious, incongruous and independent denizens." He dreams that if these separate natures could be "housed in separate identities, life would be relieved of all that was unbearable." The metaphor matters because he is literally applying the language of government, housing, and urban administration to the human soul. As the lecture notes clarify, Hyde becomes visible precisely because Jekyll tries to claim only selected parts of himself. Jekyll's vision of a housed polity highlights how deeply he relies on this institutional logic. At the same time, this administrative approach changes how the narrative itself is structured. Unlike Shelley's novel, which uses the direct testimony of the creature to build sympathy, Stevenson withholds direct knowledge for much longer and relies on the delayed observations of other respectable men. The delayed structure mimics the secrecy of the Victorian professional class. Jekyll hides his monster behind locked doors and legal wills, which proves that his monstrosity depends on the protections of his social status. So while both texts connect horror to social expectation, Shelley imagines a monster produced by helpless exile, whereas Stevenson imagines a monster produced by hypocritical inclusion.
 
-Someone could argue that Frankenstein is the more universal novel because it strips the problem down to pure isolation, suffering, and the basic human need for affection. I understand that reading. Shelley certainly gives us a devastating picture of what happens when a conscious being is entirely deprived of community. Still, Victor's tragedy depends heavily on the external world repeatedly refusing to look past physical deformity, which makes the creature's violence a reaction to a society that will not change. The Strange Case of Dr Jekyll and Mr Hyde leaves me with a stronger sense of modern unease because the disaster unfolds entirely through voluntary self deception, not just through accidental prejudice. The doctor keeps seeing the danger of his experiment and then prioritizing his own reputation anyway. So while both novels connect horror to failed responsibility, Frankenstein shows how a monster can be created when society violently rejects the unknown, whereas The Strange Case of Dr Jekyll and Mr Hyde shows how a monster can be created when an individual artificially protects his own standing. That first model feels more emotionally tragic, but that second model feels more structurally corrupt.
+The comparison matters because it proves that Gothic horror is a flexible instrument for diagnosing social failure. *Frankenstein* and *Dr Jekyll and Mr Hyde* both use the figure of the monster to expose the limits of human sympathy and the dangers of scientific overreach, but they locate the source of the danger in completely different places and through entirely different narrative structures. Shelley looks at the collapse of authority and sees a tragedy of abandonment, where an innocent being is turned into a fiend by the exact people who should have cared for him. Stevenson looks at the height of professional authority and sees a tragedy of management, where an educated man willingly fractures his own identity just to preserve his public standing. Both works require us to ask who is really responsible when violence breaks out in a civilized world. I end up finding Shelley more expansive about the need for social connection, but Stevenson more devastating about the lies we tell to maintain our respectability.
 ```
