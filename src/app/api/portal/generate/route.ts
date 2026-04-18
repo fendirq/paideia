@@ -32,13 +32,12 @@ import type {
   LegacyGenerateOptions,
 } from "@/lib/essay-generator";
 
-// Bumped from 300 to 600s. The Level 2 pipeline can run up to ~7-10 passes
-// on complex sourced assignments (plan + draft + critique + audit +
-// expansion + evidence + attribution + compliance + trim + source-flow).
-// With Gemini thinking-mode adding 30-60s per call, a 300s budget was too
-// tight — codex-review flagged worst-case series exceeding maxDuration.
-// 600s gives room for a full pipeline under typical conditions with buffer.
-export const maxDuration = 600;
+// maxDuration=300 is the Vercel default/ceiling on non-Enterprise plans
+// (Fluid Compute). A higher value caused the first preview deploy to fail
+// post-build during "Deploying outputs..." — the platform rejects
+// maxDuration > plan limit at function-packaging time. Keeping 300 and
+// budgeting per-stage timeouts to fit.
+export const maxDuration = 300;
 
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // Level 1 model is env-driven so DeepSeek V3 vs Kimi (or any Together-hosted
@@ -46,20 +45,20 @@ const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // production behavior.
 const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
-// Per-stage timeouts sized for Gemini thinking-mode (see providers/gemini.ts
-// for the thinking-budget cap). Kept intentionally modest so the full
-// pipeline worst-case stays under maxDuration with buffer.
-//   Typical stage latency on gemini-3.1-pro-preview:
-//     plan:     20-60s  (light context, short output)
-//     draft:    40-120s (heavy context, long output)
-//     critique: 20-40s  (medium context, short output)
-//     revision: 40-90s  (medium context, long output)
-// The timeouts below give ~1.5x typical so transient slowness doesn't
-// spuriously abort, but total pipeline stays well under maxDuration.
-const LEVEL2_PLAN_TIMEOUT_MS = 90_000;
-const LEVEL2_DRAFT_TIMEOUT_MS = 150_000;
-const LEVEL2_CRITIQUE_TIMEOUT_MS = 60_000;
-const LEVEL2_REVISION_TIMEOUT_MS = 120_000;
+// Per-stage timeouts sized for Gemini thinking-mode and the 300s
+// maxDuration ceiling. Sum of the core-4 passes (plan + draft + critique
+// + audit) must be < 300s: 50 + 120 + 40 + 75 = 285s. Optional passes
+// (expansion, evidence, attribution, compliance, trim, source-flow) run
+// only conditionally on argumentative assignments; narrative path skips
+// all optional passes (see qa-generation.ts isNarrativeAssignment gating)
+// so the full narrative pipeline easily fits. For argumentative
+// assignments with many conditional passes active, worst case uses the
+// full 300s — the reducer logic preserves the current essay on pass
+// failures so timeouts degrade gracefully.
+const LEVEL2_PLAN_TIMEOUT_MS = 50_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 120_000;
+const LEVEL2_CRITIQUE_TIMEOUT_MS = 40_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 75_000;
 
 interface GenerateBody {
   assignment: string;

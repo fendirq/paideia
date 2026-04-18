@@ -41,15 +41,15 @@ const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // checkpoint for longer-context assignments).
 const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
-// Per-stage timeouts sized for Gemini thinking-mode (see providers/gemini.ts).
-// Kept in sync with src/app/api/portal/generate/route.ts so QA harness and
-// production use identical budgets. Mild 1.5x headroom over typical stage
-// latency; not so big that a full pipeline exceeds 600s maxDuration in
-// production.
-const LEVEL2_PLAN_TIMEOUT_MS = 90_000;
-const LEVEL2_DRAFT_TIMEOUT_MS = 150_000;
-const LEVEL2_REVISION_TIMEOUT_MS = 120_000;
-const JUDGE_TIMEOUT_MS = 120_000;
+// Per-stage timeouts sized for Gemini thinking-mode. Kept in sync with
+// src/app/api/portal/generate/route.ts (which fits within the Vercel
+// maxDuration=300 ceiling). QA script doesn't have a maxDuration
+// ceiling itself but matching route.ts keeps judge/harness behavior
+// identical to production.
+const LEVEL2_PLAN_TIMEOUT_MS = 50_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 120_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 75_000;
+const JUDGE_TIMEOUT_MS = 90_000;
 
 // Provider is resolved lazily at call time so scripts that only run
 // Level 1 (Together AI) don't require GEMINI_API_KEY / ANTHROPIC_API_KEY.
