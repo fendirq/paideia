@@ -40,10 +40,13 @@ const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // checkpoint for longer-context assignments).
 const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
-const LEVEL2_PLAN_TIMEOUT_MS = 60_000;
-const LEVEL2_DRAFT_TIMEOUT_MS = 90_000;
-const LEVEL2_REVISION_TIMEOUT_MS = 75_000;
-const JUDGE_TIMEOUT_MS = 90_000;
+// Timeouts sized for Gemini thinking-mode (see providers/gemini.ts).
+// 2-3x bigger than the Opus-era values; a multirun validation timed out
+// at 90s during Level 2 sourced draft generation.
+const LEVEL2_PLAN_TIMEOUT_MS = 120_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 240_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 180_000;
+const JUDGE_TIMEOUT_MS = 180_000;
 
 // Provider is resolved lazily at call time so scripts that only run
 // Level 1 (Together AI) don't require GEMINI_API_KEY / ANTHROPIC_API_KEY.

@@ -39,10 +39,14 @@ const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 // production behavior.
 const LEVEL1_MODEL = process.env.LEVEL1_MODEL?.trim() || "deepseek-ai/DeepSeek-V3";
 
-const LEVEL2_PLAN_TIMEOUT_MS = 60_000;
-const LEVEL2_DRAFT_TIMEOUT_MS = 90_000;
-const LEVEL2_CRITIQUE_TIMEOUT_MS = 45_000;
-const LEVEL2_REVISION_TIMEOUT_MS = 75_000;
+// Timeouts sized for Gemini thinking-mode: each call burns a fixed
+// thinking budget (see providers/gemini.ts) on top of the visible-output
+// budget, so wall-clock latency can reach 2-3x what Opus 4.6 took.
+// Headroom added after a multirun validation timed out at 90s on draft.
+const LEVEL2_PLAN_TIMEOUT_MS = 120_000;
+const LEVEL2_DRAFT_TIMEOUT_MS = 240_000;
+const LEVEL2_CRITIQUE_TIMEOUT_MS = 120_000;
+const LEVEL2_REVISION_TIMEOUT_MS = 180_000;
 
 interface GenerateBody {
   assignment: string;

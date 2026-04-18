@@ -82,14 +82,16 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           // temperature; on older/flash models we honor the caller's hint
           // and pass temperature through.
           const useThinking = thinkingOnly || Boolean(input.thinking && supportsAdaptiveThinking(model));
-          // Thinking models burn output budget on internal reasoning. Empirically
-          // on gemini-3.1-pro-preview a 5000-token request with auto-thinking
-          // truncates a 1300-word essay at ~200 words — thinking consumes most
-          // of the budget. Callers pass desired-output-size in maxTokens; we
-          // triple it and add a floor when thinking is active so thinking has
-          // room without starving the visible output.
+          // Thinking models burn output budget on internal reasoning. Two
+          // competing risks: (a) too-small budget truncates essays, (b)
+          // auto-budget with 3×-headroom ran past 90s per call and blew
+          // the LEVEL2_DRAFT_TIMEOUT_MS ceiling during multirun validation.
+          // Explicit cap is more predictable than auto: thinking gets a
+          // fixed 4000-token budget, the caller's maxTokens becomes real
+          // output ceiling, total request budget = output + thinking.
+          const THINKING_BUDGET = 4000;
           const effectiveMaxTokens = useThinking
-            ? Math.max(input.maxTokens * 3, 12000)
+            ? input.maxTokens + THINKING_BUDGET
             : input.maxTokens;
           const response = await client.models.generateContent({
             model,
@@ -100,7 +102,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
               ...(!useThinking && input.temperature !== undefined
                 ? { temperature: input.temperature }
                 : {}),
-              ...(useThinking ? { thinkingConfig: { thinkingBudget: -1 } } : {}),
+              ...(useThinking ? { thinkingConfig: { thinkingBudget: THINKING_BUDGET } } : {}),
               abortSignal: AbortSignal.timeout(input.timeoutMs),
             },
           });
