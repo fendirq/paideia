@@ -1,0 +1,52 @@
+{
+  "label": "comparative-essay",
+  "targetWordCount": 1500,
+  "teacherProfile": {
+    "gradeLevel": "college sophomore/junior",
+    "gradeOther": "",
+    "losesPointsFor": [
+      "plot summary in place of comparison",
+      "weak integration of secondary criticism",
+      "vague or dropped quotations"
+    ],
+    "losesPointsOther": ""
+  },
+  "selfAssessment": {
+    "gradeRange": "A-/B+",
+    "gradeRangeOther": "",
+    "revisionLevel": "I usually do two revision passes and then a final edit for flow",
+    "revisionOther": "",
+    "evidenceApproach": "I build body paragraphs around textual evidence and usually compare passages directly",
+    "evidenceOther": "",
+    "conclusionApproach": "I circle back to the thesis and then qualify it a little so the ending does not feel too absolute",
+    "conclusionOther": "",
+    "wordCountTendency": "I usually land a little over the target and then cut back during revision",
+    "wordCountOther": "",
+    "writingHabits": [
+      "I repeat transition phrases like 'at the same time' and 'in other words'",
+      "I sometimes over-explain after quotations",
+      "I like building paragraphs around a comparison and then adding a counterpoint"
+    ],
+    "writingHabitsOther": "",
+    "quoteIntroStyle": [
+      "As the narrator puts it",
+      "The seminar packet argues",
+      "What stands out in this passage is"
+    ],
+    "quoteIntroOther": "",
+    "overusedPhrases": [
+      "at the same time",
+      "this matters because",
+      "what stands out to me is"
+    ],
+    "overusedPhrasesOther": "",
+    "selfEditFocus": [
+      "cutting repetition",
+      "tightening topic sentences",
+      "making source integration feel less mechanical"
+    ],
+    "selfEditOther": "",
+    "timeSpentOn": "introductions, transitions, and figuring out the order of comparisons",
+    "timeSpentOther": ""
+  }
+}

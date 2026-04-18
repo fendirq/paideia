@@ -1,0 +1,50 @@
+{
+  "label": "analytical-essay",
+  "targetWordCount": 1400,
+  "teacherProfile": {
+    "gradeLevel": "college sophomore",
+    "gradeOther": "",
+    "losesPointsFor": [
+      "shallow close reading",
+      "unsupported interpretive claims",
+      "dropped quotations without unpacking"
+    ],
+    "losesPointsOther": ""
+  },
+  "selfAssessment": {
+    "gradeRange": "A-/B+",
+    "gradeRangeOther": "",
+    "revisionLevel": "I do multiple revision passes and usually restructure paragraphs when my argument shifts",
+    "revisionOther": "",
+    "evidenceApproach": "I pull short quotations, build paragraphs around them, and explain what the wording is doing",
+    "evidenceOther": "",
+    "conclusionApproach": "I usually return to the thesis and qualify it instead of ending too neatly",
+    "conclusionOther": "",
+    "wordCountTendency": "I usually land near the target, but I can go a little long when I keep unpacking one quotation",
+    "wordCountOther": "",
+    "writingHabits": [
+      "I over-explain after quotations",
+      "I reuse frame sentences at the start of body paragraphs"
+    ],
+    "writingHabitsOther": "",
+    "quoteIntroStyle": [
+      "As the passage puts it",
+      "What the speaker is really doing here is"
+    ],
+    "quoteIntroOther": "",
+    "overusedPhrases": [
+      "at the same time",
+      "that matters because",
+      "in other words"
+    ],
+    "overusedPhrasesOther": "",
+    "selfEditFocus": [
+      "cutting repetition",
+      "making sure each quotation gets explained",
+      "tightening topic sentences"
+    ],
+    "selfEditOther": "",
+    "timeSpentOn": "introductions, body paragraph openings, and places where my argument turns",
+    "timeSpentOther": ""
+  }
+}
