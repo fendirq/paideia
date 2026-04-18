@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "qa:diff": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qa-diff.ts",
-    "qa:generate": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qa-generation.ts"
+    "qa:generate": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qa-generation.ts",
+    "qa:multirun": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/qa-multirun.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
