@@ -39,4 +39,31 @@ describe("parseActionsFromResponse", () => {
       suggestedActions: [],
     });
   });
+
+  it("strips glued acknowledgment text from the last action (no space after period)", () => {
+    // Real observed output from Gemini 2.5-flash in the tutor session:
+    // the model listed actions and then concatenated an acknowledgment
+    // paragraph to the last one without a newline separator, producing
+    // "I want to explore free will.Great choice! Ethics is a..."
+    const result = parseActionsFromResponse(
+      "Excellent! Let's narrow in.\n---ACTIONS---\n1. I'm interested in ethics.\n2. I'm curious about the nature of reality.\n3. I want to explore free will.Great choice! Ethics is a fascinating and fundamental area of philosophy.",
+    );
+
+    expect(result.suggestedActions).toEqual([
+      "I'm interested in ethics.",
+      "I'm curious about the nature of reality.",
+      "I want to explore free will.",
+    ]);
+  });
+
+  it("keeps question-mark-terminated actions intact", () => {
+    const result = parseActionsFromResponse(
+      "Good question.\n---ACTIONS---\n1. What is the thesis?\n2. What examples does the author give?",
+    );
+
+    expect(result.suggestedActions).toEqual([
+      "What is the thesis?",
+      "What examples does the author give?",
+    ]);
+  });
 });

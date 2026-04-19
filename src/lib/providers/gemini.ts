@@ -60,12 +60,18 @@ function errorStatus(err: unknown): number | undefined {
  * `shouldFallback`, and lets the caller log the specific finishReason.
  */
 export class GeminiEmptyResponseError extends Error {
-  constructor(
-    public readonly finishReason: string,
-    public readonly model: string,
-  ) {
+  // Assigned in the body (not as constructor parameter properties) so
+  // Node's `--experimental-strip-types` can parse this file — it
+  // rejects TS parameter-property syntax in strip-only mode, which
+  // is what the QA harness scripts invoke (scripts/qa-*.ts).
+  public readonly finishReason: string;
+  public readonly model: string;
+
+  constructor(finishReason: string, model: string) {
     super(`Gemini ${model} returned empty response (finishReason=${finishReason})`);
     this.name = "GeminiEmptyResponseError";
+    this.finishReason = finishReason;
+    this.model = model;
   }
 }
 

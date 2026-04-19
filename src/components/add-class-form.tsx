@@ -32,7 +32,14 @@ export function AddClassForm({ onCancel }: AddClassFormProps) {
         body: JSON.stringify({
           unitName: className,
           teacherName: teacher,
-          description: semester,
+          // The semester was being passed as `description` to satisfy
+          // the API's required field — but chat-container.tsx then
+          // renders `Help me with: ${inquiry.description}` on the
+          // welcome screen, so users saw "Help me with: Fall 2026".
+          // Leave description empty; the real help text is collected
+          // by the session-start page as helpType.
+          description: "",
+          semester,
           subject,
           files: [],
           source: "add-class",

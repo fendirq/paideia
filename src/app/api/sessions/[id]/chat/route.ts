@@ -4,10 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { retrieveRelevantChunks } from "@/lib/rag-retrieval";
 import { buildSystemPrompt } from "@/lib/system-prompt";
-import {
-  streamChatCompletion,
-  parseActionsFromResponse,
-} from "@/lib/together-chat";
+import { streamChatCompletion } from "@/lib/gemini-chat";
+import { parseActionsFromResponse } from "@/lib/parse-actions";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { buildCompressedHistory, getSummaryContext, maybeCompressThread } from "@/lib/thread-compression";
 

@@ -744,6 +744,32 @@ export function isNarrativeAssignment(assignment: string, requirements?: string)
   return signals.some((signal) => text.includes(signal));
 }
 
+/**
+ * Detects comparative-analysis assignments (compare/contrast, compare,
+ * etc). Drives a block of comparative-specific craft directives in the
+ * Level 2 Writing prompt — e.g. parallel criteria, comparative claim
+ * per paragraph, point-by-point vs block selection by complexity.
+ * Sources: Harvard comparative-analysis guide; UMGC compare/contrast.
+ */
+export function isComparativeAssignment(assignment: string, requirements?: string): boolean {
+  const text = `${assignment}\n${requirements ?? ""}`.toLowerCase();
+  const signals = [
+    "compare and contrast",
+    "comparative analysis",
+    "comparative essay",
+    "comparison essay",
+    "compare ",
+    "contrast ",
+    " vs ",
+    " vs. ",
+    "similarities and differences",
+    "similar and different",
+    "juxtapose",
+    "side by side",
+  ];
+  return signals.some((signal) => text.includes(signal));
+}
+
 // ─── Level 2 Writing Prompt (sample-first generation) ───
 
 export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
@@ -752,6 +778,7 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
   const refSamples = selectDiverseSamples(samples);
   const narrative = formatFingerprintNarrative(fingerprint);
   const isNarrative = isNarrativeAssignment(assignment, requirements);
+  const isComparative = !isNarrative && isComparativeAssignment(assignment, requirements);
 
   const gradeLevel = resolveValue(tp.gradeLevel, tp.gradeOther);
   const gradeRange = resolveValue(sa.gradeRange, sa.gradeRangeOther);
@@ -887,13 +914,39 @@ This student's vocabulary tier is "${fingerprint.vocabulary.tier}". Their go-to 
 BANNED vocabulary (too advanced for this student): "elusive", "unbridgeable", "multifaceted", "spiritually bankrupt", "pervasive", "profound", "encompasses", "transcends", "illuminates", "underscores", "epitomizes", "juxtaposition"
 Instead of fancy words, use the simple ones real students use: "shows", "proves", "is about", "means that", "is important because", "represents". When in doubt, pick the simpler word.
 
-5. EVIDENCE SPECIFICITY (MANDATORY):
-Do NOT hide behind placeholders like "in class we talked about", "in the sources you can see", "history shows", or "the text says" unless you immediately name the actual evidence. Use concrete details whenever the topic allows it: people, cities, groups, policies, events, regions, dates, or direct source claims. A real student may be simple, but they still mention the actual thing they are talking about.
+5. EVIDENCE INTEGRATION (MANDATORY — college rubric, not high-school):
+Do NOT hide behind placeholders like "in class we talked about", "in the sources you can see", "history shows", or "the text says" unless you immediately name the actual evidence. Use concrete details whenever the topic allows it: people, cities, groups, policies, events, regions, dates, or direct source claims.
 ${sourceContext ? "If approved source material is provided, pull your evidence from it and name it directly. Do not invent source details that are not in the provided material." : ""}
 ${!sourceContext ? "If no approved source material is provided, still use concrete evidence, but keep it to the kind of major details a well-prepared student could plausibly remember without research. Prefer major names, events, places, and policies over obscure dates or niche facts. Pick a few strong examples and develop them instead of trying to sound comprehensive." : ""}
 If the prompt or rubric requires a minimum number of evidence pieces, actually hit that number.
 
-6. QUALITY FLOOR:
+How A-level papers actually integrate evidence (Princeton/Harvard rubric standards):
+${sourceContext ? `- FRAME FIRST: one sentence of framing BEFORE each quote or paraphrase — name the source or speaker, provide needed context, and state what point the evidence will help prove.
+- PREFER PARAPHRASE: use paraphrase when you need the idea; use a direct quote ONLY when the exact wording, tone, or phrasing is what you will analyze in the next sentences.
+- NEVER end a body paragraph on quoted material or source summary — the paragraph must end in the writer's own analytical voice.
+- AFTER each quote or paraphrase, write at least 2 sentences of analysis explaining what the evidence implies, how it supports or complicates the paragraph claim, and why that matters for the thesis.
+- Use precise reporting verbs: 'argues', 'suggests', 'implies', 'concedes', 'reveals', 'demonstrates' — pick the verb that matches the source's action. Do not lean on generic 'says' or inflated 'illuminates'.` : `- NO FABRICATED SOURCES. You do not have an approved source packet. Do NOT reference "the source packet", "our packet", "the provided excerpt", or cite invented scholars/critics/reviewers. If you want the weight of authority, name a well-known text, figure, or event directly (e.g. "Frankenstein's creature tells Victor..." not "The critical essay by Anne Mellor in our packet..."). Fabricated citations are a rubric disqualifier — they fail the source-integration floor more dramatically than no citation at all.
+- FRAME FIRST when you name a specific text, figure, or event: one sentence of orientation (who/what, when relevant) before the claim grounded in it.
+- PREFER PARAPHRASE over pretend-quotation. Only put something in quotes if you are confident the exact words are from the text and genuinely widely-known.
+- AFTER a concrete reference (a named event, character, or widely-known claim), write at least 1-2 sentences of analysis explaining what it implies and why it matters for the thesis.
+- Use precise verbs when describing named figures or events: 'argues', 'suggests', 'implies', 'reveals', 'demonstrates' — over generic 'says' or inflated 'illuminates'.`}
+
+6. COLLEGE-RUBRIC CRAFT (MANDATORY — what turns a B paper into an A):
+- THESIS STAKES: the introduction's thesis must be arguable AND state why the claim matters (what is at stake, what it changes, why the reader should care). A descriptive topic statement ('This essay discusses X') is a B-range miss.
+- TOPIC SENTENCES AS SUBCLAIMS: each body paragraph's first sentence is a debatable subclaim that supports the thesis. Read only the first sentences of all body paragraphs in order — they should outline the argument's logic.
+- "SO WHAT" PER PARAGRAPH: near the end of each body paragraph, include a sentence that names the consequence, pattern, contradiction, or larger implication the evidence revealed. Do not leave the interpretive work to the reader.
+- COUNTERARGUMENT: at least once in the essay, introduce a plausible counterargument, counterexample, or alternative interpretation and respond to it by refining or defending the thesis. Skipping this is a hallmark of C-range work.
+- CONCLUSION SYNTHESIZES, DOES NOT REPEAT: do not restate the introduction word-for-word. Synthesize how the main claims fit together, restate the stakes in broader terms, and end with a clear "so what / now what" implication.
+- MEASURED ASSERTION: sound confident but not totalizing. Avoid both overclaiming ('proves once and for all') and deflating hedges ('kind of', 'maybe' everywhere). Match verb/qualifier strength to the evidence.
+
+${isComparative ? `7. COMPARATIVE-ANALYSIS STRUCTURE (MANDATORY — this is a comparison assignment):
+- STRUCTURE BY COMPLEXITY: choose point-by-point structure (alternate between both subjects inside each body paragraph) for complex comparisons; use block structure (all of subject A, then all of subject B) ONLY for short or simple comparisons.
+- PARALLEL CRITERIA (fair-play rule): if you compare A and B by criteria 1, 2, 3, you MUST use the same criteria for both, in the same order.
+- COMPARATIVE CLAIM PER PARAGRAPH: every body paragraph makes an explicit comparative claim using both subjects under the same lens. Do NOT discuss A and B separately without stating what the juxtaposition proves.
+- SYMMETRY: both subjects get real analysis — not "A gets three paragraphs of analysis, B gets one token paragraph." Comparative asymmetry drags A papers to B.
+- SYNTHESIS CONCLUSION: the conclusion names the relationship between the two subjects and restates why the comparison mattered in the first place.
+
+8. QUALITY FLOOR:` : "7. QUALITY FLOOR:"}
 This must read like the strongest, most educated version of this writer.
 - Clear thesis in the introduction
 - Concrete evidence, not generic placeholders
@@ -904,7 +957,7 @@ This must read like the strongest, most educated version of this writer.
 - Depth over coverage. A strong student essay should feel selective, not encyclopedic.
 - Preserve the student's recognizable style signatures, but do NOT preserve incoherence, weak grammar, or low-effort development.
 
-7. TARGET: ~${wordCount} words.
+${isComparative ? "9. " : "8. "}TARGET: ~${wordCount} words.
 
 AVOID THESE AI-DETECTOR RED FLAGS:
 "delve into", "it's important to note", "in today's society", "furthermore", "multifaceted", "nuanced", "pivotal", "underscores", "highlights the importance of", "it is worth noting", "plays a crucial role", "serves as a testament", "serves as a powerful", "devastating portrait", "compelling narrative"
