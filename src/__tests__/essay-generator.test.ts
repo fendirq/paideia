@@ -13,6 +13,8 @@ import {
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
   buildLevel2NaturalnessPrompt,
+  isComparativeAssignment,
+  isNarrativeAssignment,
   normalizeSupportedSourceAttribution,
   polishLevel2SurfaceVoice,
   stripUnsupportedSourceAttribution,
@@ -923,5 +925,96 @@ describe("sanitizeEssayOutput", () => {
     const result = sanitizeEssayOutput(raw);
 
     expect(result).toBe("Paragraph one.\n\nParagraph two.");
+  });
+});
+
+describe("isComparativeAssignment", () => {
+  it("detects compare-and-contrast prompts", () => {
+    expect(isComparativeAssignment("Compare and contrast Frankenstein and Jekyll/Hyde")).toBe(true);
+    expect(isComparativeAssignment("Write a comparative analysis of Plato's Apology and Republic")).toBe(true);
+    expect(isComparativeAssignment("Discuss the similarities and differences between X and Y")).toBe(true);
+    expect(isComparativeAssignment("Frankenstein vs. Jekyll and Hyde: a comparative essay")).toBe(true);
+  });
+
+  it("does not fire on analytical-only assignments", () => {
+    expect(isComparativeAssignment("Analyze the theme of guilt in Crime and Punishment")).toBe(false);
+    expect(isComparativeAssignment("Write a 1200-word historical argument about the Abbasid Revolution")).toBe(false);
+  });
+
+  it("is mutually exclusive with isNarrativeAssignment", () => {
+    const narrative = "Write a personal narrative about a challenge you overcame";
+    expect(isNarrativeAssignment(narrative)).toBe(true);
+    // A comparative prompt shouldn't accidentally match narrative signals
+    expect(isNarrativeAssignment("Compare two novels")).toBe(false);
+  });
+});
+
+describe("buildLevel2WritingPrompt — college rubric directives", () => {
+  function makeOptsFor(assignment: string): GenerateOptions {
+    return {
+      teacherProfile: {
+        gradeLevel: "college junior",
+        gradeOther: "",
+        losesPointsFor: [],
+        losesPointsOther: "",
+      },
+      selfAssessment: makeSelfAssessment(),
+      fingerprint: makeFingerprint(),
+      samples: [
+        { label: "prior", content: "In the novel, the author shows that..." },
+      ],
+      assignment,
+      wordCount: 1200,
+    };
+  }
+
+  it("injects comparative-specific directives for compare/contrast prompts", () => {
+    const prompt = buildLevel2WritingPrompt(
+      makeOptsFor("Compare and contrast Frankenstein and Jekyll/Hyde"),
+      "Outline here",
+    );
+    expect(prompt).toContain("COMPARATIVE-ANALYSIS STRUCTURE");
+    expect(prompt).toContain("PARALLEL CRITERIA");
+    expect(prompt).toContain("COMPARATIVE CLAIM PER PARAGRAPH");
+  });
+
+  it("does NOT inject comparative directives for analytical prompts", () => {
+    const prompt = buildLevel2WritingPrompt(
+      makeOptsFor("Analyze the theme of guilt in Crime and Punishment"),
+      "Outline here",
+    );
+    expect(prompt).not.toContain("COMPARATIVE-ANALYSIS STRUCTURE");
+  });
+
+  it("includes the college-rubric craft section for argumentative writing", () => {
+    const prompt = buildLevel2WritingPrompt(
+      makeOptsFor("Analyze the causes of the Abbasid Revolution"),
+      "Outline here",
+    );
+    expect(prompt).toContain("COLLEGE-RUBRIC CRAFT");
+    expect(prompt).toContain("THESIS STAKES");
+    expect(prompt).toContain("COUNTERARGUMENT");
+    expect(prompt).toContain("SO WHAT");
+    expect(prompt).toContain("TOPIC SENTENCES AS SUBCLAIMS");
+  });
+
+  it("includes the evidence-integration framing + reporting-verb guidance", () => {
+    const prompt = buildLevel2WritingPrompt(
+      makeOptsFor("Argue whether Gatsby's dream was doomed from the start"),
+      "Outline here",
+    );
+    expect(prompt).toContain("FRAME FIRST");
+    expect(prompt).toContain("PREFER PARAPHRASE");
+    expect(prompt).toContain("reporting verbs");
+    expect(prompt).toContain("'argues'");
+  });
+
+  it("does NOT add college-rubric craft to narrative prompts (wrong branch)", () => {
+    const prompt = buildLevel2WritingPrompt(
+      makeOptsFor("Write a personal narrative about a pivotal moment"),
+      "Outline here",
+    );
+    expect(prompt).not.toContain("COLLEGE-RUBRIC CRAFT");
+    expect(prompt).toContain("NARRATIVE CRAFT GUIDELINES");
   });
 });
