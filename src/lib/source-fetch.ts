@@ -1,10 +1,11 @@
 // Server-only source-fetching: SSRF guard, HTML/text extraction,
 // per-URL isolated fetch with timeout + size caps. This module imports
-// Node-only APIs (`node:dns`, `node:net`) and must NEVER end up in a
-// client bundle — the `import "server-only"` below will fail the
-// build at compile time if a `"use client"` file imports it.
-
-import "server-only";
+// Node-only APIs (`node:dns/promises`, `node:net`) at top level, which
+// makes it unusable in a client bundle — if a `"use client"` file
+// imports it, Next.js's chunker fails at build time with "the chunking
+// context does not support external modules". The client-safe helpers
+// (URL normalization, word-count inference, prompt formatting) live in
+// `./source-context.ts` and can be imported from anywhere.
 import { lookup as dnsLookup } from "node:dns/promises";
 import net from "node:net";
 import { extractText, resolveMimeType, isExtractableType } from "./extract-text.ts";
