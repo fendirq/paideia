@@ -998,15 +998,24 @@ describe("buildLevel2WritingPrompt — college rubric directives", () => {
     expect(prompt).toContain("TOPIC SENTENCES AS SUBCLAIMS");
   });
 
-  it("includes the evidence-integration framing + reporting-verb guidance", () => {
-    const prompt = buildLevel2WritingPrompt(
-      makeOptsFor("Argue whether Gatsby's dream was doomed from the start"),
-      "Outline here",
-    );
+  it("includes the evidence-integration framing + reporting-verb guidance for sourced runs", () => {
+    const opts = makeOptsFor("Argue whether Gatsby's dream was doomed from the start");
+    opts.sourceContext = "APPROVED SOURCE MATERIAL:\n--- Source 1: Gatsby chapter excerpts ---\n...";
+    const prompt = buildLevel2WritingPrompt(opts, "Outline here");
     expect(prompt).toContain("FRAME FIRST");
     expect(prompt).toContain("PREFER PARAPHRASE");
     expect(prompt).toContain("reporting verbs");
     expect(prompt).toContain("'argues'");
+  });
+
+  it("forbids fabricated source citations on unsourced runs", () => {
+    const prompt = buildLevel2WritingPrompt(
+      makeOptsFor("Argue whether Gatsby's dream was doomed from the start"),
+      "Outline here",
+    );
+    expect(prompt).toContain("NO FABRICATED SOURCES");
+    expect(prompt).toContain("our packet");
+    expect(prompt).not.toContain("FRAME FIRST: one sentence of framing BEFORE each quote");
   });
 
   it("does NOT add college-rubric craft to narrative prompts (wrong branch)", () => {

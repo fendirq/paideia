@@ -921,11 +921,15 @@ ${!sourceContext ? "If no approved source material is provided, still use concre
 If the prompt or rubric requires a minimum number of evidence pieces, actually hit that number.
 
 How A-level papers actually integrate evidence (Princeton/Harvard rubric standards):
-- FRAME FIRST: one sentence of framing BEFORE each quote or paraphrase — name the source or speaker, provide needed context, and state what point the evidence will help prove.
+${sourceContext ? `- FRAME FIRST: one sentence of framing BEFORE each quote or paraphrase — name the source or speaker, provide needed context, and state what point the evidence will help prove.
 - PREFER PARAPHRASE: use paraphrase when you need the idea; use a direct quote ONLY when the exact wording, tone, or phrasing is what you will analyze in the next sentences.
 - NEVER end a body paragraph on quoted material or source summary — the paragraph must end in the writer's own analytical voice.
 - AFTER each quote or paraphrase, write at least 2 sentences of analysis explaining what the evidence implies, how it supports or complicates the paragraph claim, and why that matters for the thesis.
-- Use precise reporting verbs: 'argues', 'suggests', 'implies', 'concedes', 'reveals', 'demonstrates' — pick the verb that matches the source's action. Do not lean on generic 'says' or inflated 'illuminates'.
+- Use precise reporting verbs: 'argues', 'suggests', 'implies', 'concedes', 'reveals', 'demonstrates' — pick the verb that matches the source's action. Do not lean on generic 'says' or inflated 'illuminates'.` : `- NO FABRICATED SOURCES. You do not have an approved source packet. Do NOT reference "the source packet", "our packet", "the provided excerpt", or cite invented scholars/critics/reviewers. If you want the weight of authority, name a well-known text, figure, or event directly (e.g. "Frankenstein's creature tells Victor..." not "The critical essay by Anne Mellor in our packet..."). Fabricated citations are a rubric disqualifier — they fail the source-integration floor more dramatically than no citation at all.
+- FRAME FIRST when you name a specific text, figure, or event: one sentence of orientation (who/what, when relevant) before the claim grounded in it.
+- PREFER PARAPHRASE over pretend-quotation. Only put something in quotes if you are confident the exact words are from the text and genuinely widely-known.
+- AFTER a concrete reference (a named event, character, or widely-known claim), write at least 1-2 sentences of analysis explaining what it implies and why it matters for the thesis.
+- Use precise verbs when describing named figures or events: 'argues', 'suggests', 'implies', 'reveals', 'demonstrates' — over generic 'says' or inflated 'illuminates'.`}
 
 6. COLLEGE-RUBRIC CRAFT (MANDATORY — what turns a B paper into an A):
 - THESIS STAKES: the introduction's thesis must be arguable AND state why the claim matters (what is at stake, what it changes, why the reader should care). A descriptive topic statement ('This essay discusses X') is a B-range miss.
