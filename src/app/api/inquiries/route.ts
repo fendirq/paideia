@@ -13,12 +13,18 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { subject, teacherName, unitName, description, files, source } = body;
 
-  if (!subject || !teacherName || !unitName || !description) {
+  if (!subject || !teacherName || !unitName) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 }
     );
   }
+  // description is now optional. The legacy flow passed the semester
+  // as description to satisfy the old required-field check; that was
+  // leaking into the chat welcome as "Help me with: Fall 2026". The
+  // session-start page collects the real help text as helpType, so
+  // empty description is fine.
+  const safeDescription = typeof description === "string" ? description : "";
 
   const VALID_SUBJECTS = new Set(["MATHEMATICS", "ENGLISH", "HISTORY", "SCIENCE", "MANDARIN", "HUMANITIES", "OTHER"]);
   if (!VALID_SUBJECTS.has(subject)) {
@@ -30,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   if (typeof teacherName !== "string" || teacherName.length > 100 ||
       typeof unitName !== "string" || unitName.length > 100 ||
-      typeof description !== "string" || description.length > 2000) {
+      safeDescription.length > 2000) {
     return NextResponse.json(
       { error: "Field length exceeded" },
       { status: 400 }
@@ -65,7 +71,7 @@ export async function POST(req: NextRequest) {
       subject,
       teacherName,
       unitName,
-      description,
+      description: safeDescription,
       ...(source === "add-class" && { teacherNotes: "add-class" }),
       ...(fileData.length > 0 && { files: { create: fileData } }),
     },
