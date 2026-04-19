@@ -137,6 +137,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid self-assessment data" }, { status: 400 });
   }
 
+  // Detect whether the sample set actually changed before touching
+  // the existing fingerprint. If the user is only updating teacher
+  // profile / self-assessment fields (same samples), a subsequent
+  // analysis failure should NOT clear the valid fingerprint they
+  // already have — that would downgrade future generations to the
+  // legacy path for no reason. If the samples DID change, the old
+  // fingerprint is stale by definition and we want it cleared on
+  // analysis failure so the guard / warning fires.
+  const existingSamples = await db.writingSample.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { content: true },
+  });
+  const samplesChanged =
+    existingSamples.length !== samples.length ||
+    existingSamples.some((existing, i) => existing.content !== samples[i].content);
+
   try {
     await db.$transaction(async (tx) => {
       await tx.writingProfile.upsert({
@@ -152,16 +169,6 @@ export async function POST(req: Request) {
           teacherProfile,
           selfAssessment,
           writingStyle: Prisma.JsonNull, // clear legacy field
-          // Clear any previous fingerprint atomically with the new
-          // samples. If style analysis below succeeds it overwrites
-          // this null; if it fails, the fingerprint stays null and
-          // the LEVEL2_FINGERPRINT_REQUIRED guard / warning banner
-          // will fire correctly. Without this clear, a re-save whose
-          // analysis fails would silently reuse the old fingerprint
-          // against new samples — generate/route.ts would then write
-          // essays in the user's OLD voice against the new teacher
-          // profile and assignments.
-          styleFingerprint: Prisma.JsonNull,
         },
       });
 
@@ -192,12 +199,6 @@ export async function POST(req: Request) {
         data: { styleFingerprint: styleOutcome.fingerprint },
       });
     } catch (err) {
-      // Returning 200 here would drop the user through
-      // AggregateWizard.save()'s `res.ok` redirect with NO fingerprint
-      // persisted — the next Level 2 generation would then reject with
-      // "Level 2 requires a style fingerprint" (the trap-loop bug
-      // P1-1 was meant to prevent, inverted). 500 keeps the user on
-      // the wizard so they can retry.
       console.error("portal.aggregate: persisting fingerprint failed", { userId, err });
       return NextResponse.json(
         {
@@ -206,6 +207,21 @@ export async function POST(req: Request) {
         },
         { status: 500 },
       );
+    }
+  } else if (samplesChanged) {
+    // Analysis failed AND samples changed — the previous fingerprint
+    // is stale. Clear it so generate/route.ts doesn't run the OLD
+    // voice against NEW samples.
+    try {
+      await db.writingProfile.update({
+        where: { userId },
+        data: { styleFingerprint: Prisma.JsonNull },
+      });
+    } catch (err) {
+      // Failing to clear is a degraded-but-not-fatal state; log and
+      // continue. The stale fingerprint remains, but the warning
+      // banner below still surfaces the analysis failure.
+      console.error("portal.aggregate: clearing stale fingerprint failed", { userId, err });
     }
   }
 
