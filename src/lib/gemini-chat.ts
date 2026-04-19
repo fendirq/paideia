@@ -11,11 +11,19 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Default to the `gemini-2.5-flash` chat model: low latency (~200ms
-// first-token on Gemini), cheap, and conversational by default
-// without thinking-mode budget overhead. Upgradeable per-env to
-// a pro / thinking model if the tutor needs deeper reasoning.
-const DEFAULT_CHAT_MODEL = "gemini-2.5-flash";
+// Default to `gemini-3-flash-preview` with thinking explicitly
+// disabled (`thinkingBudget: 0`). The 3-series Flash is smarter
+// than 2.5-flash at the same tier but is thinking-default — if
+// we don't pass thinkingBudget:0 the tutor's first visible token
+// is delayed by hundreds of internal reasoning tokens, which
+// destroys the conversational UX. With thinking off, observed
+// first-token latency is comparable to 2.5-flash (~200ms) with
+// better reasoning quality. Upgradeable per-env via
+// GEMINI_CHAT_MODEL — callers opting into a Pro-class model
+// should leave thinkingBudget:0 in place or the response will
+// stall (Pro-class rejects 0 with HTTP 400 — handled by the
+// provider-wrapper abstraction, not here).
+const DEFAULT_CHAT_MODEL = "gemini-3-flash-preview";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -84,6 +92,7 @@ export async function streamChatCompletion(
       systemInstruction: system || undefined,
       maxOutputTokens: 2048,
       temperature: 0.7,
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 
@@ -126,6 +135,7 @@ export async function chatCompletion(messages: ChatMessage[]): Promise<string> {
       systemInstruction: system || undefined,
       maxOutputTokens: 1024,
       temperature: 0.3,
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 

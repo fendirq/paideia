@@ -14,8 +14,8 @@ afterEach(() => {
 });
 
 describe("getChatModel", () => {
-  it("defaults to gemini-2.5-flash when no env override", () => {
-    expect(getChatModel()).toBe("gemini-2.5-flash");
+  it("defaults to gemini-3-flash-preview when no env override", () => {
+    expect(getChatModel()).toBe("gemini-3-flash-preview");
   });
   it("honors GEMINI_CHAT_MODEL env override", () => {
     process.env.GEMINI_CHAT_MODEL = "gemini-3.1-pro-preview";
