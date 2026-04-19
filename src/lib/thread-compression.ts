@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { chatCompletion } from "@/lib/together-chat";
+import { chatCompletion } from "@/lib/gemini-chat";
 
 const COMPRESSION_THRESHOLD = 30;
 const RECENT_MESSAGES_KEEP = 10;
