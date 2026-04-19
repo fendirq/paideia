@@ -5,9 +5,23 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+// Restrict post-login `next` targets to same-site app paths so an
+// attacker can't craft an open redirect via `?next=https://evil.com/`.
+function resolvePostLoginTarget(nextParam: string | null): string {
+  if (!nextParam) return "/app";
+  // Must be an absolute path, not a scheme-relative URL or absolute URL.
+  if (!nextParam.startsWith("/") || nextParam.startsWith("//")) return "/app";
+  // Only allow known in-app roots.
+  if (nextParam.startsWith("/app") || nextParam.startsWith("/onboarding") || nextParam.startsWith("/portal")) {
+    return nextParam;
+  }
+  return "/app";
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered") === "true";
+  const next = resolvePostLoginTarget(searchParams.get("next"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +59,7 @@ export function LoginForm() {
       setError("Invalid email or password.");
       setLoginLoading(false);
     } else {
-      window.location.href = "/app";
+      window.location.href = next;
     }
   }
 
@@ -69,7 +83,7 @@ export function LoginForm() {
       setError("Invalid passcode.");
       setCodeLoading(false);
     } else {
-      window.location.href = "/app";
+      window.location.href = next;
     }
   }
 

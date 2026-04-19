@@ -233,11 +233,23 @@ export function ChatContainer({
         throw new Error(`Chat failed: ${res.status}`);
       }
 
-      const reader = res.body!.getReader();
+      if (!res.body) {
+        throw new Error("Chat response had no body");
+      }
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       const sseState = createSseParserState();
       let fullText = "";
       let thinkingCleared = false;
+      // One or two malformed frames during a reconnect is fine; a
+      // sustained burst of unparseable JSON means the upstream is
+      // producing garbage and we should surface that instead of
+      // silently rendering an empty assistant message.
+      let parseFailConsecutive = 0;
+      let parseFailTotal = 0;
+      const MAX_CONSECUTIVE_PARSE_FAILS = 5;
+      const MAX_TOTAL_PARSE_FAILS = 15;
+      let streamMalformed = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -250,6 +262,7 @@ export function ChatContainer({
           if (data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data);
+            parseFailConsecutive = 0;
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
               fullText += delta;
@@ -280,9 +293,24 @@ export function ChatContainer({
               scrollToBottom();
             }
           } catch {
-            // skip parse errors
+            parseFailConsecutive += 1;
+            parseFailTotal += 1;
+            if (
+              parseFailConsecutive >= MAX_CONSECUTIVE_PARSE_FAILS ||
+              parseFailTotal >= MAX_TOTAL_PARSE_FAILS
+            ) {
+              streamMalformed = true;
+              break;
+            }
           }
         }
+        if (streamMalformed) break;
+      }
+
+      if (streamMalformed) {
+        throw new Error(
+          "Tutor stream was malformed (too many unparseable frames). Please retry.",
+        );
       }
 
       for (const data of flushSseDataMessages(sseState)) {
@@ -294,7 +322,9 @@ export function ChatContainer({
             fullText += delta;
           }
         } catch {
-          // skip malformed trailing SSE chunks
+          // Single trailing frame may be partial; silently skipped.
+          // The streaming-phase threshold above already caught
+          // sustained garbage.
         }
       }
 

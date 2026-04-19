@@ -22,14 +22,28 @@ export async function POST(req: Request) {
 
   const origin = new URL(req.url).origin;
 
-  const checkoutSession = await getStripe().checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
-    customer_email: session.user.email ?? undefined,
-    metadata: { userId: session.user.id },
-    success_url: `${origin}/portal/upgrade?success=true`,
-    cancel_url: `${origin}/portal/upgrade?canceled=true`,
-  });
-
-  return NextResponse.json({ url: checkoutSession.url });
+  try {
+    const checkoutSession = await getStripe().checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      customer_email: session.user.email ?? undefined,
+      metadata: { userId: session.user.id },
+      success_url: `${origin}/portal/upgrade?success=true`,
+      cancel_url: `${origin}/portal/upgrade?canceled=true`,
+    });
+    return NextResponse.json({ url: checkoutSession.url });
+  } catch (err) {
+    // Stripe outage or a bad priceId will throw. Without this catch
+    // Next.js surfaces a bare HTML 500 page; the client's
+    // /api/portal/checkout fetch then rejects with no useful body.
+    console.error("portal.checkout: Stripe session creation failed", {
+      userId: session.user.id,
+      priceId,
+      err,
+    });
+    return NextResponse.json(
+      { error: "Checkout service unavailable. Please try again in a minute." },
+      { status: 503 },
+    );
+  }
 }

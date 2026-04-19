@@ -4,7 +4,14 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getProvider } from "@/lib/providers";
 import { createSseParserState, extractSseDataMessages, flushSseDataMessages } from "@/lib/sse";
-import { fetchSourceContext, formatSourceContextForPrompt, inferRequiredEvidenceCount, inferWordCountBounds, normalizeSourceLinks } from "@/lib/source-context";
+import {
+  formatSourceContextForPrompt,
+  inferRequiredEvidenceCount,
+  inferWordCountBounds,
+  normalizeSourceLinks,
+  type ResolvedSource,
+} from "@/lib/source-context";
+import { fetchSourceContext } from "@/lib/source-fetch";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,
@@ -73,6 +80,15 @@ function isTimeoutError(err: unknown): boolean {
   return err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
 }
 
+// Distinguishes a client-side disconnect (which is not a failure and
+// should not be logged or surfaced as an error) from a real stream
+// error. A `TimeoutError` is a server-side abort that we DO want to
+// surface; only a plain `AbortError` with no timer is treated as a
+// client cancel.
+function isClientAbort(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -104,6 +120,17 @@ function passesRevisionLengthFloor(text: string, targetWordCount: number, curren
   const revisedWords = countWords(text);
   const currentWords = countWords(currentEssay);
   return revisedWords >= Math.max(Math.floor(targetWordCount * 0.7), currentWords - 120);
+}
+
+// The trim pass exists specifically to cut content, so the
+// `currentEssay - 120` delta from `passesRevisionLengthFloor` does not
+// apply — a valid trim from, say, 1350 → 1050 would always fail the
+// revision floor and leave the overlong essay in place. Enforce only
+// the absolute floor: rubric minimum (if known) or 70 % of target.
+function passesTrimLengthFloor(text: string, targetWordCount: number, rubricMin: number | null): boolean {
+  const revisedWords = countWords(text);
+  const floor = Math.max(rubricMin ?? 0, Math.floor(targetWordCount * 0.7));
+  return revisedWords >= floor;
 }
 
 function isWithinMaxWords(text: string, maxWords: number | null): boolean {
@@ -149,18 +176,43 @@ export async function POST(req: Request) {
   }
 
   const normalizedSourceLinks = normalizeSourceLinks(sourceLinks);
+  const hasPastedNotes = Boolean(sourceText?.trim());
   let sourceContext = "";
-  if (normalizedSourceLinks.length > 0 || sourceText?.trim()) {
-    try {
-      const fetchedSources = normalizedSourceLinks.length > 0
-        ? await fetchSourceContext(normalizedSourceLinks)
-        : [];
-      sourceContext = formatSourceContextForPrompt(fetchedSources, sourceText);
-      if (!sourceContext.trim()) {
-        return NextResponse.json({ error: "Unable to read the provided source links. Try a different link or paste source notes manually." }, { status: 400 });
+  if (normalizedSourceLinks.length > 0 || hasPastedNotes) {
+    let fetchedSources: ResolvedSource[] = [];
+    if (normalizedSourceLinks.length > 0) {
+      const result = await fetchSourceContext(normalizedSourceLinks);
+      if (result.failures.length > 0) {
+        console.warn("portal.generate: source fetch had failures", {
+          userId: session.user.id,
+          hasPastedNotes,
+          failures: result.failures,
+        });
+        // Policy: a failed URL is a hard 400 UNLESS the user also
+        // pasted source notes. Pasted notes are the explicit opt-in
+        // to "I'll supply source content manually" — treat them as
+        // the fallback for unreadable / auth-gated / scanned links.
+        // Without pasted notes, silently dropping a URL could make
+        // the essay miss required evidence the user expected to
+        // cover; we force them to fix the URL (or paste notes).
+        if (!hasPastedNotes) {
+          const detail = result.failures.map((f) => `${f.url}: ${f.reason}`).join("; ");
+          return NextResponse.json(
+            {
+              error: `Couldn't read ${result.failures.length} of ${normalizedSourceLinks.length} source link${normalizedSourceLinks.length > 1 ? "s" : ""} (${detail}). Fix the URL${result.failures.length > 1 ? "s" : ""} or paste source notes manually.`,
+            },
+            { status: 400 },
+          );
+        }
       }
-    } catch {
-      return NextResponse.json({ error: "Unable to fetch one of the provided source links. Try again or paste the source text manually." }, { status: 400 });
+      fetchedSources = result.resolved;
+    }
+    sourceContext = formatSourceContextForPrompt(fetchedSources, sourceText);
+    if (!sourceContext.trim()) {
+      return NextResponse.json(
+        { error: "Unable to read the provided source material. Try a different link or paste source notes manually." },
+        { status: 400 },
+      );
     }
   }
 
@@ -244,7 +296,7 @@ export async function POST(req: Request) {
     if (level === 1) {
       return streamLevel1(opts);
     } else {
-      return await streamLevel2(opts);
+      return await streamLevel2(opts, userId);
     }
   } else {
     // Legacy fallback — old profile shape, no fingerprint (Level 1 only)
@@ -315,12 +367,23 @@ function streamLevel1(opts: GenerateOptions): Response {
         }
 
         await pipeTogetherStream(res.body, controller, encoder);
-      } catch {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Connection failed" })}\n\n`));
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch { /* controller may already be closed by pipeTogetherStream */ }
+      } catch (err) {
+        // Client cancellation is not an error — no frame to emit,
+        // but the controller still needs to close so the runtime
+        // doesn't hold the stream open. Non-cancel failures get a
+        // structured log + user-visible error frame before close.
+        if (!isClientAbort(err)) {
+          console.error("portal.generate: level 1 stream failed", {
+            stage: "level1",
+            model: LEVEL1_MODEL,
+            err,
+          });
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Level 1 generation failed. Please try again." })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          } catch { /* controller may already be closed by pipeTogetherStream */ }
+        }
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });
@@ -331,11 +394,23 @@ function streamLevel1(opts: GenerateOptions): Response {
 }
 
 // ─── Level 2: premium pipeline (plan + draft + critique + revision) ───
-// Provider is resolved via LEVEL2_PROVIDER env (default: anthropic). The
+// Provider is resolved via LEVEL2_PROVIDER env (default: gemini). The
 // provider abstraction handles model selection, retry/fallback, and
 // thinking-mode semantics consistently across vendors.
 
-async function streamLevel2(opts: GenerateOptions): Promise<Response> {
+// Records stages that failed + fell back to a prior essay so the
+// final response can surface this to the client as a header (for
+// operator visibility) — structured log per stage goes to stderr so
+// Vercel runtime logs capture the failure with its root cause.
+function logStageDegradation(stage: string, userId: string, err?: unknown): void {
+  console.error("portal.generate: level 2 stage degraded", {
+    stage,
+    userId,
+    err: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
+  });
+}
+
+async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Response> {
   let provider;
   try {
     provider = getProvider();
@@ -347,6 +422,7 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
   let outline = "";
   let rawEssay = "";
   let critiqueNotes = "";
+  const degradedStages: string[] = [];
 
   try {
     // Step 1: Structural plan
@@ -421,7 +497,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     const critiqueCandidate = critiqueMsg.text.trim();
     critiqueNotes = isValidCritique(critiqueCandidate) ? critiqueCandidate : "";
   } catch (err) {
-    console.warn("Level 2 critique stage failed; continuing without critique notes.", err);
+    logStageDegradation("critique", userId, err);
+    degradedStages.push("critique");
   }
 
   // Step 4: Forensic revision — compare against student's real samples, fix voice mismatches
@@ -448,11 +525,13 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
 
     auditedEssay = sanitizeEssayOutput(auditMsg.text);
   } catch (err) {
-    console.warn("Level 2 revision stage failed; falling back to draft output.", err);
+    logStageDegradation("revision", userId, err);
+    degradedStages.push("revision");
   }
 
   if (auditedEssay && !isUsableEssayCandidate(auditedEssay, opts.wordCount)) {
-    console.warn("Level 2 revision returned malformed content; falling back to draft output.");
+    logStageDegradation("revision-malformed", userId);
+    degradedStages.push("revision");
     auditedEssay = "";
   }
 
@@ -473,7 +552,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = expandedEssay;
       }
     } catch (err) {
-      console.warn("Level 2 expansion stage failed; keeping current essay.", err);
+      logStageDegradation("expansion", userId, err);
+      degradedStages.push("expansion");
     }
   }
 
@@ -505,7 +585,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = evidenceEssay;
       }
     } catch (err) {
-      console.warn("Level 2 evidence stage failed; keeping current essay.", err);
+      logStageDegradation("evidence", userId, err);
+      degradedStages.push("evidence");
     }
 
     if (opts.sourceContext || bounds.max) {
@@ -525,7 +606,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
           baseEssay = attributionEssay;
         }
       } catch (err) {
-        console.warn("Level 2 attribution stage failed; keeping current essay.", err);
+        logStageDegradation("attribution", userId, err);
+        degradedStages.push("attribution");
       }
     }
 
@@ -549,7 +631,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = complianceEssay;
       }
     } catch (err) {
-      console.warn("Level 2 compliance stage failed; keeping current essay.", err);
+      logStageDegradation("compliance", userId, err);
+      degradedStages.push("compliance");
     }
   }
 
@@ -569,13 +652,14 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
       const trimmedEssay = sanitizeEssayOutput(trimMsg.text);
       if (
         isUsableEssayCandidate(trimmedEssay, opts.wordCount) &&
-        passesRevisionLengthFloor(trimmedEssay, opts.wordCount, baseEssay) &&
+        passesTrimLengthFloor(trimmedEssay, opts.wordCount, bounds.min) &&
         (isWithinMaxWords(trimmedEssay, bounds.max) || countWords(trimmedEssay) < countWords(baseEssay))
       ) {
         baseEssay = trimmedEssay;
       }
     } catch (err) {
-      console.warn("Level 2 trim stage failed; keeping current essay.", err);
+      logStageDegradation("trim", userId, err);
+      degradedStages.push("trim");
     }
   }
 
@@ -602,7 +686,8 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
         baseEssay = flowedEssay;
       }
     } catch (err) {
-      console.warn("Level 2 source-flow stage failed; keeping current essay.", err);
+      logStageDegradation("source-flow", userId, err);
+      degradedStages.push("source-flow");
     }
   }
 
@@ -628,9 +713,16 @@ async function streamLevel2(opts: GenerateOptions): Promise<Response> {
     },
   });
 
-  return new Response(stream, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  };
+  if (degradedStages.length > 0) {
+    // Deduplicate (revision can push twice on malformed vs. failed).
+    headers["X-Paideia-Degraded-Stages"] = Array.from(new Set(degradedStages)).join(",");
+  }
+  return new Response(stream, { headers });
 }
 
 // ─── Legacy: DeepSeek-V3 for old profiles without fingerprint ───
@@ -673,12 +765,19 @@ function streamLegacy(opts: LegacyGenerateOptions): Response {
         }
 
         await pipeTogetherStream(res.body, controller, encoder);
-      } catch {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Connection failed" })}\n\n`));
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch { /* controller may already be closed by pipeTogetherStream */ }
+      } catch (err) {
+        if (!isClientAbort(err)) {
+          console.error("portal.generate: legacy stream failed", {
+            stage: "legacy",
+            model: LEVEL1_MODEL,
+            err,
+          });
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Generation failed. Please try again." })}\n\n`));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          } catch { /* controller may already be closed by pipeTogetherStream */ }
+        }
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });

@@ -390,12 +390,42 @@ function prettifySourceTitle(title: string): string {
   return trimmed;
 }
 
-function bestSourceReference(matchText: string, sourceContext?: string): string {
+/**
+ * Returns the most contextually-relevant source title for a generic
+ * source-reference phrase like "according to the source" or "the class
+ * notes show".
+ *
+ * The scoring target is the surrounding sentence (or the matched
+ * phrase itself, if no context is available). Scoring against ONLY the
+ * matched phrase is useless for discrimination — the phrases
+ * `"according to the source"` and `"class notes"` never contain
+ * source-specific tokens, so the score was always 0 for every title
+ * and the function silently returned `titles[0]` for every replacement
+ * regardless of what the surrounding sentence was about. That
+ * fabricated attributions when multiple sources were in the packet
+ * (Codex MEDIUM finding).
+ */
+function bestSourceReference(
+  matchText: string,
+  sourceContext?: string,
+  surroundingContext?: string,
+): string {
   const titles = extractSourceTitles(sourceContext);
   if (titles.length === 0) return "the source";
 
-  const normalizedMatch = matchText.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
-  const ignoredTokens = new Set(["class", "notes", "note", "sources", "source", "discussion", "course", "material", "materials", "packet", "packets", "shows", "show", "explains", "explain", "describes", "describe"]);
+  const scoringCorpus = `${matchText} ${surroundingContext ?? ""}`
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ");
+  const ignoredTokens = new Set([
+    "class", "notes", "note", "sources", "source", "discussion",
+    "course", "material", "materials", "packet", "packets",
+    "shows", "show", "explains", "explain", "describes", "describe",
+    "according", "about", "from", "that", "this", "with",
+    "their", "they", "these", "those", "what", "when", "which",
+    "while", "where", "there", "their", "have", "been", "were",
+    "would", "could", "should", "only", "into", "upon", "also",
+    "however", "through", "between",
+  ]);
   let bestTitle = titles[0];
   let bestScore = -1;
 
@@ -405,7 +435,13 @@ function bestSourceReference(matchText: string, sourceContext?: string): string 
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
       .filter((token) => token.length >= 4 && !ignoredTokens.has(token));
-    const score = tokens.reduce((sum, token) => sum + (normalizedMatch.includes(token) ? 1 : 0), 0);
+    // Count distinct token matches rather than raw occurrences so a
+    // repeated proper noun in one sentence doesn't outweigh a title
+    // whose tokens appear once each.
+    const score = tokens.reduce(
+      (sum, token) => sum + (scoringCorpus.includes(token) ? 1 : 0),
+      0,
+    );
     if (score > bestScore) {
       bestScore = score;
       bestTitle = title;
@@ -413,6 +449,27 @@ function bestSourceReference(matchText: string, sourceContext?: string): string 
   }
 
   return prettifySourceTitle(bestTitle);
+}
+
+/**
+ * Extracts the sentence containing the match at `offset` — used to
+ * feed surrounding context into `bestSourceReference`.
+ *
+ * The backward search must cover `.`, `!`, `?`, and newline — if we
+ * only split on `.` and `\n`, a citation following a question or
+ * exclamation folds the prior sentence into the scoring corpus, so
+ * `Was the Battle of the Zab decisive? According to the source,
+ * Baghdad...` attributes to the Zab source instead of the Baghdad
+ * one.
+ */
+function sentenceContaining(fullText: string, offset: number, matchLength: number): string {
+  const searchUpTo = Math.max(0, offset - 1);
+  const boundaries = [".", "!", "?", "\n"].map((c) => fullText.lastIndexOf(c, searchUpTo));
+  const sentenceStart = Math.max(...boundaries, -1) + 1;
+  const afterMatch = offset + matchLength;
+  const endMarks = [".", "!", "?", "\n"].map((c) => fullText.indexOf(c, afterMatch)).filter((i) => i !== -1);
+  const sentenceEnd = endMarks.length > 0 ? Math.min(...endMarks) : fullText.length;
+  return fullText.slice(sentenceStart, sentenceEnd).trim();
 }
 
 function sourceReferenceSentenceStart(reference: string): string {
@@ -1496,17 +1553,58 @@ export function stripUnsupportedSourceAttribution(essay: string): string {
 }
 
 export function normalizeSupportedSourceAttribution(essay: string, sourceContext?: string): string {
-  return normalizeQuotes(essay)
-    .replace(/\bAccording to (?:the |our )?(?:class |revolution )?(?:notes|sources|discussion)(?: on [^,]+)?,\s*/gi, (match) => `According to ${bestSourceReference(match, sourceContext)}, `)
-    .replace(/\bAs (?:our )?class (?:notes|sources) (?:show|explain),\s*/gi, (match) => `As ${bestSourceReference(match, sourceContext)} shows, `)
-    .replace(/\bAs the course material on [^,]+ shows,\s*/gi, (match) => `As ${bestSourceReference(match, sourceContext)} shows, `)
+  // Each replace callback passes the surrounding sentence to
+  // `bestSourceReference` so scoring considers the actual topical
+  // content (e.g., "Baghdad", "Zab", "mawali") rather than just the
+  // generic phrase ("class notes") — which was the Codex-flagged bug
+  // that made every replacement collapse to source 1.
+  const normalized = normalizeQuotes(essay);
+
+  // Narrow the type to the `replace(pattern, callback)` overload that
+  // includes the position and full-string arguments. `args` is
+  // `[matchText, ...captureGroups, offset, fullString]`; our patterns
+  // have no capture groups so the last two args are offset + full string.
+  const withSurrounding =
+    (transform: (match: string, reference: string) => string) =>
+    (match: string, ...args: unknown[]): string => {
+      const offset = typeof args[args.length - 2] === "number" ? (args[args.length - 2] as number) : 0;
+      const fullText = typeof args[args.length - 1] === "string" ? (args[args.length - 1] as string) : "";
+      const surrounding = sentenceContaining(fullText, offset, match.length);
+      return transform(match, bestSourceReference(match, sourceContext, surrounding));
+    };
+
+  return normalized
+    .replace(
+      /\bAccording to (?:the |our )?(?:class |revolution )?(?:notes|sources|discussion)(?: on [^,]+)?,\s*/gi,
+      withSurrounding((_match, ref) => `According to ${ref}, `),
+    )
+    .replace(
+      /\bAs (?:our )?class (?:notes|sources) (?:show|explain),\s*/gi,
+      withSurrounding((_match, ref) => `As ${ref} shows, `),
+    )
+    .replace(
+      /\bAs the course material on [^,]+ shows,\s*/gi,
+      withSurrounding((_match, ref) => `As ${ref} shows, `),
+    )
     .replace(/\bAs the course materials on [^,]+ show,\s*/gi, () => "As the source packet shows, ")
-    .replace(/\bAccording to the source,\s*/gi, () => `According to ${bestSourceReference("the source", sourceContext)}, `)
+    .replace(
+      /\bAccording to the source,\s*/gi,
+      withSurrounding((_match, ref) => `According to ${ref}, `),
+    )
     .replace(/\bAccording to the sources,\s*/gi, () => "According to the source packet, ")
-    .replace(/\bAs the source shows,\s*/gi, () => `As ${bestSourceReference("the source", sourceContext)} shows, `)
+    .replace(
+      /\bAs the source shows,\s*/gi,
+      withSurrounding((_match, ref) => `As ${ref} shows, `),
+    )
     .replace(/\bAs the sources show,\s*/gi, () => "As the source packet shows, ")
-    .replace(/\b(?:The |Our )?(?:class |revolution )?(?:notes|sources|discussion) (?:show|explain|make clear) that\s*/gi, (match) => `${sourceReferenceSentenceStart(bestSourceReference(match, sourceContext))} shows that `)
-    .replace(/\bThe source shows that\s*/gi, () => `${sourceReferenceSentenceStart(bestSourceReference("the source", sourceContext))} shows that `)
+    .replace(
+      /\b(?:The |Our )?(?:class |revolution )?(?:notes|sources|discussion) (?:show|explain|make clear) that\s*/gi,
+      withSurrounding((_match, ref) => `${sourceReferenceSentenceStart(ref)} shows that `),
+    )
+    .replace(
+      /\bThe source shows that\s*/gi,
+      withSurrounding((_match, ref) => `${sourceReferenceSentenceStart(ref)} shows that `),
+    )
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

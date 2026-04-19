@@ -362,6 +362,11 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
         }),
       });
       if (res.ok) {
+        // Parse response so we can surface a `warning` field (Level 1
+        // style-analysis degraded, fingerprint unavailable, etc.) via
+        // a query param the destination page can read. Without this
+        // the server's warning contract is unused.
+        const data: { warning?: string } = await res.json().catch(() => ({}));
         let dest = "/portal/home";
         if (nextUrl) {
           try {
@@ -370,6 +375,10 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               dest = parsed.pathname + (parsed.search || "") + (parsed.hash || "");
             }
           } catch {}
+        }
+        if (data.warning) {
+          const sep = dest.includes("?") ? "&" : "?";
+          dest = `${dest}${sep}warning=${encodeURIComponent(data.warning)}`;
         }
         router.push(dest);
       } else {

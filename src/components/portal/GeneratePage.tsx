@@ -133,11 +133,58 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
         return;
       }
 
-      const reader = res.body!.getReader();
+      if (!res.body) {
+        setError("Server response was empty. Please try again.");
+        setGenerating(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       const sseState = createSseParserState();
       let fullText = "";
       let streamError = false;
+      // Parse-failure accounting — one or two malformed frames can
+      // happen during re-connect or TCP hiccup, but a sustained stream
+      // of unparseable JSON means the upstream is producing garbage
+      // (model safety-block returning prose, provider outage echoing
+      // HTML, etc.) and continuing silently would save an empty essay.
+      let parseFailConsecutive = 0;
+      let parseFailTotal = 0;
+      const MAX_CONSECUTIVE_PARSE_FAILS = 5;
+      const MAX_TOTAL_PARSE_FAILS = 15;
+
+      const tripParseFailure = (): boolean => {
+        if (
+          parseFailConsecutive >= MAX_CONSECUTIVE_PARSE_FAILS ||
+          parseFailTotal >= MAX_TOTAL_PARSE_FAILS
+        ) {
+          setError("Stream from model was malformed. Please try again.");
+          return true;
+        }
+        return false;
+      };
+
+      const processFrame = (data: string): boolean => {
+        if (data === "[DONE]") return false;
+        try {
+          const parsed = JSON.parse(data);
+          parseFailConsecutive = 0;
+          if (parsed.error) {
+            setError(parsed.error);
+            return true;
+          }
+          if (parsed.content) {
+            fullText += parsed.content;
+            setEssay(fullText);
+          }
+          return false;
+        } catch {
+          parseFailConsecutive += 1;
+          parseFailTotal += 1;
+          return tripParseFailure();
+        }
+      };
 
       try {
         while (true) {
@@ -148,40 +195,18 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
           const messages = extractSseDataMessages(sseState, chunk);
 
           for (const data of messages) {
-            if (data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.error) {
-                setError(parsed.error);
-                streamError = true;
-                break;
-              }
-              if (parsed.content) {
-                fullText += parsed.content;
-                setEssay(fullText);
-              }
-            } catch {
-              // skip malformed SSE chunks
+            if (processFrame(data)) {
+              streamError = true;
+              break;
             }
           }
           if (streamError) break;
         }
 
         for (const data of flushSseDataMessages(sseState)) {
-          if (data === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.error) {
-              setError(parsed.error);
-              streamError = true;
-              break;
-            }
-            if (parsed.content) {
-              fullText += parsed.content;
-              setEssay(fullText);
-            }
-          } catch {
-            // skip malformed trailing SSE chunks
+          if (processFrame(data)) {
+            streamError = true;
+            break;
           }
         }
       } finally {
@@ -189,7 +214,8 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
       }
 
       if (!streamError && fullText) await saveEssay(fullText);
-    } catch {
+    } catch (err) {
+      console.error("portal.generate: client stream failed", err);
       setError("Something went wrong. Try again.");
     } finally {
       setGenerating(false);

@@ -21,19 +21,35 @@ interface AggregateBody {
   selfAssessment: Prisma.InputJsonValue;
 }
 
-async function analyzeStyle(samples: { label: string; content: string }[]): Promise<Prisma.InputJsonValue | null> {
-  if (!samples.length) return null;
+interface AnalyzeStyleOutcome {
+  fingerprint: Prisma.InputJsonValue | null;
+  // Populated when style analysis failed for a recoverable reason so the
+  // caller can tell the difference between "no samples to analyze"
+  // (fingerprint null, reason undefined) and "Gemini rejected the
+  // request" (fingerprint null, reason set). Drives the UI warning.
+  failureReason?: string;
+}
+
+async function analyzeStyle(
+  samples: { label: string; content: string }[],
+  userId: string,
+): Promise<AnalyzeStyleOutcome> {
+  if (!samples.length) return { fingerprint: null };
 
   let provider;
   try {
     provider = getProvider();
-  } catch {
-    // No LLM provider configured — skip style analysis rather than 500.
-    return null;
+  } catch (err) {
+    console.error("portal.aggregate: LLM provider not configured", { userId, err });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis provider not configured",
+    };
   }
 
   const prompt = buildStyleAnalysisPrompt(samples);
 
+  let raw: string;
   try {
     const response = await provider.createLevel2Message({
       prompt,
@@ -44,17 +60,42 @@ async function analyzeStyle(samples: { label: string; content: string }[]): Prom
       stageLabel: "style-analysis",
       thinking: true,
     });
+    raw = response.text;
+  } catch (err) {
+    console.error("portal.aggregate: style analysis provider call failed", { userId, err });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis provider call failed",
+    };
+  }
 
-    // Strip markdown code fences if present
-    const content = response.text
-      .replace(/^```(?:json)?\s*\n?/i, "")
-      .replace(/\n?```\s*$/i, "")
-      .trim();
+  // Strip markdown code fences if present
+  const content = raw
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
 
+  if (!content) {
+    console.error("portal.aggregate: style analysis returned empty response", { userId });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis returned empty response",
+    };
+  }
+
+  try {
     const parsed = JSON.parse(content);
-    return parsed as Prisma.InputJsonValue;
-  } catch {
-    return null;
+    return { fingerprint: parsed as Prisma.InputJsonValue };
+  } catch (err) {
+    console.error("portal.aggregate: style analysis returned non-JSON", {
+      userId,
+      preview: content.slice(0, 200),
+      err,
+    });
+    return {
+      fingerprint: null,
+      failureReason: "style analysis returned non-JSON output",
+    };
   }
 }
 
@@ -96,6 +137,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid self-assessment data" }, { status: 400 });
   }
 
+  // Detect whether the sample set actually changed before touching
+  // the existing fingerprint. If the user is only updating teacher
+  // profile / self-assessment fields (same samples), a subsequent
+  // analysis failure should NOT clear the valid fingerprint they
+  // already have — that would downgrade future generations to the
+  // legacy path for no reason. If the samples DID change, the old
+  // fingerprint is stale by definition and we want it cleared on
+  // analysis failure so the guard / warning fires.
+  const [existingSamples, existingProfile] = await Promise.all([
+    db.writingSample.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+      select: { content: true },
+    }),
+    db.writingProfile.findUnique({
+      where: { userId },
+      select: { styleFingerprint: true },
+    }),
+  ]);
+  const samplesChanged =
+    existingSamples.length !== samples.length ||
+    existingSamples.some((existing, i) => existing.content !== samples[i].content);
+  const hadFingerprint = Boolean(existingProfile?.styleFingerprint);
+
   try {
     await db.$transaction(async (tx) => {
       await tx.writingProfile.upsert({
@@ -124,24 +189,87 @@ export async function POST(req: Request) {
         })),
       });
     });
-  } catch {
+  } catch (err) {
+    console.error("portal.aggregate: profile save transaction failed", { userId, err });
     return NextResponse.json({ error: "Failed to save profile. Please try again." }, { status: 500 });
   }
 
-  // Run style analysis in parallel (non-blocking for the save)
-  // but we wait for it so the user sees "Analyzing..." state
-  const fingerprint = await analyzeStyle(
-    samples.map((s) => ({ label: s.label, content: s.content }))
+  const styleOutcome = await analyzeStyle(
+    samples.map((s) => ({ label: s.label, content: s.content })),
+    userId,
   );
 
-  if (fingerprint) {
-    await db.writingProfile.update({
-      where: { userId },
-      data: { styleFingerprint: fingerprint },
-    });
+  if (styleOutcome.fingerprint) {
+    try {
+      await db.writingProfile.update({
+        where: { userId },
+        data: { styleFingerprint: styleOutcome.fingerprint },
+      });
+    } catch (err) {
+      console.error("portal.aggregate: persisting fingerprint failed", { userId, err });
+      return NextResponse.json(
+        {
+          error: "Style analysis ran, but we couldn't save its output. Please try again.",
+          code: "FINGERPRINT_PERSIST_FAILED",
+        },
+        { status: 500 },
+      );
+    }
+  } else if (samplesChanged) {
+    // Analysis failed AND samples changed — the previous fingerprint
+    // is stale. Clear it so generate/route.ts doesn't run the OLD
+    // voice against NEW samples.
+    try {
+      await db.writingProfile.update({
+        where: { userId },
+        data: { styleFingerprint: Prisma.JsonNull },
+      });
+    } catch (err) {
+      // Failing to clear is a degraded-but-not-fatal state; log and
+      // continue. The stale fingerprint remains, but the warning
+      // banner below still surfaces the analysis failure.
+      console.error("portal.aggregate: clearing stale fingerprint failed", { userId, err });
+    }
   }
 
-  return NextResponse.json({ success: true, hasFingerprint: !!fingerprint });
+  // For Level 2 profiles the fingerprint is required — generate/route.ts
+  // hard-rejects Level 2 when profile.styleFingerprint is missing.
+  // But "a fingerprint exists" covers TWO cases now:
+  //   - This analysis produced one (`styleOutcome.fingerprint`), OR
+  //   - Samples didn't change and the pre-existing fingerprint was
+  //     preserved (`hadFingerprint && !samplesChanged`).
+  // Blocking only on `!styleOutcome.fingerprint` would refuse a
+  // Level 2 profile-only edit during a transient LLM outage even
+  // though the preserved fingerprint keeps generation working.
+  const hasEffectiveFingerprint =
+    Boolean(styleOutcome.fingerprint) || (hadFingerprint && !samplesChanged);
+  if (profileLevel === 2 && !hasEffectiveFingerprint) {
+    return NextResponse.json(
+      {
+        error: `Style analysis could not complete (${styleOutcome.failureReason ?? "unknown reason"}). Your profile is saved, but Level 2 voice matching requires the fingerprint. Please try again.`,
+        code: "LEVEL2_FINGERPRINT_REQUIRED",
+      },
+      { status: 500 },
+    );
+  }
+
+  // Level 1 profiles work without a fingerprint. Surface the `warning`
+  // field so the UI can still show an amber banner if analysis failed
+  // but profile-save succeeded, while allowing the happy-path redirect.
+  const response: {
+    success: true;
+    hasFingerprint: boolean;
+    warning?: string;
+  } = {
+    success: true,
+    hasFingerprint: hasEffectiveFingerprint,
+  };
+  if (!styleOutcome.fingerprint && styleOutcome.failureReason) {
+    response.warning = hasEffectiveFingerprint
+      ? `Your existing style fingerprint was kept — style analysis could not complete on this save (${styleOutcome.failureReason}).`
+      : `Profile saved, but style analysis could not complete (${styleOutcome.failureReason}).`;
+  }
+  return NextResponse.json(response);
 }
 
 export async function GET() {

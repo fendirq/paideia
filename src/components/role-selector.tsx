@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 
 const SUBJECTS = [
   { value: "MATHEMATICS", label: "Mathematics" },
@@ -22,6 +23,7 @@ const GRADES = [
 ] as const;
 
 export function RoleSelector() {
+  const { update: updateSession } = useSession();
   const [selectedRole, setSelectedRole] = useState<"STUDENT" | "TEACHER" | null>(null);
   const [school, setSchool] = useState("");
   const [grade, setGrade] = useState("");
@@ -65,8 +67,12 @@ export function RoleSelector() {
       });
 
       if (res.ok || res.status === 409) {
-        // Force JWT cookie refresh so middleware sees the new role
-        await fetch("/api/auth/session");
+        // Trigger the JWT callback with `trigger="update"` so auth.ts
+        // bypasses the null-role cooldown and picks up the freshly-
+        // saved role. A plain GET to /api/auth/session passes
+        // `trigger=undefined` and would land inside the cooldown,
+        // bouncing fast onboarders back here for up to 10s.
+        await updateSession();
         window.location.href = selectedRole === "TEACHER" ? "/app/teacher" : "/app";
       } else {
         setError("Something went wrong. Please try again.");

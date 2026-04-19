@@ -25,12 +25,33 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
       attempts++;
       try {
         const res = await fetch("/api/portal/payment-status");
-        const data = await res.json();
-        if (data.hasLevel2) {
-          setConfirmed(true);
+        if (res.status === 401) {
+          // Session expired between the Stripe round-trip and our
+          // poll — the user isn't "still processing," they need to
+          // log back in. Framing that as a slow confirmation is
+          // misleading.
           clearInterval(poll);
+          window.location.href = "/login?next=" + encodeURIComponent("/portal/upgrade?success=true");
+          return;
         }
-      } catch { /* retry */ }
+        if (!res.ok) {
+          // 5xx / other non-auth failures are worth logging but not
+          // worth redirecting the user for — keep polling until the
+          // attempt cap.
+          console.error("portal.upgrade: payment-status poll failed", {
+            status: res.status,
+          });
+        } else {
+          const data = await res.json();
+          if (data.hasLevel2) {
+            setConfirmed(true);
+            clearInterval(poll);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("portal.upgrade: payment-status poll threw", err);
+      }
       if (attempts >= 10) {
         clearInterval(poll);
         setPollTimedOut(true);

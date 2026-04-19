@@ -1,15 +1,29 @@
-import { extractText, resolveMimeType, isExtractableType } from "./extract-text.ts";
+// Client-safe helpers for source-link normalization, rubric parsing,
+// and prompt-facing source formatting. This file is imported by both
+// Next.js Server Components (API routes) and Client Components — it
+// must NOT depend on Node-only APIs. Server-only fetching logic
+// (DNS / net / file extraction) lives in `./source-fetch.ts`, which
+// carries `import "server-only"` so client bundles fail fast if a
+// "use client" file ever accidentally pulls it in.
 
 export const MAX_SOURCE_LINKS = 3;
-const MAX_SOURCE_FETCH_BYTES = 5 * 1024 * 1024;
-const MAX_SOURCE_EXCERPT_CHARS = 2200;
 export const MAX_SOURCE_TEXT_CHARS = 4000;
-const SOURCE_FETCH_TIMEOUT_MS = 15_000;
+export const MAX_SOURCE_EXCERPT_CHARS = 2200;
 
 export interface ResolvedSource {
   url: string;
   title: string;
   excerpt: string;
+}
+
+export interface SourceFetchFailure {
+  url: string;
+  reason: string;
+}
+
+export interface SourceContextResult {
+  resolved: ResolvedSource[];
+  failures: SourceFetchFailure[];
 }
 
 export function normalizeSourceLinks(input: string[] | string | undefined): string[] {
@@ -181,95 +195,4 @@ export function formatSourceContextForPrompt(
   }
 
   return sections.join("\n\n");
-}
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
-}
-
-function stripHtml(html: string): { title: string; text: string } {
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = decodeEntities(titleMatch?.[1] ?? "Source");
-
-  const cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<\/(p|div|section|article|li|h1|h2|h3|h4|h5|h6|br)>/gi, "\n")
-    .replace(/<[^>]+>/g, " ");
-
-  const text = decodeEntities(cleaned)
-    .replace(/\r/g, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-
-  return { title: title.trim() || "Source", text };
-}
-
-function clipExcerpt(text: string, maxChars = MAX_SOURCE_EXCERPT_CHARS): string {
-  const clipped = text.trim();
-  if (clipped.length <= maxChars) return clipped;
-  return `${clipped.slice(0, maxChars).trimEnd()}...`;
-}
-
-export async function fetchSourceContext(urls: string[]): Promise<ResolvedSource[]> {
-  const resolved: ResolvedSource[] = [];
-
-  for (const url of urls.slice(0, MAX_SOURCE_LINKS)) {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "PaideiaSourceFetcher/1.0 (+https://paideia.app)",
-        Accept: "text/html,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain;q=0.9,*/*;q=0.8",
-      },
-      redirect: "follow",
-      signal: AbortSignal.timeout(SOURCE_FETCH_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch source: ${url}`);
-    }
-
-    const contentLength = Number(response.headers.get("content-length") ?? 0);
-    if (Number.isFinite(contentLength) && contentLength > MAX_SOURCE_FETCH_BYTES) {
-      throw new Error(`Source is too large: ${url}`);
-    }
-
-    const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
-    const mimeType = resolveMimeType(contentType, new URL(url).pathname);
-
-    if (isExtractableType(mimeType, url)) {
-      const arrayBuffer = await response.arrayBuffer();
-      if (arrayBuffer.byteLength > MAX_SOURCE_FETCH_BYTES) {
-        throw new Error(`Source is too large: ${url}`);
-      }
-      const text = await extractText(Buffer.from(arrayBuffer), mimeType);
-      resolved.push({
-        url,
-        title: new URL(url).hostname,
-        excerpt: clipExcerpt(text),
-      });
-      continue;
-    }
-
-    const html = await response.text();
-    if (html.length > MAX_SOURCE_FETCH_BYTES) {
-      throw new Error(`Source is too large: ${url}`);
-    }
-    const { title, text } = stripHtml(html);
-    resolved.push({
-      url,
-      title,
-      excerpt: clipExcerpt(text),
-    });
-  }
-
-  return resolved.filter((source) => source.excerpt.length > 0);
 }

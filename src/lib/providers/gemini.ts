@@ -48,7 +48,34 @@ function errorStatus(err: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * Thrown when Gemini returns a response whose `text` is empty and
+ * whose `finishReason` indicates the model stopped for reasons other
+ * than normal completion (SAFETY, RECITATION, MAX_TOKENS, OTHER).
+ *
+ * Without this, the route sees `text: ""` and has to guess whether the
+ * primary model silently truncated (retryable on fallback) or the
+ * pipeline genuinely produced nothing (non-retryable). Throwing here
+ * lets the existing retry loop route the empty-response case through
+ * `shouldFallback`, and lets the caller log the specific finishReason.
+ */
+export class GeminiEmptyResponseError extends Error {
+  constructor(
+    public readonly finishReason: string,
+    public readonly model: string,
+  ) {
+    super(`Gemini ${model} returned empty response (finishReason=${finishReason})`);
+    this.name = "GeminiEmptyResponseError";
+  }
+}
+
 function shouldFallback(err: unknown): boolean {
+  if (err instanceof GeminiEmptyResponseError) {
+    // MAX_TOKENS and SAFETY can improve on the fallback model (different
+    // context-window / safety-tuning). RECITATION and OTHER rarely do,
+    // so they surface as hard failures.
+    return err.finishReason === "MAX_TOKENS" || err.finishReason === "SAFETY";
+  }
   const status = errorStatus(err);
   if (status !== undefined) {
     return status === 400 || status === 404 || status === 429 || status >= 500;
@@ -106,7 +133,21 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
               abortSignal: AbortSignal.timeout(input.timeoutMs),
             },
           });
-          return { text: response.text ?? "", model };
+          const text = response.text ?? "";
+          // When Gemini stops for a non-normal reason (safety block,
+          // hit the output ceiling, recitation filter, etc.) `text` is
+          // often empty. Swallowing that as `text: ""` tells callers
+          // "pipeline produced nothing" rather than "retry on
+          // fallback" — the latter is what we want for SAFETY and
+          // MAX_TOKENS on preview models. Throw a tagged error and
+          // let `shouldFallback` decide.
+          if (!text.trim()) {
+            const finishReason = response.candidates?.[0]?.finishReason;
+            if (finishReason && finishReason !== "STOP") {
+              throw new GeminiEmptyResponseError(String(finishReason), model);
+            }
+          }
+          return { text, model };
         } catch (err) {
           lastError = err;
           const canRetry =
