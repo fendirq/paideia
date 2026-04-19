@@ -80,7 +80,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.userId = user.id;
         token.role = user.role ?? null;
@@ -111,7 +111,14 @@ export const authOptions: NextAuthOptions = {
       const cooldownMs = roleIsNull ? NULL_ROLE_RETRY_MS : ROLE_REFRESH_MS;
       const neverFetched = token.roleCheckedAt === undefined;
       const cooledDown = !neverFetched && Date.now() - token.roleCheckedAt! >= cooldownMs;
-      if (token.userId && (neverFetched || cooledDown)) {
+      // `trigger === "update"` is NextAuth's explicit "client asked
+      // for a fresh session" signal (via `useSession().update()`).
+      // RoleSelector uses it right after /api/onboarding so the new
+      // role can land on the JWT even when the cooldown hasn't
+      // elapsed — without this, fast onboarders would bounce back to
+      // /onboarding for up to 10 seconds after submit.
+      const forceRefresh = trigger === "update";
+      if (token.userId && (forceRefresh || neverFetched || cooledDown)) {
         try {
           const dbUser = await db.user.findUnique({
             where: { id: token.userId as string },

@@ -9,6 +9,17 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+// RoleSelector now uses `useSession().update()` to force a JWT
+// refresh after /api/onboarding. Stub out next-auth/react so the
+// component mounts without a real SessionProvider context.
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({
+    data: null,
+    status: "unauthenticated" as const,
+    update: vi.fn(async () => null),
+  }),
+}));
+
 describe("RoleSelector", () => {
   it("renders student and teacher options", () => {
     render(<RoleSelector />);
