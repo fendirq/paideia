@@ -368,9 +368,10 @@ function streamLevel1(opts: GenerateOptions): Response {
 
         await pipeTogetherStream(res.body, controller, encoder);
       } catch (err) {
-        // Client cancellation is not an error — no frame to emit.
-        // Anything else is a real upstream or streaming failure that
-        // needs an ops signal and a user-visible error frame.
+        // Client cancellation is not an error — no frame to emit,
+        // but the controller still needs to close so the runtime
+        // doesn't hold the stream open. Non-cancel failures get a
+        // structured log + user-visible error frame before close.
         if (!isClientAbort(err)) {
           console.error("portal.generate: level 1 stream failed", {
             stage: "level1",
@@ -380,9 +381,9 @@ function streamLevel1(opts: GenerateOptions): Response {
           try {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Level 1 generation failed. Please try again." })}\n\n`));
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            controller.close();
           } catch { /* controller may already be closed by pipeTogetherStream */ }
         }
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });
@@ -774,9 +775,9 @@ function streamLegacy(opts: LegacyGenerateOptions): Response {
           try {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Generation failed. Please try again." })}\n\n`));
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            controller.close();
           } catch { /* controller may already be closed by pipeTogetherStream */ }
         }
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { VideoHero } from "@/components/video-hero";
 import { ConfirmModal } from "@/components/confirm-modal";
 
@@ -50,6 +51,15 @@ export function PortalHome({ userName, initialClasses, hasProfile }: PortalHomeP
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Read a `warning` query param set by the aggregate flow on
+  // degraded-success (profile saved but style analysis failed).
+  // `warningDismissed` lets the user close the banner without a
+  // reload.
+  const searchParams = useSearchParams();
+  const queryWarning = searchParams.get("warning");
+  const [warningDismissed, setWarningDismissed] = useState(false);
+  const warning = !warningDismissed ? queryWarning : null;
 
   async function handleAdd() {
     if (saving || !newName.trim()) return;
@@ -106,6 +116,22 @@ export function PortalHome({ userName, initialClasses, hasProfile }: PortalHomeP
       {/* Scroll-down section */}
       <div className="relative z-10 min-h-screen border-t border-[rgba(168,152,128,0.10)] rounded-t-3xl">
         <div className="flex flex-col items-center py-20 gap-6 max-w-lg mx-auto px-6">
+
+          {warning && (
+            <div
+              className="w-full rounded-xl border border-yellow-400/30 bg-yellow-400/[0.06] px-4 py-3 flex items-start gap-3"
+              role="status"
+            >
+              <span className="text-yellow-400 text-sm flex-1">{warning}</span>
+              <button
+                onClick={() => setWarningDismissed(true)}
+                className="text-xs text-yellow-400/70 hover:text-yellow-400 transition-colors"
+                aria-label="Dismiss warning"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {/* Writing Profile link */}
           <Link
