@@ -145,14 +145,21 @@ export async function POST(req: Request) {
   // legacy path for no reason. If the samples DID change, the old
   // fingerprint is stale by definition and we want it cleared on
   // analysis failure so the guard / warning fires.
-  const existingSamples = await db.writingSample.findMany({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-    select: { content: true },
-  });
+  const [existingSamples, existingProfile] = await Promise.all([
+    db.writingSample.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+      select: { content: true },
+    }),
+    db.writingProfile.findUnique({
+      where: { userId },
+      select: { styleFingerprint: true },
+    }),
+  ]);
   const samplesChanged =
     existingSamples.length !== samples.length ||
     existingSamples.some((existing, i) => existing.content !== samples[i].content);
+  const hadFingerprint = Boolean(existingProfile?.styleFingerprint);
 
   try {
     await db.$transaction(async (tx) => {
@@ -226,12 +233,17 @@ export async function POST(req: Request) {
   }
 
   // For Level 2 profiles the fingerprint is required — generate/route.ts
-  // hard-rejects Level 2 when profile.styleFingerprint is missing. A 200
-  // here with hasFingerprint=false would let AggregateWizard redirect
-  // the user away; they'd then hit the same trap-loop the P1-1 fix was
-  // meant to prevent. Force a 500 with a specific code so the wizard
-  // keeps the user on-page and they can retry.
-  if (profileLevel === 2 && !styleOutcome.fingerprint) {
+  // hard-rejects Level 2 when profile.styleFingerprint is missing.
+  // But "a fingerprint exists" covers TWO cases now:
+  //   - This analysis produced one (`styleOutcome.fingerprint`), OR
+  //   - Samples didn't change and the pre-existing fingerprint was
+  //     preserved (`hadFingerprint && !samplesChanged`).
+  // Blocking only on `!styleOutcome.fingerprint` would refuse a
+  // Level 2 profile-only edit during a transient LLM outage even
+  // though the preserved fingerprint keeps generation working.
+  const hasEffectiveFingerprint =
+    Boolean(styleOutcome.fingerprint) || (hadFingerprint && !samplesChanged);
+  if (profileLevel === 2 && !hasEffectiveFingerprint) {
     return NextResponse.json(
       {
         error: `Style analysis could not complete (${styleOutcome.failureReason ?? "unknown reason"}). Your profile is saved, but Level 2 voice matching requires the fingerprint. Please try again.`,
@@ -250,10 +262,12 @@ export async function POST(req: Request) {
     warning?: string;
   } = {
     success: true,
-    hasFingerprint: !!styleOutcome.fingerprint,
+    hasFingerprint: hasEffectiveFingerprint,
   };
   if (!styleOutcome.fingerprint && styleOutcome.failureReason) {
-    response.warning = `Profile saved, but style analysis could not complete (${styleOutcome.failureReason}).`;
+    response.warning = hasEffectiveFingerprint
+      ? `Your existing style fingerprint was kept — style analysis could not complete on this save (${styleOutcome.failureReason}).`
+      : `Profile saved, but style analysis could not complete (${styleOutcome.failureReason}).`;
   }
   return NextResponse.json(response);
 }
