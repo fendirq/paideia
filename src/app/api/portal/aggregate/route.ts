@@ -152,6 +152,16 @@ export async function POST(req: Request) {
           teacherProfile,
           selfAssessment,
           writingStyle: Prisma.JsonNull, // clear legacy field
+          // Clear any previous fingerprint atomically with the new
+          // samples. If style analysis below succeeds it overwrites
+          // this null; if it fails, the fingerprint stays null and
+          // the LEVEL2_FINGERPRINT_REQUIRED guard / warning banner
+          // will fire correctly. Without this clear, a re-save whose
+          // analysis fails would silently reuse the old fingerprint
+          // against new samples — generate/route.ts would then write
+          // essays in the user's OLD voice against the new teacher
+          // profile and assignments.
+          styleFingerprint: Prisma.JsonNull,
         },
       });
 
