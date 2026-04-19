@@ -58,6 +58,12 @@ describe("isPrivateIp (SSRF guard)", () => {
     expect(isPrivateIp("ff02::1")).toBe(true);
     expect(isPrivateIp("::ffff:127.0.0.1")).toBe(true); // v4-mapped loopback
     expect(isPrivateIp("::ffff:192.168.1.1")).toBe(true);
+    // IPv4-compatible (deprecated but parsable): ::w.x.y.z. Missing
+    // these let `::127.0.0.1` bypass the SSRF guard (Codex 12th pass).
+    expect(isPrivateIp("::127.0.0.1")).toBe(true);
+    expect(isPrivateIp("::10.0.0.5")).toBe(true);
+    expect(isPrivateIp("::192.168.1.1")).toBe(true);
+    expect(isPrivateIp("::169.254.169.254")).toBe(true); // cloud metadata via v6
   });
 
   it("accepts public IPv6", () => {

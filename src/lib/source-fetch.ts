@@ -87,10 +87,20 @@ export function isPrivateIp(ip: string): boolean {
     // public. Plus the deprecated site-local fec0::/10 (fec0-feff).
     if (/^fe[89ab]/.test(lower) || /^fe[cdef]/.test(lower)) return true;
     if (lower.startsWith("ff")) return true;                                 // multicast
-    if (lower.startsWith("::ffff:")) {
-      // IPv4-mapped: validate the embedded v4 form
-      const tail = lower.slice("::ffff:".length);
-      return isPrivateIp(tail);
+    // IPv6 mixed notation: the last 32 bits can be written as a
+    // dotted-decimal IPv4 literal. Covers both
+    //   - ::ffff:w.x.y.z  (IPv4-mapped, e.g. ::ffff:127.0.0.1)
+    //   - ::w.x.y.z       (IPv4-compatible, deprecated but still
+    //                      parsable: ::127.0.0.1, ::10.0.0.5, etc.)
+    // Extract the v4 portion (everything after the last `:`) and
+    // validate it — missing this special-case let `::127.0.0.1`
+    // pass the SSRF guard.
+    if (lower.includes(".")) {
+      const lastColon = lower.lastIndexOf(":");
+      if (lastColon !== -1) {
+        const v4Part = lower.slice(lastColon + 1);
+        return isPrivateIp(v4Part);
+      }
     }
     return false;
   }

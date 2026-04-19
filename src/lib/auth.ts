@@ -118,18 +118,16 @@ export const authOptions: NextAuthOptions = {
             select: { role: true },
           });
           token.role = dbUser?.role ?? null;
-          // Only stamp the cooldown once we've actually observed a
-          // populated role. If the DB still returns null (user has
-          // signed up but hasn't completed onboarding yet), leaving
-          // `roleCheckedAt` unset keeps `neverFetched=true` so the
-          // very next JWT callback re-runs the query. This is what
-          // makes the onboarding handoff work: RoleSelector calls
-          // /api/auth/session immediately after /api/onboarding, and
-          // we need that session refresh to pick up the newly-saved
-          // role rather than honor the 10s null-role cooldown.
-          if (token.role !== null) {
-            token.roleCheckedAt = Date.now();
-          }
+          // Always stamp `roleCheckedAt` on a successful DB call, even
+          // when the DB returned null. Without this stamp, pre-
+          // onboarding requests would keep `neverFetched=true` and
+          // hit the DB on every request (amplification during a
+          // burst). The 10s NULL_ROLE_RETRY_MS cadence is short
+          // enough that onboarding still works: RoleSelector submits
+          // the form then calls /api/auth/session, by which point the
+          // user has spent more than 10s filling the form so the
+          // cooldown has already elapsed and the refresh proceeds.
+          token.roleCheckedAt = Date.now();
         } catch (err) {
           console.error("auth.jwt: role refresh from DB failed", {
             userId: token.userId,
