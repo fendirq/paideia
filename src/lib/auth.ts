@@ -137,12 +137,15 @@ export const authOptions: NextAuthOptions = {
             roleIsNull,
             err,
           });
-          // On the very first JWT refresh (neverFetched && no prior
-          // role) we have nothing to keep — surface the error so the
-          // token is re-issued. Otherwise keep the cached role and
-          // stamp the cooldown so the next request in the cooldown
-          // window skips this branch entirely.
-          if (neverFetched) throw err;
+          // Only throw when we have nothing to preserve — i.e. this
+          // is the very first refresh on this token AND the token
+          // has no cached role. Sessions minted before this deploy
+          // (no `roleCheckedAt` field, but `role` populated from
+          // sign-in) must NOT be logged out by a transient DB
+          // hiccup. In every other case keep the cached role and
+          // stamp the cooldown so the next request within the
+          // cooldown window skips this branch.
+          if (neverFetched && roleIsNull) throw err;
           token.roleCheckedAt = Date.now();
         }
       }

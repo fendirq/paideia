@@ -176,30 +176,34 @@ export async function POST(req: Request) {
   }
 
   const normalizedSourceLinks = normalizeSourceLinks(sourceLinks);
+  const hasPastedNotes = Boolean(sourceText?.trim());
   let sourceContext = "";
-  if (normalizedSourceLinks.length > 0 || sourceText?.trim()) {
+  if (normalizedSourceLinks.length > 0 || hasPastedNotes) {
     let fetchedSources: ResolvedSource[] = [];
     if (normalizedSourceLinks.length > 0) {
       const result = await fetchSourceContext(normalizedSourceLinks);
-      // Any fetch failure is a hard 400. Silently dropping one URL
-      // from a 3-URL packet would let generation proceed against an
-      // incomplete source set — the model could miss required
-      // evidence or citations the user expected to cover. The per-URL
-      // isolation in fetchSourceContext still pays off here by
-      // enumerating EVERY failed URL with its specific reason, so the
-      // user can fix them all in one pass instead of one at a time.
       if (result.failures.length > 0) {
         console.warn("portal.generate: source fetch had failures", {
           userId: session.user.id,
+          hasPastedNotes,
           failures: result.failures,
         });
-        const detail = result.failures.map((f) => `${f.url}: ${f.reason}`).join("; ");
-        return NextResponse.json(
-          {
-            error: `Couldn't read ${result.failures.length} of ${normalizedSourceLinks.length} source link${normalizedSourceLinks.length > 1 ? "s" : ""} (${detail}). Fix the URL${result.failures.length > 1 ? "s" : ""} or paste source notes manually.`,
-          },
-          { status: 400 },
-        );
+        // Policy: a failed URL is a hard 400 UNLESS the user also
+        // pasted source notes. Pasted notes are the explicit opt-in
+        // to "I'll supply source content manually" — treat them as
+        // the fallback for unreadable / auth-gated / scanned links.
+        // Without pasted notes, silently dropping a URL could make
+        // the essay miss required evidence the user expected to
+        // cover; we force them to fix the URL (or paste notes).
+        if (!hasPastedNotes) {
+          const detail = result.failures.map((f) => `${f.url}: ${f.reason}`).join("; ");
+          return NextResponse.json(
+            {
+              error: `Couldn't read ${result.failures.length} of ${normalizedSourceLinks.length} source link${normalizedSourceLinks.length > 1 ? "s" : ""} (${detail}). Fix the URL${result.failures.length > 1 ? "s" : ""} or paste source notes manually.`,
+            },
+            { status: 400 },
+          );
+        }
       }
       fetchedSources = result.resolved;
     }
