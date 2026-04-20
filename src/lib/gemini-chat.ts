@@ -1,13 +1,13 @@
-// Gemini-backed tutor chat. Exposes the same public API as the old
-// `together-chat.ts` (streamChatCompletion + chatCompletion) so the
-// callers (chat route, thread-compression) don't need to change —
-// except for the import path.
+// Gemini-backed tutor chat. Exposes `streamChatCompletion` and
+// `chatCompletion` consumed by the chat route + thread compression.
 //
 // The streaming output is re-formatted as OpenAI-style SSE frames so
 // the existing transform in `src/app/api/sessions/[id]/chat/route.ts`
 // and the SSE parser in `src/components/chat-container.tsx` continue
 // to parse `data: {"choices":[{"delta":{"content":"..."}}]}` lines
-// without modification.
+// without modification. This framing predates the Gemini migration —
+// it stayed because rewriting the client-side SSE parser was out of
+// scope.
 //
 // Model resolution: primary (`gemini-3-flash-preview` by default,
 // thinking disabled) + stable fallback (`gemini-2.5-flash` GA).
@@ -179,12 +179,11 @@ export async function streamChatCompletion(
         controller.enqueue(encoder.encode(DONE_FRAME));
       } catch (err) {
         console.error("gemini-chat: stream failed", err);
-        // Match the old together-chat behavior on mid-stream failure:
-        // emit an error frame the client SSE parser surfaces as an
-        // assistant message failure, then DONE so the loop exits.
-        // We intentionally do NOT retry here — the user has already
-        // seen partial output and switching models mid-stream would
-        // produce an incoherent response.
+        // On mid-stream failure: emit an error frame the client SSE
+        // parser surfaces as an assistant message failure, then DONE
+        // so the loop exits. We intentionally do NOT retry here —
+        // the user has already seen partial output and switching
+        // models mid-stream would produce an incoherent response.
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({ error: "AI service error. Please try again." })}\n\n`,

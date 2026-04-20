@@ -229,9 +229,9 @@ describe("splitMessages", () => {
   });
 
   it("concatenates multiple system messages with blank-line separators", () => {
-    // together-chat historically supported multiple system messages
-    // in sequence; Gemini only accepts one systemInstruction, so we
-    // join them.
+    // Callers sometimes send multiple system messages; Gemini only
+    // accepts one `systemInstruction`, so we join them with a
+    // blank-line separator.
     const { system } = splitMessages([
       { role: "system", content: "Base persona." },
       { role: "system", content: "Extra context." },
