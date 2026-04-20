@@ -109,28 +109,38 @@ interface BackfillStats {
   processedCount: number;
 }
 
-// If >= this many consecutive rows fail (any reason), abort the
-// batch — suggests a systemic problem (bad API key, rate-limit,
-// schema drift) and the rest of the run would just burn quota and
-// DB writes. Picks 20 as a threshold that's high enough to ignore
-// a few truly-malformed docs but low enough to cap wasted spend.
+// Circuit-breaker thresholds. Two independent triggers:
+//
+//   1. CONSECUTIVE — 20 rows in a row fail. Catches the "hard
+//      systemic outage" case (bad key, DB down, schema drift).
+//      Walked in SUBMISSION order after each slice, not in
+//      async-completion order, to make the count deterministic
+//      under concurrency > 1.
+//
+//   2. FAILURE_RATE — once we've processed a minimum sample, if
+//      >= X% of all rows-so-far failed, abort. Catches the
+//      "flaky systemic" case where 1-in-3 succeeds and keeps
+//      resetting the consecutive counter but the run is still
+//      burning mostly-wasted Gemini spend.
 const CONSECUTIVE_FAILURE_ABORT = 20;
+const FAILURE_RATE_MIN_SAMPLES = 20;
+const FAILURE_RATE_THRESHOLD = 0.5; // >50% failure rate
 
 // Parameter-properties (`public readonly` in ctor args) aren't
 // supported under `node --experimental-strip-types`, so declare +
 // assign in the body. Same workaround as GeminiEmptyResponseError.
 class SystemicFailureAbort extends Error {
   public readonly table: TableName;
-  public readonly consecutive: number;
+  public readonly reason: string;
   public readonly lastErrClass: string;
 
-  constructor(table: TableName, consecutive: number, lastErrClass: string) {
+  constructor(table: TableName, reason: string, lastErrClass: string) {
     super(
-      `Aborting ${table} backfill: ${consecutive} consecutive failures (last errClass=${lastErrClass}). Re-run with --dry-run or investigate before continuing.`,
+      `Aborting ${table} backfill: ${reason} (last errClass=${lastErrClass}). Investigate and re-run with --dry-run to confirm before continuing.`,
     );
     this.name = "SystemicFailureAbort";
     this.table = table;
-    this.consecutive = consecutive;
+    this.reason = reason;
     this.lastErrClass = lastErrClass;
   }
 }
@@ -141,6 +151,13 @@ function errClass(err: unknown): string {
   const name = typeof e.name === "string" ? e.name : "Error";
   const code = typeof e.code === "string" ? `:${e.code}` : "";
   return `${name}${code}`;
+}
+
+interface RowOutcome {
+  submissionIndex: number;
+  success: boolean;
+  kind?: string;
+  errClass?: string;
 }
 
 async function applyBackfill(
@@ -155,27 +172,39 @@ async function applyBackfill(
     failedCount: 0,
     processedCount: 0,
   };
+  // Walked in submission order after each slice completes — NOT
+  // mutated inside the concurrent workers. Fixes the race where
+  // increments/resets would otherwise reflect async-completion
+  // order rather than true row order.
   let consecutiveFailures = 0;
   let lastErrClass = "";
 
   for (let i = 0; i < rows.length; i += concurrency) {
     const slice = rows.slice(i, i + concurrency);
-    await Promise.all(
-      slice.map(async (row) => {
+
+    const outcomes: RowOutcome[] = await Promise.all(
+      slice.map(async (row, localIdx): Promise<RowOutcome> => {
+        const submissionIndex = i + localIdx;
+        if (dryRun) {
+          return { submissionIndex, success: true };
+        }
         try {
-          if (dryRun) {
-            stats.processedCount++;
-            consecutiveFailures = 0;
-            return;
-          }
           const result = await detectStructure(row.extractedText);
-          // detectStructure itself never throws — but a result.error
-          // still represents a per-row failure in the classification
-          // pipeline. Count it toward the consecutive-failure tally
-          // so a flood of e.g. "GEMINI_API_KEY not set" trips the
-          // circuit breaker even though each row technically
-          // "succeeded" at the JS-throw level.
-          const kind = result.structure.kind;
+          // detectStructure never throws — a `result.error` still
+          // represents a per-row classification failure (e.g.,
+          // missing API key, MAX_TOKENS, validator rejection).
+          // Treat it as a failure for the circuit-breaker so a
+          // flood of same-error rows is caught.
+          if (result.error) {
+            console.warn(
+              `  ${table} ${row.id} classified unknown (model=${result.model} reason="${result.error}")`,
+            );
+            return {
+              submissionIndex,
+              success: false,
+              errClass: "DetectError",
+            };
+          }
           await c.query(
             `UPDATE "${table}"
              SET "structureKind"        = $1,
@@ -183,41 +212,72 @@ async function applyBackfill(
                  "structureExtractedAt" = NOW(),
                  "structureModel"       = $3
              WHERE id = $4`,
-            [kind, JSON.stringify(result.structure), result.model, row.id],
+            [
+              result.structure.kind,
+              JSON.stringify(result.structure),
+              result.model,
+              row.id,
+            ],
           );
-          stats.kindCounts[kind] = (stats.kindCounts[kind] ?? 0) + 1;
-          stats.processedCount++;
-          if (result.error) {
-            stats.failedCount++;
-            consecutiveFailures++;
-            lastErrClass = "DetectError";
-            console.warn(
-              `  ${table} ${row.id} classified unknown (reason="${result.error}")`,
-            );
-          } else {
-            consecutiveFailures = 0;
-          }
-          if (stats.processedCount % 10 === 0 || stats.processedCount === rows.length) {
-            console.log(
-              `  ${table}: ${stats.processedCount}/${rows.length} processed (last kind=${kind})`,
-            );
-          }
+          return {
+            submissionIndex,
+            success: true,
+            kind: result.structure.kind,
+          };
         } catch (err) {
-          stats.failedCount++;
-          consecutiveFailures++;
-          lastErrClass = errClass(err);
+          const ec = errClass(err);
           console.error(
-            `  ${table} ${row.id} (${row.fileName}) failed (errClass=${lastErrClass}):`,
+            `  ${table} ${row.id} (${row.fileName}) failed (errClass=${ec}):`,
             err instanceof Error ? err.message : err,
           );
+          return { submissionIndex, success: false, errClass: ec };
         }
       }),
     );
-    // Check breaker AFTER each concurrent batch — not inside the
-    // inner map — so in-flight siblings in the same slice aren't
-    // already awaited when we bail.
+
+    // Walk outcomes in submission order so `consecutiveFailures`
+    // actually means "consecutive rows in the input" rather than
+    // "consecutive Promise resolutions."
+    outcomes.sort((a, b) => a.submissionIndex - b.submissionIndex);
+    for (const o of outcomes) {
+      stats.processedCount++;
+      if (o.success) {
+        consecutiveFailures = 0;
+        if (o.kind) {
+          stats.kindCounts[o.kind] = (stats.kindCounts[o.kind] ?? 0) + 1;
+        }
+      } else {
+        stats.failedCount++;
+        consecutiveFailures++;
+        if (o.errClass) lastErrClass = o.errClass;
+      }
+    }
+    if (stats.processedCount % 10 === 0 || stats.processedCount === rows.length) {
+      console.log(
+        `  ${table}: ${stats.processedCount}/${rows.length} processed, ${stats.failedCount} failed`,
+      );
+    }
+
+    // Trigger 1: hard-consecutive (every recent row failed)
     if (consecutiveFailures >= CONSECUTIVE_FAILURE_ABORT) {
-      throw new SystemicFailureAbort(table, consecutiveFailures, lastErrClass);
+      throw new SystemicFailureAbort(
+        table,
+        `${consecutiveFailures} consecutive failures`,
+        lastErrClass,
+      );
+    }
+    // Trigger 2: flaky-systemic (most of the run is failing but
+    // interspersed successes kept resetting the consecutive count)
+    if (
+      stats.processedCount >= FAILURE_RATE_MIN_SAMPLES &&
+      stats.failedCount / stats.processedCount >= FAILURE_RATE_THRESHOLD
+    ) {
+      const pct = (stats.failedCount / stats.processedCount) * 100;
+      throw new SystemicFailureAbort(
+        table,
+        `${stats.failedCount}/${stats.processedCount} rows failed (${pct.toFixed(0)}%)`,
+        lastErrClass,
+      );
     }
   }
   return stats;
