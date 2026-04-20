@@ -37,6 +37,8 @@ vi.mock("@google/genai", () => ({
 import {
   detectAndPersistStructureForFile,
   detectAndPersistStructureForMaterialFile,
+} from "../lib/material-structure-persist";
+import {
   isMaterialStructureEnabled,
   resolveDetectionModel,
   validateStructure,

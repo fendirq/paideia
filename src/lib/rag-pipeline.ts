@@ -6,7 +6,7 @@ import { generateEmbeddings } from "./embeddings";
 import {
   detectAndPersistStructureForFile,
   detectAndPersistStructureForMaterialFile,
-} from "./material-structure";
+} from "./material-structure-persist";
 
 function isBlobUrl(url: string): boolean {
   try {
