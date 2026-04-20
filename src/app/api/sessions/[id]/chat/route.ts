@@ -98,7 +98,8 @@ export async function POST(
     },
   });
 
-  // Stream response from Together.ai
+  // Stream response from Gemini (see src/lib/gemini-chat.ts for
+  // primary-with-fallback model selection).
   let upstreamBody: ReadableStream<Uint8Array>;
   try {
     upstreamBody = await streamChatCompletion(chatMessages);
