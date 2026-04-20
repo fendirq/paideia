@@ -8,6 +8,7 @@ import { streamChatCompletion } from "@/lib/gemini-chat";
 import { parseActionsFromResponse } from "@/lib/parse-actions";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { buildCompressedHistory, getSummaryContext, maybeCompressThread } from "@/lib/thread-compression";
+import { validateStructure, type MaterialStructure } from "@/lib/material-structure";
 
 export async function POST(
   req: NextRequest,
@@ -29,12 +30,23 @@ export async function POST(
   const tutoringSession = await db.tutoringSession.findUnique({
     where: { id },
     include: {
-      inquiry: true,
+      inquiry: {
+        include: {
+          files: {
+            select: { structure: true, structureKind: true },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      },
       material: {
         select: {
           title: true,
           description: true,
           class: { select: { subject: true, teacher: { select: { name: true } } } },
+          files: {
+            select: { structure: true, structureKind: true },
+            orderBy: { createdAt: "asc" },
+          },
         },
       },
       messages: { orderBy: { createdAt: "desc" }, take: 50 },
@@ -62,6 +74,25 @@ export async function POST(
     console.error("RAG retrieval failed, continuing without context:", e);
   }
 
+  // Pick the first non-null structure across the session's uploaded
+  // files. Most sessions have a single file; multi-file is an edge
+  // case we handle by taking the first (chronologically) that the
+  // classifier was able to shape. Silent fallback to null when no
+  // file has structure populated — upstream `buildSystemPrompt`
+  // then omits the Material Structure block entirely.
+  const sessionFiles = tutoringSession.materialId
+    ? (mat?.files ?? [])
+    : (tutoringSession.inquiry?.files ?? []);
+  let structure: MaterialStructure | null = null;
+  for (const f of sessionFiles) {
+    if (!f.structure) continue;
+    const parsed = validateStructure(f.structure);
+    if (parsed && parsed.kind !== "unknown") {
+      structure = parsed;
+      break;
+    }
+  }
+
   // Build system prompt with Socratic instructions + RAG context
   const systemPrompt = buildSystemPrompt({
     subject,
@@ -70,6 +101,7 @@ export async function POST(
     description,
     ragChunks,
     helpType: tutoringSession.helpType,
+    structure,
   });
 
   // Append conversation summary to system prompt (avoids second system message)

@@ -14,6 +14,8 @@
 // validator here is small. If the schema grows, reassess.
 
 import { GoogleGenAI } from "@google/genai";
+import { db } from "./db";
+import type { Prisma } from "@/generated/prisma/client";
 
 export type QuestionType =
   | "short_answer"
@@ -229,6 +231,18 @@ export function resolveDetectionModel(): string {
   return process.env.MATERIAL_STRUCTURE_MODEL?.trim() || DEFAULT_MODEL;
 }
 
+/**
+ * Feature-flag gate for the whole detection pathway. When off (default),
+ * `detectAndPersistStructureForFile` / `...ForMaterialFile` are no-ops
+ * and the tutor system prompt sees `structure: null` → falls back to
+ * pre-existing RAG-only behavior. Flip `ENABLE_MATERIAL_STRUCTURE=true`
+ * per-env to opt in (we ship the code off first, flip on once the
+ * backfill has run).
+ */
+export function isMaterialStructureEnabled(): boolean {
+  return process.env.ENABLE_MATERIAL_STRUCTURE?.trim().toLowerCase() === "true";
+}
+
 export async function detectStructure(
   text: string,
   opts?: { apiKey?: string; modelOverride?: string; timeoutMs?: number }
@@ -310,4 +324,71 @@ export async function detectStructure(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+// ─── Persistence ──────────────────────────────────────────────────
+//
+// Called from the upload pipeline (src/lib/rag-pipeline.ts) in
+// parallel with chunk embedding. Strictly additive — all failure
+// modes swallow errors + log so detection never blocks an upload.
+// Gated behind ENABLE_MATERIAL_STRUCTURE so prod can ship the
+// wiring but not light up detection cost until we're ready.
+
+async function runAndPersist(
+  fileId: string,
+  rawText: string,
+  logLabel: string,
+  persistFn: (data: {
+    structureKind: string;
+    structure: Prisma.InputJsonValue;
+    structureExtractedAt: Date;
+    structureModel: string;
+  }) => Promise<unknown>,
+): Promise<void> {
+  if (!isMaterialStructureEnabled()) return;
+  try {
+    const result = await detectStructure(rawText);
+    await persistFn({
+      structureKind: result.structure.kind,
+      structure: result.structure as unknown as Prisma.InputJsonValue,
+      structureExtractedAt: new Date(),
+      structureModel: result.model,
+    });
+    if (result.error) {
+      console.warn(
+        `material-structure: ${logLabel} ${fileId} classified as unknown (${result.error})`,
+      );
+    }
+  } catch (err) {
+    console.error(
+      `material-structure: ${logLabel} ${fileId} persist failed`,
+      err,
+    );
+  }
+}
+
+/**
+ * Detect structure for an Inquiry-uploaded `File` and persist onto
+ * the row's structure* columns. Never throws; errors are logged.
+ */
+export async function detectAndPersistStructureForFile(
+  fileId: string,
+  rawText: string,
+): Promise<void> {
+  await runAndPersist(fileId, rawText, "File", (data) =>
+    db.file.update({ where: { id: fileId }, data }),
+  );
+}
+
+/**
+ * Detect structure for a teacher-uploaded `ClassMaterialFile` and
+ * persist onto the row's structure* columns. Never throws.
+ */
+export async function detectAndPersistStructureForMaterialFile(
+  fileId: string,
+  rawText: string,
+): Promise<void> {
+  await runAndPersist(fileId, rawText, "ClassMaterialFile", (data) =>
+    db.classMaterialFile.update({ where: { id: fileId }, data }),
+  );
 }

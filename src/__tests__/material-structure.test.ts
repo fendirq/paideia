@@ -1,8 +1,45 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
 import {
-  validateStructure,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+// Hoisted mocks — the SDK + db are both needed so the real
+// detectStructure + persist helpers can run without a network
+// call or a real database.
+const {
+  fileUpdateMock,
+  materialFileUpdateMock,
+  generateContentMock,
+} = vi.hoisted(() => ({
+  fileUpdateMock: vi.fn(),
+  materialFileUpdateMock: vi.fn(),
+  generateContentMock: vi.fn(),
+}));
+
+vi.mock("../lib/db", () => ({
+  db: {
+    file: { update: fileUpdateMock },
+    classMaterialFile: { update: materialFileUpdateMock },
+  },
+}));
+
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class MockGoogleGenAI {
+    models = { generateContent: generateContentMock };
+  },
+}));
+
+import {
+  detectAndPersistStructureForFile,
+  detectAndPersistStructureForMaterialFile,
+  isMaterialStructureEnabled,
   resolveDetectionModel,
+  validateStructure,
   type MaterialStructure,
 } from "../lib/material-structure";
 
@@ -231,5 +268,169 @@ describe("resolveDetectionModel", () => {
     expect(resolveDetectionModel()).toBe("gemini-foo");
     if (ORIGINAL === undefined) delete process.env.MATERIAL_STRUCTURE_MODEL;
     else process.env.MATERIAL_STRUCTURE_MODEL = ORIGINAL;
+  });
+});
+
+describe("isMaterialStructureEnabled", () => {
+  const ORIGINAL = process.env.ENABLE_MATERIAL_STRUCTURE;
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.ENABLE_MATERIAL_STRUCTURE;
+    else process.env.ENABLE_MATERIAL_STRUCTURE = ORIGINAL;
+  });
+
+  it("false when unset (default)", () => {
+    delete process.env.ENABLE_MATERIAL_STRUCTURE;
+    expect(isMaterialStructureEnabled()).toBe(false);
+  });
+
+  it("true only for exact 'true' (case-insensitive, trimmed)", () => {
+    process.env.ENABLE_MATERIAL_STRUCTURE = "true";
+    expect(isMaterialStructureEnabled()).toBe(true);
+    process.env.ENABLE_MATERIAL_STRUCTURE = "  TRUE  ";
+    expect(isMaterialStructureEnabled()).toBe(true);
+  });
+
+  it("false for truthy-but-not-'true' values", () => {
+    for (const v of ["1", "yes", "on", "false", "", "0"]) {
+      process.env.ENABLE_MATERIAL_STRUCTURE = v;
+      expect(isMaterialStructureEnabled()).toBe(false);
+    }
+  });
+});
+
+// Helper to stub a successful Gemini classification response.
+// The real detectStructure parses response.text as JSON, validates
+// via validateStructure, and writes the validated shape to the DB.
+function mockGeminiSuccess(structure: MaterialStructure) {
+  generateContentMock.mockResolvedValue({
+    text: JSON.stringify(structure),
+    candidates: [{ finishReason: "STOP" }],
+  });
+}
+
+const ORIGINAL_FLAG = process.env.ENABLE_MATERIAL_STRUCTURE;
+const ORIGINAL_KEY = process.env.GEMINI_API_KEY;
+
+function resetFlagAndKey(): void {
+  if (ORIGINAL_FLAG === undefined) delete process.env.ENABLE_MATERIAL_STRUCTURE;
+  else process.env.ENABLE_MATERIAL_STRUCTURE = ORIGINAL_FLAG;
+  if (ORIGINAL_KEY === undefined) delete process.env.GEMINI_API_KEY;
+  else process.env.GEMINI_API_KEY = ORIGINAL_KEY;
+}
+
+describe("detectAndPersistStructureForFile", () => {
+  beforeEach(() => {
+    fileUpdateMock.mockReset();
+    materialFileUpdateMock.mockReset();
+    generateContentMock.mockReset();
+    process.env.GEMINI_API_KEY = "test-key";
+  });
+  afterEach(resetFlagAndKey);
+
+  it("is a no-op when flag off (default)", async () => {
+    delete process.env.ENABLE_MATERIAL_STRUCTURE;
+    await detectAndPersistStructureForFile("file-1", "some text");
+    expect(generateContentMock).not.toHaveBeenCalled();
+    expect(fileUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("runs detection + persists on success when flag on", async () => {
+    process.env.ENABLE_MATERIAL_STRUCTURE = "true";
+    mockGeminiSuccess({
+      kind: "problem_set",
+      problems: [{ id: "p1", text: "integrate x dx" }],
+    });
+    fileUpdateMock.mockResolvedValue({});
+    await detectAndPersistStructureForFile("file-1", "some text");
+    expect(generateContentMock).toHaveBeenCalledTimes(1);
+    expect(fileUpdateMock).toHaveBeenCalledTimes(1);
+    const arg = fileUpdateMock.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: "file-1" });
+    expect(arg.data.structureKind).toBe("problem_set");
+    expect(arg.data.structureModel).toBe("gemini-3-flash-preview");
+    expect(arg.data.structure).toEqual({
+      kind: "problem_set",
+      problems: [{ id: "p1", text: "integrate x dx" }],
+    });
+    expect(arg.data.structureExtractedAt).toBeInstanceOf(Date);
+  });
+
+  it("never throws when the Gemini call rejects — persists unknown + logs", async () => {
+    process.env.ENABLE_MATERIAL_STRUCTURE = "true";
+    generateContentMock.mockRejectedValueOnce(new Error("gemini exploded"));
+    fileUpdateMock.mockResolvedValue({});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(
+      detectAndPersistStructureForFile("file-2", "text"),
+    ).resolves.toBeUndefined();
+    // Still persists the `unknown` fallback so the column isn't null
+    // in a way that's indistinguishable from "never ran".
+    expect(fileUpdateMock).toHaveBeenCalledTimes(1);
+    expect(fileUpdateMock.mock.calls[0][0].data.structureKind).toBe("unknown");
+    warn.mockRestore();
+  });
+
+  it("never throws when the DB update throws — logs + swallows", async () => {
+    process.env.ENABLE_MATERIAL_STRUCTURE = "true";
+    mockGeminiSuccess({ kind: "reading_only", passage: "p" });
+    fileUpdateMock.mockRejectedValueOnce(new Error("db down"));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      detectAndPersistStructureForFile("file-3", "text"),
+    ).resolves.toBeUndefined();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it("persists the unknown result when the validator rejects", async () => {
+    process.env.ENABLE_MATERIAL_STRUCTURE = "true";
+    // Valid JSON but not a recognized shape → real detectStructure
+    // falls back to { kind: "unknown" } internally, and the persist
+    // helper writes that.
+    generateContentMock.mockResolvedValue({
+      text: JSON.stringify({ kind: "martian", foo: "bar" }),
+      candidates: [{ finishReason: "STOP" }],
+    });
+    fileUpdateMock.mockResolvedValue({});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await detectAndPersistStructureForFile("file-4", "text");
+    expect(fileUpdateMock).toHaveBeenCalledTimes(1);
+    expect(fileUpdateMock.mock.calls[0][0].data.structureKind).toBe("unknown");
+    warn.mockRestore();
+  });
+});
+
+describe("detectAndPersistStructureForMaterialFile", () => {
+  beforeEach(() => {
+    fileUpdateMock.mockReset();
+    materialFileUpdateMock.mockReset();
+    generateContentMock.mockReset();
+    process.env.GEMINI_API_KEY = "test-key";
+  });
+  afterEach(resetFlagAndKey);
+
+  it("is a no-op when flag off", async () => {
+    delete process.env.ENABLE_MATERIAL_STRUCTURE;
+    await detectAndPersistStructureForMaterialFile("mat-1", "text");
+    expect(generateContentMock).not.toHaveBeenCalled();
+    expect(materialFileUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("hits the classMaterialFile table (not the file table) on success", async () => {
+    process.env.ENABLE_MATERIAL_STRUCTURE = "true";
+    mockGeminiSuccess({
+      kind: "worksheet",
+      sections: [
+        { questions: [{ id: "q1", text: "x", type: "short_answer" }] },
+      ],
+    });
+    materialFileUpdateMock.mockResolvedValue({});
+    await detectAndPersistStructureForMaterialFile("mat-1", "text");
+    expect(materialFileUpdateMock).toHaveBeenCalledTimes(1);
+    expect(materialFileUpdateMock.mock.calls[0][0].where).toEqual({
+      id: "mat-1",
+    });
+    // Sanity: we didn't accidentally ALSO write to File.
+    expect(fileUpdateMock).not.toHaveBeenCalled();
   });
 });
