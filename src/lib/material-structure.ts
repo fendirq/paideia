@@ -230,12 +230,20 @@ export function resolveDetectionModel(): string {
 }
 
 /**
- * Feature-flag gate for the whole detection pathway. When off (default),
- * `detectAndPersistStructureForFile` / `...ForMaterialFile` are no-ops
- * and the tutor system prompt sees `structure: null` → falls back to
- * pre-existing RAG-only behavior. Flip `ENABLE_MATERIAL_STRUCTURE=true`
- * per-env to opt in (we ship the code off first, flip on once the
- * backfill has run).
+ * Feature-flag gate for upload-time detection. When off (default),
+ * `detectAndPersistStructureForFile` / `...ForMaterialFile` short-
+ * circuit without calling Gemini or writing to the DB.
+ *
+ * IMPORTANT — write-time only. The chat-route read-side intentionally
+ * does NOT consult this flag: if a row already has `structure`
+ * populated (from a previous flag-on period, from the backfill
+ * script, or from manual fixture data), the tutor system prompt
+ * uses it regardless. Ship plan: deploy with flag OFF → run
+ * backfill → flip flag ON. Rolling back = flip flag OFF, which
+ * stops NEW uploads from classifying but leaves existing rows
+ * driving the prompt. To fully roll back, flip flag OFF AND either
+ * null out the structure columns or short-circuit the read-side
+ * (separate change, not this function's responsibility).
  */
 export function isMaterialStructureEnabled(): boolean {
   return process.env.ENABLE_MATERIAL_STRUCTURE?.trim().toLowerCase() === "true";

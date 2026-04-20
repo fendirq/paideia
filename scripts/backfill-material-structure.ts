@@ -103,27 +103,79 @@ async function findPending(
   return res.rows;
 }
 
+interface BackfillStats {
+  kindCounts: Record<string, number>;
+  failedCount: number;
+  processedCount: number;
+}
+
+// If >= this many consecutive rows fail (any reason), abort the
+// batch — suggests a systemic problem (bad API key, rate-limit,
+// schema drift) and the rest of the run would just burn quota and
+// DB writes. Picks 20 as a threshold that's high enough to ignore
+// a few truly-malformed docs but low enough to cap wasted spend.
+const CONSECUTIVE_FAILURE_ABORT = 20;
+
+// Parameter-properties (`public readonly` in ctor args) aren't
+// supported under `node --experimental-strip-types`, so declare +
+// assign in the body. Same workaround as GeminiEmptyResponseError.
+class SystemicFailureAbort extends Error {
+  public readonly table: TableName;
+  public readonly consecutive: number;
+  public readonly lastErrClass: string;
+
+  constructor(table: TableName, consecutive: number, lastErrClass: string) {
+    super(
+      `Aborting ${table} backfill: ${consecutive} consecutive failures (last errClass=${lastErrClass}). Re-run with --dry-run or investigate before continuing.`,
+    );
+    this.name = "SystemicFailureAbort";
+    this.table = table;
+    this.consecutive = consecutive;
+    this.lastErrClass = lastErrClass;
+  }
+}
+
+function errClass(err: unknown): string {
+  if (!err || typeof err !== "object") return typeof err;
+  const e = err as { name?: unknown; code?: unknown };
+  const name = typeof e.name === "string" ? e.name : "Error";
+  const code = typeof e.code === "string" ? `:${e.code}` : "";
+  return `${name}${code}`;
+}
+
 async function applyBackfill(
   c: Client,
   table: TableName,
   rows: PendingRow[],
   concurrency: number,
   dryRun: boolean,
-): Promise<Record<string, number>> {
-  const kindCounts: Record<string, number> = {};
-  let done = 0;
+): Promise<BackfillStats> {
+  const stats: BackfillStats = {
+    kindCounts: {},
+    failedCount: 0,
+    processedCount: 0,
+  };
+  let consecutiveFailures = 0;
+  let lastErrClass = "";
+
   for (let i = 0; i < rows.length; i += concurrency) {
     const slice = rows.slice(i, i + concurrency);
     await Promise.all(
       slice.map(async (row) => {
         try {
           if (dryRun) {
-            done++;
+            stats.processedCount++;
+            consecutiveFailures = 0;
             return;
           }
           const result = await detectStructure(row.extractedText);
+          // detectStructure itself never throws — but a result.error
+          // still represents a per-row failure in the classification
+          // pipeline. Count it toward the consecutive-failure tally
+          // so a flood of e.g. "GEMINI_API_KEY not set" trips the
+          // circuit breaker even though each row technically
+          // "succeeded" at the JS-throw level.
           const kind = result.structure.kind;
-          kindCounts[kind] = (kindCounts[kind] ?? 0) + 1;
           await c.query(
             `UPDATE "${table}"
              SET "structureKind"        = $1,
@@ -133,22 +185,42 @@ async function applyBackfill(
              WHERE id = $4`,
             [kind, JSON.stringify(result.structure), result.model, row.id],
           );
-          done++;
-          if (done % 10 === 0 || done === rows.length) {
+          stats.kindCounts[kind] = (stats.kindCounts[kind] ?? 0) + 1;
+          stats.processedCount++;
+          if (result.error) {
+            stats.failedCount++;
+            consecutiveFailures++;
+            lastErrClass = "DetectError";
+            console.warn(
+              `  ${table} ${row.id} classified unknown (reason="${result.error}")`,
+            );
+          } else {
+            consecutiveFailures = 0;
+          }
+          if (stats.processedCount % 10 === 0 || stats.processedCount === rows.length) {
             console.log(
-              `  ${table}: ${done}/${rows.length} processed (last kind=${kind})`,
+              `  ${table}: ${stats.processedCount}/${rows.length} processed (last kind=${kind})`,
             );
           }
         } catch (err) {
+          stats.failedCount++;
+          consecutiveFailures++;
+          lastErrClass = errClass(err);
           console.error(
-            `  ${table} ${row.id} (${row.fileName}) failed:`,
+            `  ${table} ${row.id} (${row.fileName}) failed (errClass=${lastErrClass}):`,
             err instanceof Error ? err.message : err,
           );
         }
       }),
     );
+    // Check breaker AFTER each concurrent batch — not inside the
+    // inner map — so in-flight siblings in the same slice aren't
+    // already awaited when we bail.
+    if (consecutiveFailures >= CONSECUTIVE_FAILURE_ABORT) {
+      throw new SystemicFailureAbort(table, consecutiveFailures, lastErrClass);
+    }
   }
-  return kindCounts;
+  return stats;
 }
 
 async function main(): Promise<void> {
@@ -177,8 +249,9 @@ async function main(): Promise<void> {
   await client.connect();
   console.log(`connected to ${new URL(connectionString).host}`);
 
-  const summary: Record<string, Record<string, number>> = {};
+  const summary: Record<string, BackfillStats> = {};
   const startedAt = Date.now();
+  let abortedBy: SystemicFailureAbort | null = null;
 
   try {
     for (const table of targets) {
@@ -195,13 +268,21 @@ async function main(): Promise<void> {
         }
         continue;
       }
-      summary[table] = await applyBackfill(
-        client,
-        table,
-        pending,
-        args.concurrency,
-        args.dryRun,
-      );
+      try {
+        summary[table] = await applyBackfill(
+          client,
+          table,
+          pending,
+          args.concurrency,
+          args.dryRun,
+        );
+      } catch (err) {
+        if (err instanceof SystemicFailureAbort) {
+          abortedBy = err;
+          break; // Skip remaining targets too — systemic issue.
+        }
+        throw err;
+      }
     }
   } finally {
     await client.end();
@@ -209,13 +290,18 @@ async function main(): Promise<void> {
 
   console.log("\n=== DONE ===");
   console.log(`elapsed: ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
-  console.log("kind distribution by table:");
-  for (const [table, counts] of Object.entries(summary)) {
-    console.log(`  ${table}:`);
-    for (const [kind, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+  if (abortedBy) {
+    console.error(`\n⚠️  ${abortedBy.message}`);
+  }
+  for (const [table, stats] of Object.entries(summary)) {
+    console.log(
+      `  ${table}: ${stats.processedCount} processed, ${stats.failedCount} failed`,
+    );
+    for (const [kind, n] of Object.entries(stats.kindCounts).sort((a, b) => b[1] - a[1])) {
       console.log(`    ${kind}: ${n}`);
     }
   }
+  if (abortedBy) process.exit(2);
 }
 
 main().catch((err) => {
