@@ -7,45 +7,47 @@ Unblocks Prisma migrations (`prisma migrate dev`) for the class-announcements, m
 Neon supports branching a database from any moment on your prod branch — schema + data cloned, isolated compute, reset-safe.
 
 1. Open the Neon console → select the Paideia project → **Branches** → **Create branch**.
-2. Name it `dev` (or `dev-<your-name>`). Source: `main` (or whatever the prod branch is called). Compute size: minimum tier is fine.
-3. Once created, click the dev branch → **Connection string** → copy the pooled `postgres://…?sslmode=require` URL.
-4. Create `.env.development` in the repo root:
+2. Name it `dev`. Parent branch: `production` (whatever your current prod branch is called). **Uncheck** "Automatically delete branch after" — otherwise the branch disappears on you mid-cycle. Include data: **Current data**.
+3. Once created, click the branch → **Connect** button → the connection panel opens.
+4. Copy the **pooled** connection string (hostname contains `-pooler`).
+5. Flip the **Connection pooling** toggle OFF. Copy the **direct** connection string that appears (hostname without `-pooler`).
+6. Create `.env.development.local` in the repo root (`.local` suffix = auto-gitignored by the existing `.env*.local` rule, no gitignore edit needed):
 
    ```
    # Dev Postgres — isolated Neon branch. Safe for `prisma migrate dev`.
-   DATABASE_URL="<paste the dev-branch connection string here>"
-   DIRECT_URL="<paste the same URL, but swap the pooled host for the direct-connect host — Neon shows both in the connection panel>"
+   DATABASE_URL="<paste the POOLED connection string here>"
+   DIRECT_URL="<paste the DIRECT connection string here>"
    ```
 
-   `DIRECT_URL` is the non-pooled variant Prisma uses for migrations. Both are shown in the same Neon connection card.
-
-5. Add `.env.development` to `.gitignore` if it isn't already:
+7. Confirm the wiring:
 
    ```bash
-   git check-ignore .env.development || echo ".env.development" >> .gitignore
+   set -a && source .env.development.local && set +a && npx prisma migrate status
    ```
 
-6. Confirm the wiring:
+   Should print `Database schema is up to date!` and show the dev-branch hostname (with `-pooler`) in the `Datasource` line. If it shows your prod hostname, stop and re-check step 6.
+
+8. To actually run migrations against dev:
 
    ```bash
-   npx dotenv -e .env.development -- npx prisma migrate status
+   set -a && source .env.development.local && set +a && npx prisma migrate dev --name <migration-name>
    ```
 
-   Should print something like `Database schema is up to date!` (or list pending migrations if a branch has some). If it tries to touch prod (you'll see the prod host in the output), stop and re-check step 4.
+   The `set -a && source ... && set +a` prefix loads the dev env vars into the shell for just this command — overrides anything Prisma would auto-load from `.env.local`. Same pattern works for any other Prisma command against dev (`db push`, `db seed`, etc.).
 
-7. To actually run migrations against dev:
-
-   ```bash
-   npx dotenv -e .env.development -- npx prisma migrate dev --name <migration-name>
+   Optional npm-script shortcut — add to `package.json`:
+   ```json
+   "scripts": {
+     "migrate:dev": "bash -c 'set -a && source .env.development.local && set +a && prisma migrate dev'"
+   }
    ```
-
-   Or set up an npm script: `"migrate:dev": "dotenv -e .env.development -- prisma migrate dev"` in `package.json`.
+   Then: `npm run migrate:dev -- --name my-migration`.
 
 ## Notes
 
 - The dev branch is cheap — Neon's free tier includes branching. When you're done with a migration cycle, you can delete the branch and re-create from main if you want a fresh clone.
 - `prisma migrate dev` creates a migration file in `prisma/migrations/` AND applies it. Commit the migration file. Production applies via `prisma migrate deploy` in your CI/deploy step.
-- Do NOT point `.env.local` at dev — `.env.local` is for runtime dev-server connections where you want to hit real data. `.env.development` is migration-only.
+- Do NOT point `.env.local` at dev — `.env.local` is for runtime dev-server connections where you want to hit real data. `.env.development.local` is migration-only.
 
 ## Alternative: local Postgres
 
@@ -58,12 +60,12 @@ createdb paideia_dev
 psql paideia_dev -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-Then `DATABASE_URL="postgres://<your-mac-user>@localhost:5432/paideia_dev"` in `.env.development`. The Neon route is easier because schemas + extensions match prod exactly.
+Then `DATABASE_URL="postgres://<your-mac-user>@localhost:5432/paideia_dev"` + same URL for `DIRECT_URL` in `.env.development.local`. The Neon route is easier because schemas + extensions match prod exactly.
 
 ## First migration once this is done
 
 ```bash
-npx dotenv -e .env.development -- npx prisma migrate dev --name add_material_structure_columns
+set -a && source .env.development.local && set +a && npx prisma migrate dev --name add_material_structure_columns
 ```
 
-That will apply the material-structure columns (`structureKind`, `structure`, `structureExtractedAt`, `structureModel`) to `File` + `ClassMaterialFile`, and generate the corresponding migration SQL under `prisma/migrations/`.
+That applies the material-structure columns (`structureKind`, `structure`, `structureExtractedAt`, `structureModel`) to `File` + `ClassMaterialFile`, and generates the corresponding migration SQL under `prisma/migrations/`.
