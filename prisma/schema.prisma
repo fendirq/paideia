@@ -108,15 +108,23 @@ model Inquiry {
 }
 
 model File {
-  id            String      @id @default(cuid())
-  inquiryId     String
-  inquiry       Inquiry     @relation(fields: [inquiryId], references: [id])
-  fileName      String
-  fileUrl       String
-  fileType      String
-  extractedText String?
-  chunks        TextChunk[]
-  createdAt     DateTime    @default(now())
+  id                    String      @id @default(cuid())
+  inquiryId             String
+  inquiry               Inquiry     @relation(fields: [inquiryId], references: [id])
+  fileName              String
+  fileUrl               String
+  fileType              String
+  extractedText         String?
+  chunks                TextChunk[]
+  createdAt             DateTime    @default(now())
+  // Material-structure detection (see src/lib/material-structure.ts).
+  // Populated once at upload; used by the tutor system prompt to
+  // adapt output format (question numbering, walkthrough vs Socratic).
+  // Nullable so uploads never block on detection failure.
+  structureKind         String?
+  structure             Json?
+  structureExtractedAt  DateTime?
+  structureModel        String?
 }
 
 model TextChunk {
@@ -245,15 +253,20 @@ model ClassMaterial {
 }
 
 model ClassMaterialFile {
-  id            String         @id @default(cuid())
-  materialId    String
-  material      ClassMaterial  @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  fileName      String
-  fileUrl       String
-  fileType      String
-  extractedText String?
-  chunks        MaterialChunk[]
-  createdAt     DateTime       @default(now())
+  id                    String         @id @default(cuid())
+  materialId            String
+  material              ClassMaterial  @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  fileName              String
+  fileUrl               String
+  fileType              String
+  extractedText         String?
+  chunks                MaterialChunk[]
+  createdAt             DateTime       @default(now())
+  // Material-structure detection — see File model for usage.
+  structureKind         String?
+  structure             Json?
+  structureExtractedAt  DateTime?
+  structureModel        String?
 }
 
 model MaterialChunk {

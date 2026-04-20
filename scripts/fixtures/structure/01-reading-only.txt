@@ -1,0 +1,13 @@
+Photosynthesis: The Chemistry of Life
+
+Photosynthesis is the process by which green plants, algae, and certain bacteria convert light energy — usually from the sun — into chemical energy stored in glucose. It takes place primarily in the chloroplasts of plant cells, where the pigment chlorophyll absorbs light, predominantly in the blue and red wavelengths, and reflects green, which is why most leaves appear green to our eyes.
+
+The overall reaction can be summarized by the equation:
+
+    6 CO₂ + 6 H₂O + light energy → C₆H₁₂O₆ + 6 O₂
+
+Carbon dioxide enters the leaf through small pores called stomata, while water is drawn up from the roots through the xylem. The energy from sunlight splits water molecules in a process called photolysis, releasing oxygen as a byproduct and freeing electrons that drive the synthesis of ATP and NADPH during the light-dependent reactions.
+
+In the subsequent light-independent reactions — often called the Calvin cycle — the ATP and NADPH are used to fix atmospheric CO₂ into a three-carbon sugar, which is eventually converted into glucose. Glucose serves as both an immediate energy source and a building block for cellulose, the structural component of plant cell walls.
+
+Photosynthesis is the foundation of nearly all life on Earth: it produces the oxygen animals breathe and the organic compounds that form the base of virtually every food chain. Without it, the atmosphere would lack sufficient oxygen, and the carbon cycle as we know it would collapse.

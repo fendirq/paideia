@@ -3,6 +3,10 @@ import { db } from "./db";
 import { extractText, isExtractableType, resolveMimeType } from "./extract-text";
 import { chunkText } from "./chunker";
 import { generateEmbeddings } from "./embeddings";
+import {
+  detectAndPersistStructureForFile,
+  detectAndPersistStructureForMaterialFile,
+} from "./material-structure-persist";
 
 function isBlobUrl(url: string): boolean {
   try {
@@ -61,10 +65,20 @@ export async function processFile(
 
   // 3. Chunk text
   const chunks = chunkText(rawText);
-  if (chunks.length === 0) return;
 
-  // 4. Generate embeddings for all chunks
-  const embeddings = await generateEmbeddings(chunks.map((c) => c.content));
+  // 4. Run embedding + structure detection concurrently. Both are
+  // network-bound and independent; Promise.all keeps total upload
+  // latency at max(embed, detect) instead of sum. Structure
+  // detection self-handles failure (logs, writes { kind: "unknown" }
+  // or no-op when gated off) — safe to never await separately.
+  const [embeddings] = await Promise.all([
+    chunks.length > 0
+      ? generateEmbeddings(chunks.map((c) => c.content))
+      : Promise.resolve([] as number[][]),
+    detectAndPersistStructureForFile(fileId, rawText),
+  ]);
+
+  if (chunks.length === 0) return;
 
   // 5. Store chunks + embeddings in pgvector via raw SQL
   // Prisma can't insert Unsupported("vector") types directly
@@ -145,9 +159,17 @@ export async function processMaterialFile(
   });
 
   const chunks = chunkText(rawText);
-  if (chunks.length === 0) return;
 
-  const embeddings = await generateEmbeddings(chunks.map((c) => c.content));
+  // Parallelize embedding + structure detection — same pattern as
+  // processFile above.
+  const [embeddings] = await Promise.all([
+    chunks.length > 0
+      ? generateEmbeddings(chunks.map((c) => c.content))
+      : Promise.resolve([] as number[][]),
+    detectAndPersistStructureForMaterialFile(fileId, rawText),
+  ]);
+
+  if (chunks.length === 0) return;
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];

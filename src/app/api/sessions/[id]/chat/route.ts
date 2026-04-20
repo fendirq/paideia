@@ -8,6 +8,7 @@ import { streamChatCompletion } from "@/lib/gemini-chat";
 import { parseActionsFromResponse } from "@/lib/parse-actions";
 import { filterResponseBySubject } from "@/lib/content-filter";
 import { buildCompressedHistory, getSummaryContext, maybeCompressThread } from "@/lib/thread-compression";
+import { validateStructure, type MaterialStructure } from "@/lib/material-structure";
 
 export async function POST(
   req: NextRequest,
@@ -62,6 +63,62 @@ export async function POST(
     console.error("RAG retrieval failed, continuing without context:", e);
   }
 
+  // Load file structure in a SEPARATE, guarded query. Keeping it
+  // out of the main `findUnique` above means a missing
+  // `structure*` column (code deployed before migration applied)
+  // degrades to null-structure instead of breaking every chat
+  // request. Same guard also catches any future query-shape bugs
+  // in the files include.
+  type StructureRow = { id: string; structure: unknown; structureKind: string | null };
+  let sessionFiles: StructureRow[] = [];
+  try {
+    if (tutoringSession.materialId) {
+      sessionFiles = await db.classMaterialFile.findMany({
+        where: { materialId: tutoringSession.materialId },
+        select: { id: true, structure: true, structureKind: true },
+        orderBy: { createdAt: "asc" },
+      });
+    } else if (tutoringSession.inquiryId) {
+      sessionFiles = await db.file.findMany({
+        where: { inquiryId: tutoringSession.inquiryId },
+        select: { id: true, structure: true, structureKind: true },
+        orderBy: { createdAt: "asc" },
+      });
+    }
+  } catch (e) {
+    console.error(
+      `chat-route: failed to load material-structure columns for session ${id} — degrading to null-structure. Likely cause: migration not applied on this environment.`,
+      e,
+    );
+  }
+
+  // Pick the first non-unknown structure across the session's
+  // uploaded files. Multi-file sessions are an edge case — first
+  // chronologically that the classifier was able to shape wins.
+  //
+  // Loudly log when the DB says a file HAS structure (non-null
+  // blob, non-unknown `structureKind`) but the validator rejects
+  // the stored blob — that's a silent divergence that would
+  // otherwise drop us back to RAG-only with zero signal.
+  let structure: MaterialStructure | null = null;
+  for (const f of sessionFiles) {
+    if (!f.structure) continue;
+    const parsed = validateStructure(f.structure);
+    if (parsed && parsed.kind !== "unknown") {
+      structure = parsed;
+      break;
+    }
+    if (
+      parsed === null &&
+      f.structureKind !== null &&
+      f.structureKind !== "unknown"
+    ) {
+      console.error(
+        `chat-route: stored structure failed re-validation (session=${id} file=${f.id} storedKind=${f.structureKind}). Falling back to null-structure.`,
+      );
+    }
+  }
+
   // Build system prompt with Socratic instructions + RAG context
   const systemPrompt = buildSystemPrompt({
     subject,
@@ -70,6 +127,7 @@ export async function POST(
     description,
     ragChunks,
     helpType: tutoringSession.helpType,
+    structure,
   });
 
   // Append conversation summary to system prompt (avoids second system message)

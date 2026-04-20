@@ -18,6 +18,7 @@ import {
   historyLayout,
   historyActions,
 } from "./subject-prompts";
+import type { MaterialStructure } from "./material-structure";
 
 export interface PromptContext {
   subject: string;
@@ -26,6 +27,14 @@ export interface PromptContext {
   description: string;
   ragChunks: { content: string }[];
   helpType: string | null;
+  // Aggregated material structure across the session's files.
+  // When present, injects a "Material Structure" block that the
+  // tutor uses to adapt output format (numbered walkthroughs for
+  // worksheets, problem-by-problem scoping for problem sets, etc.).
+  // Null / omitted / { kind: "unknown" } suppresses the block
+  // entirely — the tutor falls back to its current RAG-only
+  // behavior.
+  structure?: MaterialStructure | null;
 }
 
 type SubjectGroup = "math-stem" | "writing" | "history";
@@ -91,6 +100,119 @@ function sanitize(input: string, maxLength: number = 500): string {
   return input.replace(/[\x00-\x1f\x7f]/g, "").slice(0, maxLength);
 }
 
+function clip(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n)}…` : s;
+}
+
+/**
+ * Emit a "Material Structure" block for the system prompt. Returns
+ * empty string when there's no structure to describe (null / unknown
+ * / unrecognized kind).
+ *
+ * The block is Socratic-first by default. The "full walkthrough"
+ * escape hatch activates only when the student explicitly asks
+ * ("show me every step", "walk me through all of it"). This is the
+ * product decision: Paideia is Socratic; step-by-step solutions are
+ * student-triggered, not model-initiated.
+ */
+export function buildStructureInstructions(
+  structure: MaterialStructure | null | undefined
+): string {
+  if (!structure || structure.kind === "unknown") return "";
+
+  const header = "\n\n## Material Structure";
+  const socraticTail =
+    "- Default posture remains Socratic — one step per turn. Full walkthroughs are an opt-in escape hatch, not the default.";
+
+  switch (structure.kind) {
+    case "reading_only":
+      return `${header}
+The student's material is a reading passage. Guide them to engage with specific parts — quote back to them and ask what stands out. If they request a summary, steer them to identify key points themselves first.`;
+
+    case "reading_with_questions": {
+      const preview = structure.questions
+        .slice(0, 5)
+        .map(
+          (q) => `  ${q.number ?? q.id}. ${clip(sanitize(q.text, 200), 120)}`
+        )
+        .join("\n");
+      return `${header}
+Reading passage followed by ${structure.questions.length} questions. Preview:
+${preview}
+
+Output format rules:
+- Reference questions by the source's numbering (e.g., "For Question 3…").
+- When the student asks about a specific item ("help me with Q3"), scope your response to that one.
+- When the student explicitly asks for a full walkthrough ("show me every step", "walk me through all of it"), give a direct structured response numbered to match the source. Return to Socratic after.
+${socraticTail}`;
+    }
+
+    case "worksheet": {
+      const totalQ = structure.sections.reduce(
+        (n, s) => n + s.questions.length,
+        0
+      );
+      const sectionList = structure.sections
+        .map(
+          (s, i) =>
+            `  - ${s.title ? sanitize(s.title, 100) : `Section ${i + 1}`}: ${s.questions.length} questions`
+        )
+        .join("\n");
+      return `${header}
+Worksheet with ${structure.sections.length} sections, ${totalQ} total questions:
+${sectionList}
+
+Output format rules:
+- Reference questions by section + number (e.g., "In Part A #3…").
+- When the student asks for a specific numbered item, scope your response there.
+- When the student explicitly asks for a full walkthrough, give a direct section-by-section response numbered to match the source. Return to Socratic after.
+${socraticTail}`;
+    }
+
+    case "problem_set": {
+      const preview = structure.problems
+        .slice(0, 3)
+        .map(
+          (p) => `  ${p.number ?? p.id}. ${clip(sanitize(p.text, 200), 120)}`
+        )
+        .join("\n");
+      return `${header}
+Problem set with ${structure.problems.length} problems. Preview:
+${preview}
+
+Output format rules:
+- Reference problems by their source numbering (e.g., "For Problem 3…").
+- When the student explicitly asks for "every step" or "show me the full solution" for a problem, give a clean step-by-step worked solution for that one problem. Return to Socratic after.
+${socraticTail}`;
+    }
+
+    case "essay_prompt": {
+      const reqLine = structure.requirements?.length
+        ? `\nRequirements: ${structure.requirements.map((r) => sanitize(r, 200)).join("; ")}`
+        : "";
+      const rubricLine = structure.rubric
+        ? `\nRubric: ${clip(sanitize(structure.rubric, 800), 400)}`
+        : "";
+      return `${header}
+Essay prompt: "${clip(sanitize(structure.prompt, 800), 400)}"${reqLine}${rubricLine}
+
+Output format rules:
+- Guide the essay process Socratically: thesis → outline → paragraph-by-paragraph.
+- If the student asks you to write or draft for them, first surface what they've already thought about the prompt. Help them refine; do not ghostwrite.
+- Reference rubric criteria when giving feedback.`;
+    }
+
+    case "fill_in_template":
+      return `${header}
+Fill-in template with ${structure.blanks.length} blanks. Each blank has context anchoring what belongs there.
+
+Output format rules:
+- Reference blanks by their surrounding context (e.g., "The blank after 'Character's full name:'").
+- Guide the student to fill each blank themselves — ask what the surrounding text implies before suggesting content.
+- If the student asks for "all the answers", redirect: offer to walk them through one blank at a time. Only provide direct content if they persist past that.`;
+  }
+}
+
 export function buildSystemPrompt(context: PromptContext): string {
   const group = classifySubject(context.subject);
 
@@ -115,6 +237,7 @@ export function buildSystemPrompt(context: PromptContext): string {
 
   const subjectSections = buildSubjectSections(group);
   const actionRules = buildActionRules(group);
+  const structureBlock = buildStructureInstructions(context.structure);
 
   return `You are Paideia, an AI Socratic tutor for Drew School students.
 
@@ -140,7 +263,7 @@ ${subjectSections}
 Subject: ${context.subject}
 Unit/Topic: ${safeUnit}
 Teacher: ${safeTeacher}${helpTypeContext}${fileFirstResponse}
-${ragContext}
+${ragContext}${structureBlock}
 
 ## Response Format — ACTIONS (CRITICAL)
 End EVERY response with this separator and EXACTLY 3 choices:
