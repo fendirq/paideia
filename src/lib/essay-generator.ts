@@ -770,12 +770,33 @@ export function isComparativeAssignment(assignment: string, requirements?: strin
   return signals.some((signal) => text.includes(signal));
 }
 
-// ─── Level 2 Writing Prompt (sample-first generation) ───
+// ─── Level 2 Writing Prompt (voice-profile generation) ───
 
 export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
+  const { teacherProfile: tp, selfAssessment: sa, fingerprint, assignment, wordCount, requirements, sourceContext } = opts;
 
-  const refSamples = selectDiverseSamples(samples);
+  // Raw samples are intentionally withheld from the initial write
+  // pass. Gemini's attention on concrete sample sentences overrides
+  // abstract "don't copy verbatim" directives — we observed this
+  // across multiple QA runs (analytical-essay L2 unsourced at 4/10
+  // with "directly copying exact sentences" verdict). Narrative
+  // assignments have always withheld samples for this reason;
+  // argumentative now matches.
+  //
+  // The voice profile (formatFingerprintNarrative) carries the
+  // load-bearing traits — sentence rhythm, paragraph pattern,
+  // vocabulary tier, transition habits, evidence-integration style
+  // — without the verbatim-copy trap. The forensic critique + audit
+  // prompts (which legitimately compare essay-to-sample for
+  // AI-detection) still see raw samples; those fire AFTER the draft
+  // exists and cannot introduce new verbatim reuse.
+  //
+  // The downstream revision prompts (expansion/compliance/evidence
+  // integration/attribution/naturalness/trim/sourceFlow) ALSO still
+  // see raw samples — removing samples there in a broader-scope fix
+  // regressed L2 sourced from 8 → 4 in QA. Revision passes rely on
+  // sample reference for evidence-integration and quote-intro
+  // style matching.
   const narrative = formatFingerprintNarrative(fingerprint);
   const isNarrative = isNarrativeAssignment(assignment, requirements);
   const isComparative = !isNarrative && isComparativeAssignment(assignment, requirements);
@@ -833,15 +854,15 @@ This is deliberate: narrative voice is easy to describe abstractly (sentence rhy
 Your job: read the voice profile below, the self-report, and the assignment prompt. Then invent an original scene with its own subject, opening move, cast, setting, and ending. The subject must not be something the student has written about before (the profile may hint at their past topics — avoid them).
 
 Write in the student's voice as described. Let the voice live in sentence cadence, word choice, sensory attention, and analytical stance. Do NOT try to reproduce specific images, phrases, or paragraph structures you might have seen before — those are not part of this prompt.`
-    : `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
+    : `ANALYTICAL VOICE REFERENCE — you will work from the structured voice profile below, NOT from the student's raw prior essays.
 
-${refSamples}
+This is deliberate: raw sample text in a generation pass invites structural plagiarism. Gemini's attention latches onto concrete sample sentences, paragraph templates, and evidence phrasing, then reproduces them with new proper nouns ("mad-libs"). Abstract "don't copy" instructions do not override this pull; withholding the samples entirely is what works.
 
-Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.`}
+Your job: read the voice profile below, the self-report, the assignment, and the outline. Then write an original analytical essay in this student's voice. Let that voice show up in sentence cadence, paragraph movement, evidence framing, transition habits, vocabulary ceiling, and analytical stance. Do NOT try to reproduce specific sentences, images, or paragraph structures you might have seen before — those are not part of this prompt.`}
 
 ---
 
-WRITER'S PROFILE (analyst's notes on this student's patterns):
+STUDENT'S VOICE PROFILE (analyst's notes on this student's patterns):
 
 ${narrative}
 
