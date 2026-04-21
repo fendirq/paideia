@@ -564,11 +564,16 @@ describe("buildLevel2SourceFlowPrompt", () => {
 });
 
 describe("buildLevel2NaturalnessPrompt", () => {
-  it("asks for less formulaic phrasing without weakening evidence", () => {
+  it("targets AI-chain openers + AI-typical phrasing, not just 'formulaic'", () => {
     const essay = "This shows the Abbasids were strong. This shows the Umayyads were weak.";
     const result = buildLevel2NaturalnessPrompt(essay, makeOpts());
 
-    expect(result).toContain("Replace repetitive analytical phrasing");
+    // Voice profile (no raw samples) is the driver
+    expect(result).toContain("STUDENT'S VOICE PROFILE");
+    expect(result).not.toContain("THEIR ACTUAL WRITING");
+    // Specific anti-mad-libs + anti-AI checks
+    expect(result).toContain("opener-stem");
+    expect(result).toContain("This matters because");
     expect(result).toContain("Do NOT pretend you have class notes");
     expect(result).toContain("Do not make the essay vaguer");
   });
@@ -582,7 +587,7 @@ describe("buildLevel2NaturalnessPrompt", () => {
       }),
     );
 
-    expect(result).toContain("Keep source attribution when it is supported");
+    expect(result).toContain("Keep source attribution when it's supported");
     expect(result).not.toContain("Do NOT pretend you have class notes");
   });
 });

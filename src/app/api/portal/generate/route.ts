@@ -22,6 +22,7 @@ import {
   buildLevel2EvidenceIntegrationPrompt,
   buildLevel2AttributionPrompt,
   buildLevel2CompliancePrompt,
+  buildLevel2NaturalnessPrompt,
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
   buildLegacyLevel1Prompt,
@@ -691,7 +692,36 @@ async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Resp
     }
   }
 
-  // Step 11: Final cleanup — keep Level 2 polished instead of re-injecting roughness
+  // Step 11: Naturalness pass — breaks up "He [verb]" opener runs, AI-typical
+  // vocabulary, generic source connectors. Withholds raw samples (operates
+  // from voice profile only) so it doesn't reintroduce verbatim copying.
+  // Skipped for narrative (different voice constraints).
+  if (!isNarrative) {
+    try {
+      const naturalMsg = await provider.createLevel2Message({
+        prompt: buildLevel2NaturalnessPrompt(baseEssay, opts),
+        system: "You are polishing surface naturalness in a student-voice essay. Break AI-chain openers, replace generic connectors with direct naming, preserve argument + evidence.",
+        maxTokens: 5000,
+        temperature: 0.1,
+        timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+        stageLabel: "naturalness",
+      });
+      const naturalEssay = sanitizeEssayOutput(naturalMsg.text);
+      if (
+        isUsableEssayCandidate(naturalEssay, opts.wordCount) &&
+        passesRevisionLengthFloor(naturalEssay, opts.wordCount, baseEssay) &&
+        countParagraphs(naturalEssay) === countParagraphs(baseEssay) &&
+        isWithinMaxWords(naturalEssay, bounds.max)
+      ) {
+        baseEssay = naturalEssay;
+      }
+    } catch (err) {
+      logStageDegradation("naturalness", userId, err);
+      degradedStages.push("naturalness");
+    }
+  }
+
+  // Step 12: Final cleanup — keep Level 2 polished instead of re-injecting roughness
   baseEssay = opts.sourceContext
     ? normalizeSupportedSourceAttribution(baseEssay, opts.sourceContext)
     : stripUnsupportedSourceAttribution(baseEssay);
