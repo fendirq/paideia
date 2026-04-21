@@ -47,3 +47,9 @@ prisma/migrations/migration_lock.toml
 
 # local scratch / codex review artifacts / qa intermediate output
 /tmp/
+
+# QA harness per-fixture output (essays, grade reports) —
+# regenerated every run, not worth versioning. Keep hand-written
+# review .md files at the top of output/qa/ (curated analyses).
+/output/qa/*/
+!/output/qa/*.md

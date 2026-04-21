@@ -791,12 +791,15 @@ export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string)
   // AI-detection) still see raw samples; those fire AFTER the draft
   // exists and cannot introduce new verbatim reuse.
   //
-  // The downstream revision prompts (expansion/compliance/evidence
-  // integration/attribution/naturalness/trim/sourceFlow) ALSO still
-  // see raw samples — removing samples there in a broader-scope fix
-  // regressed L2 sourced from 8 → 4 in QA. Revision passes rely on
-  // sample reference for evidence-integration and quote-intro
-  // style matching.
+  // Downstream revision prompts are split by role:
+  //   - buildLevel2NaturalnessPrompt: voice-only polish — withholds
+  //     raw samples (same reason as this prompt).
+  //   - buildLevel2ExpansionPrompt / CompliancePrompt / TrimPrompt /
+  //     EvidenceIntegrationPrompt / AttributionPrompt /
+  //     SourceFlowPrompt: still see raw samples. They need sample
+  //     reference for evidence-integration and quote-intro style
+  //     matching. A broader-scope fix that removed samples from
+  //     these regressed L2 sourced from 8 → 4 in QA.
   const narrative = formatFingerprintNarrative(fingerprint);
   const isNarrative = isNarrativeAssignment(assignment, requirements);
   const isComparative = !isNarrative && isComparativeAssignment(assignment, requirements);
