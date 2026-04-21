@@ -18,19 +18,10 @@ export default async function SignupPage() {
       >
         <source src="/hero-bg.mp4" type="video/mp4" />
       </video>
-      <div className="fixed inset-0 bg-bg-base/50 z-0" />
+      <div className="fixed inset-0 bg-bg-base/55 z-0" />
 
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-12">
-        <h1 className="font-display font-bold text-base tracking-[0.1em] mb-10">
-          PAIDEIA
-        </h1>
-
-        <div className="w-full max-w-sm bg-[rgba(40,32,24,0.55)] backdrop-blur-[20px] border border-[rgba(168,152,128,0.15)] rounded-[20px] p-8">
-          <h2 className="font-display font-semibold text-lg text-text-primary text-center mb-6">
-            Create Account
-          </h2>
-          <SignupForm />
-        </div>
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6">
+        <SignupForm />
       </main>
     </div>
   );
