@@ -31,17 +31,18 @@ export default withAuth(
       authorized({ token, req }) {
         const { pathname } = req.nextUrl;
 
-        // Waitlist page is always public
+        // Waitlist page is always public (kept accessible by direct
+        // link for anyone who bookmarked it during the pre-launch
+        // phase; /api/waitlist API still records submissions for
+        // admin review).
         if (pathname === "/waitlist") return true;
 
-        // Login/signup require waitlist access (if WAITLIST_CODE is configured)
+        // Login/signup are open — Paideia is live. Before public
+        // launch these required a `waitlist_access` cookie set via
+        // WAITLIST_CODE verification. To re-gate, wrap this return
+        // with the env-var + cookie check (see git history for the
+        // prior pattern).
         if (pathname === "/login" || pathname === "/signup") {
-          if (process.env.WAITLIST_CODE) {
-            const waitlistCookie = req.cookies.get("waitlist_access");
-            if (waitlistCookie?.value !== "granted") {
-              return false; // redirects to pages.signIn ("/")
-            }
-          }
           return true;
         }
 
