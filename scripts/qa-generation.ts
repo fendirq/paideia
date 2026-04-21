@@ -17,6 +17,7 @@ import {
   buildLevel2EvidenceIntegrationPrompt,
   buildLevel2AttributionPrompt,
   buildLevel2CompliancePrompt,
+  buildLevel2NaturalnessPrompt,
   buildLevel2SourceFlowPrompt,
   buildLevel2TrimPrompt,
   isNarrativeAssignment,
@@ -740,6 +741,36 @@ async function generateLevel2Essay(opts: GenerateOptions): Promise<string> {
       }
     } catch {
       // Pass failure is non-fatal; keep current baseEssay.
+    }
+  }
+
+  // Naturalness pass — breaks up "He [verb]" opener runs, AI-typical
+  // vocabulary, generic source connectors. Withholds raw samples so it
+  // doesn't reintroduce verbatim. Mirrored from prod route so QA
+  // reflects prod behavior. Skipped for narrative.
+  if (!isNarrative) {
+    try {
+      const natural = sanitizeEssayOutput(
+        extractText(
+          await provider.createLevel2Message({
+            prompt: buildLevel2NaturalnessPrompt(baseEssay, opts),
+            system: "You are polishing surface naturalness in a student-voice essay. Break AI-chain openers, replace generic connectors with direct naming, preserve argument + evidence.",
+            maxTokens: 5000,
+            temperature: 0.1,
+            timeoutMs: LEVEL2_REVISION_TIMEOUT_MS,
+            stageLabel: "naturalness",
+          })
+        )
+      );
+      if (
+        passesRevisionLengthFloor(natural, opts.wordCount, baseEssay) &&
+        countParagraphs(natural) === countParagraphs(baseEssay) &&
+        isWithinMaxWords(natural, bounds.max)
+      ) {
+        baseEssay = natural;
+      }
+    } catch {
+      // Non-fatal; keep current baseEssay.
     }
   }
 

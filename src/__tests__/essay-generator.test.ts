@@ -246,19 +246,21 @@ describe("buildLevel2PlanPrompt", () => {
 describe("buildLevel2WritingPrompt", () => {
   const outline = "I. Intro with thesis\nII. Green light analysis\nIII. Valley of Ashes\nIV. Conclusion";
 
-  it("places samples BEFORE fingerprint", () => {
+  it("places the voice-reference block BEFORE the self-report context", () => {
     const result = buildLevel2WritingPrompt(makeOpts(), outline);
-    const samplesIdx = result.indexOf("THEIR ACTUAL WRITING");
-    const profileIdx = result.indexOf("WRITER'S PROFILE");
-    expect(samplesIdx).toBeGreaterThan(-1);
-    expect(profileIdx).toBeGreaterThan(-1);
-    expect(samplesIdx).toBeLessThan(profileIdx);
+    const voiceRefIdx = result.indexOf("ANALYTICAL VOICE REFERENCE");
+    const profileIdx = result.indexOf("STUDENT'S VOICE PROFILE");
+    const selfReportIdx = result.indexOf("WHAT THE STUDENT SAYS");
+    expect(voiceRefIdx).toBeGreaterThan(-1);
+    expect(profileIdx).toBeGreaterThan(voiceRefIdx);
+    expect(selfReportIdx).toBeGreaterThan(profileIdx);
   });
 
-  it("includes samples content", () => {
+  it("withholds raw sample content from the argumentative writing prompt (prevents verbatim mad-libs)", () => {
     const result = buildLevel2WritingPrompt(makeOpts(), outline);
-    expect(result).toContain("events of the war");
-    expect(result).toContain("author shows how the character");
+    expect(result).not.toContain("events of the war");
+    expect(result).not.toContain("author shows how the character");
+    expect(result).toContain("NOT from the student's raw prior essays");
   });
 
   it("uses narrative fingerprint, not JSON", () => {
@@ -299,14 +301,15 @@ describe("buildLevel2WritingPrompt", () => {
     expect(result).toContain("body paragraphs");
   });
 
-  it("packs more than three references when budget allows", () => {
+  it("withholds sample content regardless of how many samples are available", () => {
     const samples = Array.from({ length: 5 }, (_, i) => ({
       label: `Essay ${i + 1}`,
       content: `Sample ${i + 1}. ` + "This shows that the student writes in a pretty specific way. ".repeat(20 + i),
     }));
     const result = buildLevel2WritingPrompt(makeOpts({ samples }), outline);
 
-    expect(result).toContain("Reference 4");
+    expect(result).not.toContain("Reference 4");
+    expect(result).not.toContain("Sample 4.");
   });
 
   it("tells the model not to use vague evidence placeholders", () => {
@@ -561,11 +564,16 @@ describe("buildLevel2SourceFlowPrompt", () => {
 });
 
 describe("buildLevel2NaturalnessPrompt", () => {
-  it("asks for less formulaic phrasing without weakening evidence", () => {
+  it("targets AI-chain openers + AI-typical phrasing, not just 'formulaic'", () => {
     const essay = "This shows the Abbasids were strong. This shows the Umayyads were weak.";
     const result = buildLevel2NaturalnessPrompt(essay, makeOpts());
 
-    expect(result).toContain("Replace repetitive analytical phrasing");
+    // Voice profile (no raw samples) is the driver
+    expect(result).toContain("STUDENT'S VOICE PROFILE");
+    expect(result).not.toContain("THEIR ACTUAL WRITING");
+    // Specific anti-mad-libs + anti-AI checks
+    expect(result).toContain("opener-stem");
+    expect(result).toContain("This matters because");
     expect(result).toContain("Do NOT pretend you have class notes");
     expect(result).toContain("Do not make the essay vaguer");
   });
@@ -579,7 +587,7 @@ describe("buildLevel2NaturalnessPrompt", () => {
       }),
     );
 
-    expect(result).toContain("Keep source attribution when it is supported");
+    expect(result).toContain("Keep source attribution when it's supported");
     expect(result).not.toContain("Do NOT pretend you have class notes");
   });
 });

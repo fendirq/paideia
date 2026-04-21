@@ -770,12 +770,33 @@ export function isComparativeAssignment(assignment: string, requirements?: strin
   return signals.some((signal) => text.includes(signal));
 }
 
-// ─── Level 2 Writing Prompt (sample-first generation) ───
+// ─── Level 2 Writing Prompt (voice-profile generation) ───
 
 export function buildLevel2WritingPrompt(opts: GenerateOptions, outline: string): string {
-  const { teacherProfile: tp, selfAssessment: sa, fingerprint, samples, assignment, wordCount, requirements, sourceContext } = opts;
+  const { teacherProfile: tp, selfAssessment: sa, fingerprint, assignment, wordCount, requirements, sourceContext } = opts;
 
-  const refSamples = selectDiverseSamples(samples);
+  // Raw samples are intentionally withheld from the initial write
+  // pass. Gemini's attention on concrete sample sentences overrides
+  // abstract "don't copy verbatim" directives — we observed this
+  // across multiple QA runs (analytical-essay L2 unsourced at 4/10
+  // with "directly copying exact sentences" verdict). Narrative
+  // assignments have always withheld samples for this reason;
+  // argumentative now matches.
+  //
+  // The voice profile (formatFingerprintNarrative) carries the
+  // load-bearing traits — sentence rhythm, paragraph pattern,
+  // vocabulary tier, transition habits, evidence-integration style
+  // — without the verbatim-copy trap. The forensic critique + audit
+  // prompts (which legitimately compare essay-to-sample for
+  // AI-detection) still see raw samples; those fire AFTER the draft
+  // exists and cannot introduce new verbatim reuse.
+  //
+  // The downstream revision prompts (expansion/compliance/evidence
+  // integration/attribution/naturalness/trim/sourceFlow) ALSO still
+  // see raw samples — removing samples there in a broader-scope fix
+  // regressed L2 sourced from 8 → 4 in QA. Revision passes rely on
+  // sample reference for evidence-integration and quote-intro
+  // style matching.
   const narrative = formatFingerprintNarrative(fingerprint);
   const isNarrative = isNarrativeAssignment(assignment, requirements);
   const isComparative = !isNarrative && isComparativeAssignment(assignment, requirements);
@@ -833,15 +854,15 @@ This is deliberate: narrative voice is easy to describe abstractly (sentence rhy
 Your job: read the voice profile below, the self-report, and the assignment prompt. Then invent an original scene with its own subject, opening move, cast, setting, and ending. The subject must not be something the student has written about before (the profile may hint at their past topics — avoid them).
 
 Write in the student's voice as described. Let the voice live in sentence cadence, word choice, sensory attention, and analytical stance. Do NOT try to reproduce specific images, phrases, or paragraph structures you might have seen before — those are not part of this prompt.`
-    : `THEIR ACTUAL WRITING — study this carefully before you begin. This is how they really write:
+    : `ANALYTICAL VOICE REFERENCE — you will work from the structured voice profile below, NOT from the student's raw prior essays.
 
-${refSamples}
+This is deliberate: raw sample text in a generation pass invites structural plagiarism. Gemini's attention latches onto concrete sample sentences, paragraph templates, and evidence phrasing, then reproduces them with new proper nouns ("mad-libs"). Abstract "don't copy" instructions do not override this pull; withholding the samples entirely is what works.
 
-Read the samples above multiple times. Notice how they build paragraphs, how long their sentences are, how they introduce evidence, what transitions they use, what mistakes they make, how sophisticated (or not) their vocabulary is. You must write the way THEY write.`}
+Your job: read the voice profile below, the self-report, the assignment, and the outline. Then write an original analytical essay in this student's voice. Let that voice show up in sentence cadence, paragraph movement, evidence framing, transition habits, vocabulary ceiling, and analytical stance. Do NOT try to reproduce specific sentences, images, or paragraph structures you might have seen before — those are not part of this prompt.`}
 
 ---
 
-WRITER'S PROFILE (analyst's notes on this student's patterns):
+STUDENT'S VOICE PROFILE (analyst's notes on this student's patterns):
 
 ${narrative}
 
@@ -1338,8 +1359,9 @@ MANDATORY CHECKS:
 - Tie each body paragraph back to the thesis before moving on.
 ${requiredEvidenceCount ? `- The essay must clearly include at least ${requiredEvidenceCount} distinct pieces of evidence.` : ""}
 - If a paragraph already has one strong example, deepen the explanation before piling on extra facts.
-- ${sourceContext ? "When approved source material is present, prefer it over generic background knowledge. Refer to the actual event, person, or source claim instead of generic phrases like \"class notes explain\" whenever possible." : "If no approved source material is present, use 3-5 concrete, high-confidence details a prepared student could plausibly remember from class. Prefer major names, events, places, and policies over niche facts or stacked dates, and do not try to cover everything."}
-- Add direct source phrasing when natural, such as \"the source shows\" or \"class notes explain,\" but only if the source context actually supports it.
+- ${sourceContext ? "When approved source material is present, prefer it over generic background knowledge. Refer to the actual event, person, or source claim by NAME — not by generic connector." : "If no approved source material is present, use 3-5 concrete, high-confidence details a prepared student could plausibly remember from class. Prefer major names, events, places, and policies over niche facts or stacked dates, and do not try to cover everything."}
+- BANNED generic source connectors: "the source shows", "the source says", "class notes explain", "historians note", "the text says", "the sources tell us", "according to the sources". Replace EACH occurrence with direct naming: name the specific person, work, event, or claim. If you can't name something specific, cut the sentence rather than leaving a vague filler.
+- Precise reporting verbs for named sources: "argues", "suggests", "implies", "concedes", "reveals", "demonstrates". Avoid generic "says" or inflated "illuminates".
 - Do not add fake citations, invented quotes, or niche specifics that were never established.
 
 IMPORTANT:
@@ -1417,13 +1439,17 @@ export function buildLevel2NaturalnessPrompt(
   essay: string,
   opts: GenerateOptions,
 ): string {
-  const { fingerprint, samples, assignment, requirements, sourceContext } = opts;
-  const refSamples = selectDiverseSamples(samples);
+  const { fingerprint, assignment, requirements, sourceContext } = opts;
   const narrative = formatFingerprintNarrative(fingerprint);
 
-  return `STUDENT'S REAL WRITING — match this level and texture:
+  // Raw samples withheld here — same trap as the write prompt
+  // (`buildLevel2WritingPrompt`). At naturalness time, exposing
+  // samples causes the model to re-introduce distinctive
+  // multi-word phrases verbatim while trying to "match texture".
+  // Voice profile carries the load-bearing traits.
+  return `ANALYTICAL VOICE REFERENCE — work from the structured voice profile below, NOT from the student's raw prior essays.
 
-${refSamples}
+This is deliberate: naturalness/surface polish should come from the profile's rhythm + diction description, not from pattern-copying against raw sample text.
 
 ---
 
@@ -1433,7 +1459,7 @@ ${essay}
 
 ---
 
-WRITER'S PROFILE:
+STUDENT'S VOICE PROFILE:
 
 ${narrative}
 
@@ -1448,20 +1474,21 @@ ${sourceContext ? `\n\n${sourceContext}` : ""}
 
 YOUR TASK:
 
-Keep the same argument, evidence, and overall structure, but make the essay sound more naturally like this student's real writing.
+Keep the argument, evidence, and paragraph structure exactly, but tighten the essay so it reads like a real student with this voice — not an AI polishing a draft.
 
 MANDATORY CHECKS:
-- Simplify any sentence that sounds more polished, textbook-like, or over-explained than the real samples.
-- Replace repetitive analytical phrasing like "This shows," "This matters because," "According to," or other formulaic sentence starters when they repeat too often.
-- Keep some student-like repetition, but do not let the same analytical opener dominate the essay.
-- Use a few direct, plainspoken statements instead of turning every idea into polished commentary.
-${sourceContext ? "- Keep source attribution when it is supported by the provided material, but make it feel natural instead of mechanical." : "- Do NOT pretend you have class notes, class sources, or a source packet. If the essay mentions them, rewrite those lines so they state the evidence directly."}
+- Break up runs of 3+ consecutive sentences that start with the same subject pronoun + verb (e.g., "He argues… He shows… He demonstrates…" → vary subject + opener so no opener-stem dominates).
+- Replace AI-typical analytical phrasing where it clusters: "This shows," "This matters because," "It is important to note," "Furthermore," "In conclusion," "Moreover," "In today's society," "delve into," "underscores," "plays a crucial role." Leave a FEW student-like analytical connectives intact — the goal is to break the AI-chain pattern, not erase every analytical transition.
+- Replace generic source connectors — "the source shows", "class notes explain", "the text says", "historians note" — with direct naming: name the specific person, text, event, or claim being referenced. If the essay can't directly name something, cut the connector sentence rather than leaving a vague stand-in.
+- Swap over-polished, AI-typical vocabulary for the student's tier: "elusive" → "hard to reach", "pervasive" → "everywhere", "illuminates" → "shows", "transcends" → "goes beyond", "devastating portrait" → cut or rewrite, "multifaceted" → cut or rewrite.
+- Vary sentence length: every body paragraph should have at least one sentence under 10 words AND one over 25 words. If you see 3+ consecutive sentences within 5 words of each other, break the pattern.
+${sourceContext ? "- Keep source attribution when it's supported by the provided material, but make it feel natural instead of mechanical — vary the reporting verb (argues, suggests, implies, reveals, demonstrates) instead of repeating 'says'." : "- Do NOT pretend you have class notes, class sources, or a source packet. If the essay mentions them, rewrite those lines so they state the evidence directly."}
 - Preserve the concrete evidence and thesis. Do not make the essay vaguer.
 
 IMPORTANT:
-- Keep the student's natural diction and rhythm.
+- Keep the student's natural diction as described in the profile.
 - Do not add headers or commentary.
-- Do not remove major historical details that are already helping the essay satisfy the assignment.
+- Do not remove major historical details that help satisfy the assignment.
 
 Return ONLY the revised essay.`;
 }
