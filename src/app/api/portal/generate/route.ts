@@ -714,6 +714,16 @@ async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Resp
         isWithinMaxWords(naturalEssay, bounds.max)
       ) {
         baseEssay = naturalEssay;
+      } else {
+        // Acceptance-gate rejection isn't a thrown error, so it
+        // wouldn't hit logStageDegradation above. Surface it
+        // explicitly so we can tell "naturalness never ran" (the
+        // output was kept pre-naturalness) apart from "naturalness
+        // ran and helped."
+        console.warn(
+          `level2 naturalness output rejected by acceptance gates: paras=${countParagraphs(naturalEssay)}/${countParagraphs(baseEssay)} words=${naturalEssay.split(/\s+/).filter(Boolean).length}`,
+        );
+        degradedStages.push("naturalness");
       }
     } catch (err) {
       logStageDegradation("naturalness", userId, err);
