@@ -1,11 +1,5 @@
 "use client";
 
-interface WaitlistEntry {
-  id: string;
-  email: string;
-  createdAt: string;
-}
-
 interface UserEntry {
   id: string;
   name: string | null;
@@ -16,7 +10,6 @@ interface UserEntry {
 }
 
 interface AdminDashboardProps {
-  waitlistEntries: WaitlistEntry[];
   users: UserEntry[];
 }
 
@@ -49,54 +42,13 @@ function RoleBadge({ role }: { role: string | null }) {
   );
 }
 
-export function AdminDashboard({ waitlistEntries, users }: AdminDashboardProps) {
+export function AdminDashboard({ users }: AdminDashboardProps) {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] px-6 py-12">
       <div className="max-w-5xl mx-auto space-y-10">
         <h1 className="font-display text-2xl font-bold text-text-primary">
           Admin Dashboard
         </h1>
-
-        {/* Waitlist */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display text-lg font-semibold text-text-primary">Waitlist</h2>
-            <span className="text-xs text-text-muted bg-[rgba(168,152,128,0.14)] px-2.5 py-0.5 rounded-full">
-              {waitlistEntries.length}
-            </span>
-          </div>
-
-          {waitlistEntries.length === 0 ? (
-            <p className="text-text-muted text-sm">No waitlist entries yet.</p>
-          ) : (
-            <div className="bg-bg-surface border border-bg-elevated rounded-xl overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[rgba(168,152,128,0.12)]">
-                    <th className="text-left px-5 py-3 text-text-muted font-display text-xs uppercase tracking-wide">
-                      Email
-                    </th>
-                    <th className="text-left px-5 py-3 text-text-muted font-display text-xs uppercase tracking-wide">
-                      Joined
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {waitlistEntries.map((entry) => (
-                    <tr key={entry.id} className="border-b border-[rgba(168,152,128,0.12)] last:border-0">
-                      <td className="px-5 py-3 text-sm text-text-secondary">
-                        {entry.email}
-                      </td>
-                      <td className="px-5 py-3 text-sm text-text-muted">
-                        {formatDate(entry.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
 
         {/* Users */}
         <section className="space-y-4">
