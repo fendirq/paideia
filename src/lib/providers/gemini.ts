@@ -159,10 +159,17 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           const canRetry =
             i < models.length - 1 && !isTimeoutError(err) && shouldFallback(err);
           if (!canRetry) throw err;
-          console.warn(
-            `Level 2 ${input.stageLabel} failed on ${model}; retrying with ${models[i + 1]}.`,
-            err,
-          );
+          console.error("level2.gemini: primary failed, trying fallback", {
+            stage: input.stageLabel,
+            primary: model,
+            fallback: models[i + 1],
+            status: errorStatus(err),
+            finishReason:
+              err instanceof GeminiEmptyResponseError ? err.finishReason : undefined,
+            err: err instanceof Error
+              ? { name: err.name, message: err.message }
+              : { message: String(err) },
+          });
         }
       }
 

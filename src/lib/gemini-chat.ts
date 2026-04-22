@@ -159,10 +159,12 @@ export async function streamChatCompletion(
       lastError = err;
       const canRetry = i < models.length - 1 && isRetryableChatError(err);
       if (!canRetry) throw err;
-      console.warn(
-        `gemini-chat stream: ${model} failed, retrying with ${models[i + 1]}.`,
-        err,
-      );
+      console.error("gemini-chat.stream: primary failed, trying fallback", {
+        stage: "chat-stream",
+        primary: model,
+        fallback: models[i + 1],
+        err: errorSummary(err),
+      });
     }
   }
 
@@ -178,16 +180,25 @@ export async function streamChatCompletion(
         }
         controller.enqueue(encoder.encode(DONE_FRAME));
       } catch (err) {
-        console.error("gemini-chat: stream failed", err);
+        console.error("gemini-chat: stream failed mid-stream", {
+          stage: "chat-stream-midflight",
+          err: errorSummary(err),
+        });
         // On mid-stream failure: emit an error frame the client SSE
         // parser surfaces as an assistant message failure, then DONE
         // so the loop exits. We intentionally do NOT retry here —
         // the user has already seen partial output and switching
         // models mid-stream would produce an incoherent response.
+        //
+        // Branch the user-visible message: a SAFETY/RECITATION block
+        // will loop forever if the user just retries, so the text has
+        // to hint at rephrasing. Retryable errors (5xx, network) use
+        // a generic retry message.
+        const message = isSafetyBlockError(err)
+          ? "This response was blocked. Try rephrasing your message."
+          : "AI service error. Please try again.";
         controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ error: "AI service error. Please try again." })}\n\n`,
-          ),
+          encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`),
         );
         controller.enqueue(encoder.encode(DONE_FRAME));
       } finally {
@@ -195,6 +206,34 @@ export async function streamChatCompletion(
       }
     },
   });
+}
+
+// Serializable summary for structured logs. Vercel renders `{err}` as
+// "[object Object]" in the log aggregator, so we hand it a plain
+// object with the fields humans actually care about.
+function errorSummary(err: unknown): { name?: string; message?: string; status?: number } {
+  if (err instanceof Error) {
+    const status = (err as { status?: number }).status;
+    return { name: err.name, message: err.message, status: typeof status === "number" ? status : undefined };
+  }
+  return { message: String(err) };
+}
+
+// Matches Gemini safety / recitation blocks, which are not retryable.
+// Retrying the exact same prompt would hit the same classifier, so the
+// user-visible message needs to nudge toward rephrasing, not retry.
+function isSafetyBlockError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  if (msg.includes("safety") || msg.includes("blocked") || msg.includes("recitation")) {
+    return true;
+  }
+  const finishReason = (err as { finishReason?: string }).finishReason;
+  if (typeof finishReason === "string") {
+    const r = finishReason.toUpperCase();
+    if (r === "SAFETY" || r === "RECITATION" || r === "PROHIBITED_CONTENT") return true;
+  }
+  return false;
 }
 
 export async function chatCompletion(messages: ChatMessage[]): Promise<string> {
@@ -221,10 +260,12 @@ export async function chatCompletion(messages: ChatMessage[]): Promise<string> {
       lastError = err;
       const canRetry = i < models.length - 1 && isRetryableChatError(err);
       if (!canRetry) throw err;
-      console.warn(
-        `gemini-chat non-stream: ${model} failed, retrying with ${models[i + 1]}.`,
-        err,
-      );
+      console.error("gemini-chat.nonStream: primary failed, trying fallback", {
+        stage: "chat-nonstream",
+        primary: model,
+        fallback: models[i + 1],
+        err: errorSummary(err),
+      });
     }
   }
 

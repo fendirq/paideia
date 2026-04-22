@@ -1,7 +1,11 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "portal_access";
+// __Host- prefix: the browser enforces Path=/, Secure, no Domain=.
+// This prevents a subdomain (or attacker who controls one) from
+// setting or reading this cookie. Required attributes are all already
+// in portalCookieHeader(), so the prefix is a pure hardening step.
+const COOKIE_NAME = "__Host-portal_access";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const COOKIE_MAX_AGE_MS = COOKIE_MAX_AGE_SECONDS * 1000;
 
@@ -29,12 +33,13 @@ export function validatePortalCode(input: string): boolean {
   if (!input || typeof input !== "string") return false;
   const expected = process.env.PORTAL_ACCESS_CODE;
   if (!expected) return false;
-  // Fixed-length buffers to prevent timing leak on length mismatch
-  const a = Buffer.alloc(64);
-  const b = Buffer.alloc(64);
-  a.write(input);
-  b.write(expected);
-  return input.length === expected.length && timingSafeEqual(a, b);
+  // Hash both sides to sha256 (32 bytes, constant length) before
+  // comparing. Fixed-length allocation with Buffer.alloc(64) + .write()
+  // silently truncated anything longer, which let same-length inputs
+  // that only matched on the first 64 bytes pass.
+  const a = createHash("sha256").update(input, "utf8").digest();
+  const b = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(a, b);
 }
 
 /**

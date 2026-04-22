@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { buildStyleAnalysisPrompt } from "@/lib/essay-generator";
 import { getProvider } from "@/lib/providers";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@/generated/prisma/client";
 
 export const maxDuration = 90;
@@ -99,10 +100,24 @@ async function analyzeStyle(
   }
 }
 
+// Style-analysis Gemini call per aggregate run. Generous cap — legit
+// users resubmit when they add new writing samples, not on a loop.
+const AGG_LIMIT = 20;
+const AGG_WINDOW_MS = 60 * 60 * 1000;
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await checkRateLimit("portal-aggregate", session.user.id, AGG_LIMIT, AGG_WINDOW_MS);
+  if (!rl.allowed) {
+    console.warn("portal.aggregate: rate limit exceeded", { userId: session.user.id });
+    return NextResponse.json(
+      { error: "Hourly aggregation limit reached. Try again in a bit." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000)) } },
+    );
   }
 
   const body: AggregateBody = await req.json();

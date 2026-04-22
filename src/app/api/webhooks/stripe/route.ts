@@ -21,6 +21,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Idempotency: record the event.id BEFORE touching user state. Stripe
+  // replays events on timeout/non-2xx; without this, a stale replay of
+  // `checkout.session.completed` after a `customer.subscription.deleted`
+  // would reinstate level2PaidAt without a new payment.
+  try {
+    await db.stripeWebhookEvent.create({
+      data: { id: event.id, eventType: event.type },
+    });
+  } catch (err) {
+    const prismaErr = err as { code?: string };
+    if (prismaErr.code === "P2002") {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    console.error("stripe webhook: idempotency insert failed", err);
+    return NextResponse.json({ error: "DB error" }, { status: 500 });
+  }
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const userId = session.metadata?.userId;

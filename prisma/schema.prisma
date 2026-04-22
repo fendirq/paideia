@@ -337,3 +337,18 @@ model PortalClass {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 }
+
+model StripeWebhookEvent {
+  id          String   @id
+  eventType   String
+  processedAt DateTime @default(now())
+}
+
+model RateLimit {
+  id          String   @id
+  windowStart DateTime
+  count       Int
+  updatedAt   DateTime @default(now())
+
+  @@index([windowStart])
+}
