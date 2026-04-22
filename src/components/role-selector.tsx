@@ -209,7 +209,7 @@ export function RoleSelector() {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full bg-accent hover:bg-accent/90 text-[#281c14] font-display text-[14px] font-semibold rounded-[12px] px-5 py-3.5 transition-colors disabled:opacity-50"
+          className="w-full bg-accent hover:bg-accent-light text-[#281c14] font-display text-[14px] font-semibold rounded-xl px-5 py-3.5 transition-colors disabled:opacity-50"
         >
           {loading ? "Setting up..." : "Continue"}
         </button>

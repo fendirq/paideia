@@ -38,7 +38,7 @@ export default async function SubjectPage({
             Not this one.
           </p>
           <p className="text-text-secondary text-sm">
-            Go use Claude Opus 4.6 or ChatGPT 5.4 :)
+            Paideia writes essays. Try your AI chatbot of choice for this one.
           </p>
         </div>
       </div>

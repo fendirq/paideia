@@ -447,7 +447,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(168,152,128,0.08)] text-text-muted">Standard</span>
               </div>
               <p className="text-sm text-text-muted">
-                8 questions about your writing. Fast setup, solid results with DeepSeek-V3.
+                8 questions about your writing. Fast setup, solid results.
               </p>
             </button>
             <button
@@ -473,8 +473,8 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
               </div>
               <p className="text-sm text-text-muted">
                 {hasLevel2
-                  ? "12 in-depth questions for the most accurate voice match. Powered by Claude Sonnet 4."
-                  : "Unlock enhanced voice matching powered by Claude Sonnet 4."}
+                  ? "12 in-depth questions for the most accurate voice match. Multi-pass refinement."
+                  : "Unlock enhanced voice matching and multi-pass refinement."}
               </p>
             </button>
           </div>
@@ -873,7 +873,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
           <button
             onClick={() => setStep(step + 1)}
             disabled={!canAdvance()}
-            className="btn-primary text-sm disabled:opacity-30"
+            className="bg-accent hover:bg-accent-light text-[#281c14] font-display text-sm font-semibold rounded-xl px-6 py-2.5 transition-colors disabled:opacity-30"
           >
             Next
           </button>
@@ -881,7 +881,7 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
           <button
             onClick={save}
             disabled={saving}
-            className="btn-primary text-sm disabled:opacity-50"
+            className="bg-accent hover:bg-accent-light text-[#281c14] font-display text-sm font-semibold rounded-xl px-6 py-2.5 transition-colors disabled:opacity-50"
           >
             {analyzing ? (
               <span className="flex items-center gap-2">

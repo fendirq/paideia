@@ -45,10 +45,11 @@ function RoleBadge({ role }: { role: string | null }) {
 export function AdminDashboard({ users }: AdminDashboardProps) {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] px-6 py-12">
-      <div className="max-w-5xl mx-auto space-y-10">
-        <h1 className="font-display text-2xl font-bold text-text-primary">
-          Admin Dashboard
-        </h1>
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-[rgba(40,32,24,0.55)] backdrop-blur-2xl border border-[rgba(168,152,128,0.15)] rounded-[20px] p-8 space-y-10">
+          <h1 className="font-display text-2xl font-bold text-text-primary">
+            Admin Dashboard
+          </h1>
 
         {/* Users */}
         <section className="space-y-4">
@@ -108,6 +109,7 @@ export function AdminDashboard({ users }: AdminDashboardProps) {
             </div>
           )}
         </section>
+        </div>
       </div>
     </div>
   );
