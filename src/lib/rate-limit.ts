@@ -106,5 +106,11 @@ export function getClientIdentifier(req: Request): string {
   }
   const xri = req.headers.get("x-real-ip");
   if (xri) return xri.trim();
+  // Behind Vercel's edge, x-forwarded-for is always injected. If this
+  // fires in prod it means the edge changed behavior or we're being
+  // called from an unexpected path — ops should see it. Every
+  // header-free request collapses into one shared bucket until fixed,
+  // so a burst would lock everyone out.
+  console.warn("rate-limit: no client IP header found, using shared bucket");
   return "unknown";
 }
