@@ -11,7 +11,7 @@ export default withAuth(
       return NextResponse.redirect(new URL("/app", req.url));
     }
 
-    // Portal routes (pages + API, except access/verify) require portal_access cookie
+    // Portal routes (pages + API, except access/verify) require the portal access cookie
     const isPortalRoute = pathname.startsWith("/portal") || pathname.startsWith("/api/portal");
     const isPortalEntry = pathname === "/portal/access" || pathname === "/api/portal/verify-code";
     if (isPortalRoute && !isPortalEntry) {
