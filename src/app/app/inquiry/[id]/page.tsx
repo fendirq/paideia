@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { FileCabinet } from "@/components/file-cabinet";
+import { validateStructure, type MaterialStructure } from "@/lib/material-structure";
 
 export default async function InquiryPage({
   params,
@@ -24,6 +25,8 @@ export default async function InquiryPage({
           fileType: true,
           extractedText: true,
           createdAt: true,
+          structure: true,
+          structureKind: true,
         },
         orderBy: { createdAt: "desc" },
       },
@@ -33,10 +36,26 @@ export default async function InquiryPage({
 
   if (!inquiry || inquiry.userId !== session.user.id) redirect("/app");
 
+  // First non-unknown validated structure across the inquiry's files.
+  // Mirrors the selection logic in src/app/api/sessions/[id]/chat/route.ts
+  // so the menu and the tutor both see the same structure.
+  let structure: MaterialStructure | null = null;
+  for (const f of inquiry.files) {
+    if (!f.structure) continue;
+    const parsed = validateStructure(f.structure);
+    if (parsed && parsed.kind !== "unknown") {
+      structure = parsed;
+      break;
+    }
+  }
+
   return (
     <FileCabinet
       files={inquiry.files.map((f) => ({
-        ...f,
+        id: f.id,
+        fileName: f.fileName,
+        fileType: f.fileType,
+        extractedText: f.extractedText,
         createdAt: f.createdAt.toISOString(),
       }))}
       inquiryId={inquiry.id}
@@ -47,6 +66,7 @@ export default async function InquiryPage({
       chunkCount={inquiry._count.chunks}
       teacherNotes={inquiry.teacherNotes}
       isTeacher={session.user.role === "TEACHER"}
+      structure={structure}
     />
   );
 }

@@ -103,6 +103,11 @@ model Inquiry {
   sessions    TutoringSession[]
   exams       Exam[]
   studyItems  StudyItem[]
+  // Socratic starter questions generated from uploaded file content.
+  // Populated lazily on first session open (see src/lib/topic-questions.ts)
+  // and cached across subsequent sessions for the same inquiry. Empty
+  // array = not yet generated; rendering falls back to generic prompts.
+  topicQuestions String[]       @default([])
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }

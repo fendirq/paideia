@@ -35,6 +35,12 @@ export interface PromptContext {
   // entirely — the tutor falls back to its current RAG-only
   // behavior.
   structure?: MaterialStructure | null;
+  // True only for the very first assistant response in a session.
+  // Injects a stronger "open with a specific detail from their file"
+  // directive so the user's first experience is immediately tailored
+  // instead of a generic greeting. Detected in the chat route via
+  // `messages.length === 0`.
+  firstTurn?: boolean;
 }
 
 type SubjectGroup = "math-stem" | "writing" | "history";
@@ -235,6 +241,18 @@ export function buildSystemPrompt(context: PromptContext): string {
     ? `\n\n## First Response Rule\nWhen this is the first message in a conversation with uploaded files, you MUST:\n1. Quote or reference a specific passage from the uploaded excerpts\n2. Use it to frame your opening question or discussion point\n3. Show the student you've read their material — never give a generic greeting`
     : "";
 
+  // First-turn amplifier: message 1 in a session. We already have
+  // fileFirstResponse above for the file case; this block adds a
+  // tighter directive that fires regardless of file state, so the
+  // student's very first experience is grounded in their actual
+  // submission rather than a canned "how can I help you today". The
+  // ragChunks (when present) contain excerpts; `structure` names the
+  // document kind. Together they let the tutor open with a specific
+  // reference on turn 1 even when `helpType` is missing.
+  const firstTurnDirective = context.firstTurn
+    ? `\n\n## First Turn — Tailored Opener\nThis is the student's FIRST message in this session. Your opening response must:\n1. Lead with ONE specific reference (a phrase, question number, claim, or paragraph from their material).\n2. Ask ONE open question that invites them to explain their thinking about that specific reference.\n3. Do NOT greet them with "Hi", "Hello", or "How can I help". Jump straight into the substance.\n4. Keep the whole opener under 60 words before the actions separator.`
+    : "";
+
   const subjectSections = buildSubjectSections(group);
   const actionRules = buildActionRules(group);
   const structureBlock = buildStructureInstructions(context.structure);
@@ -262,7 +280,7 @@ ${subjectSections}
 ## Subject Context
 Subject: ${context.subject}
 Unit/Topic: ${safeUnit}
-Teacher: ${safeTeacher}${helpTypeContext}${fileFirstResponse}
+Teacher: ${safeTeacher}${helpTypeContext}${fileFirstResponse}${firstTurnDirective}
 ${ragContext}${structureBlock}
 
 ## Response Format — ACTIONS (CRITICAL)
