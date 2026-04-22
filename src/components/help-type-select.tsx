@@ -2,18 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { HELP_TYPES, DEFAULT_HELP_TYPES } from "@/lib/help-types";
+import { HELP_TYPES, DEFAULT_HELP_TYPES, structureAwareHelpTypes } from "@/lib/help-types";
+import type { MaterialStructure } from "@/lib/material-structure";
 
 interface HelpTypeSelectProps {
   inquiryId: string;
   subject: string;
+  structure?: MaterialStructure | null;
   onClose: () => void;
 }
 
-export function HelpTypeSelect({ inquiryId, subject, onClose }: HelpTypeSelectProps) {
+export function HelpTypeSelect({ inquiryId, subject, structure, onClose }: HelpTypeSelectProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
-  const helpTypes = HELP_TYPES[subject] ?? DEFAULT_HELP_TYPES;
+  // Prepend structure-aware openers (e.g. "Work through problem 3") so
+  // the first option matches the actual document the student uploaded.
+  // Falls through to the static per-subject list below for the rest.
+  const structureOptions = structureAwareHelpTypes(structure);
+  const helpTypes = [...structureOptions, ...(HELP_TYPES[subject] ?? DEFAULT_HELP_TYPES)];
 
   const startSession = (helpType: string) => {
     setLoading(helpType);

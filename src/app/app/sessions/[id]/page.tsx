@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { ChatContainer } from "@/components/chat-container";
 import { SocraticBanner } from "@/components/socratic-banner";
-import { getTopicPreviews } from "@/lib/rag-retrieval";
+import { getOrGenerateTopicQuestions } from "@/lib/topic-questions";
 import Link from "next/link";
 
 export default async function SessionPage({
@@ -53,9 +53,12 @@ export default async function SessionPage({
   const teacherName = tutoringSession.inquiry?.teacherName ?? mat?.class?.teacher?.name ?? "Unknown";
   const description = tutoringSession.inquiry?.description ?? mat?.description ?? "";
 
-  // Fetch topic previews from uploaded file chunks (only for new sessions with an inquiry)
+  // AI-generated Socratic opener questions. Cached on Inquiry after
+  // first generation, so subsequent sessions of the same inquiry
+  // skip the Gemini call. Only surfaces on turn 0 — an in-progress
+  // session doesn't need openers.
   const topicPreviews = tutoringSession.inquiryId && initialMessages.length === 0
-    ? await getTopicPreviews(tutoringSession.inquiryId, 3).catch(() => [] as string[])
+    ? await getOrGenerateTopicQuestions(tutoringSession.inquiryId, subject).catch(() => [] as string[])
     : [];
 
   const subjectLabel = subject.charAt(0) + subject.slice(1).toLowerCase();

@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { VALID_HELP_TYPES } from "@/lib/help-types";
+import { VALID_HELP_TYPES, isStructureAwareHelpType } from "@/lib/help-types";
 
 export default async function NewSessionPage({
   searchParams,
@@ -13,7 +13,15 @@ export default async function NewSessionPage({
   if (!session) redirect("/login");
 
   const { inquiry: inquiryId, helpType: rawHelpType } = await searchParams;
-  const helpType = rawHelpType && VALID_HELP_TYPES.has(rawHelpType) ? rawHelpType : null;
+  // Accept static help-types OR dynamic structure-aware values
+  // (e.g. "work-through-problem-3"). Without the prefix check the
+  // structure-aware menu silently drops to null and the tutor never
+  // sees the student's file-specific selection.
+  const helpType =
+    rawHelpType &&
+    (VALID_HELP_TYPES.has(rawHelpType) || isStructureAwareHelpType(rawHelpType))
+      ? rawHelpType
+      : null;
   if (!inquiryId) redirect("/app");
 
   const inquiry = await db.inquiry.findUnique({ where: { id: inquiryId } });

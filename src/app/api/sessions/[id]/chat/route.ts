@@ -119,7 +119,12 @@ export async function POST(
     }
   }
 
-  // Build system prompt with Socratic instructions + RAG context
+  // Build system prompt with Socratic instructions + RAG context.
+  // First-turn detection: messages are fetched before the incoming
+  // user message is persisted, so length===0 identifies message #1
+  // and unlocks a stricter "open with a specific detail" directive
+  // (see buildSystemPrompt).
+  const isFirstTurn = tutoringSession.messages.length === 0;
   const systemPrompt = buildSystemPrompt({
     subject,
     unitName,
@@ -128,6 +133,7 @@ export async function POST(
     ragChunks,
     helpType: tutoringSession.helpType,
     structure,
+    firstTurn: isFirstTurn,
   });
 
   // Append conversation summary to system prompt (avoids second system message)

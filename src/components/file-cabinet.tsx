@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { HelpTypeSelect } from "./help-type-select";
+import type { MaterialStructure } from "@/lib/material-structure";
 
 interface FileItem {
   id: string;
@@ -22,6 +23,9 @@ interface FileCabinetProps {
   chunkCount: number;
   teacherNotes?: string | null;
   isTeacher?: boolean;
+  // First non-unknown structure across the inquiry's files, used to
+  // tailor the "How can I help?" menu with file-specific openers.
+  structure?: MaterialStructure | null;
 }
 
 export function FileCabinet({
@@ -34,6 +38,7 @@ export function FileCabinet({
   chunkCount,
   teacherNotes,
   isTeacher,
+  structure,
 }: FileCabinetProps) {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(
     files[0]?.id ?? null
@@ -159,6 +164,7 @@ export function FileCabinet({
         <HelpTypeSelect
           inquiryId={inquiryId}
           subject={subject}
+          structure={structure}
           onClose={() => setShowHelpSelect(false)}
         />
       )}

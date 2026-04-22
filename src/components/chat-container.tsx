@@ -73,27 +73,23 @@ export function ChatContainer({
   }, []);
 
   const welcomeActions = useMemo(() => {
-    // When we have actual file content previews, build prompts from them
+    // When topicPreviews is populated it contains full Socratic
+    // questions AI-generated from the student's uploaded material
+    // (see src/lib/topic-questions.ts). Surface them directly as
+    // action labels — the questions are already complete prompts and
+    // wrapping them ("Walk me through this: ...") reads clunky.
     if (topicPreviews.length > 0) {
-      if (subjectGroup === "math-stem") {
-        return [
-          `Walk me through this: ${topicPreviews[0]}`,
-          topicPreviews[1] ? `Help me solve: ${topicPreviews[1]}` : `Quiz me on ${inquiry.unitName}`,
-          topicPreviews[2] ? `Explain this concept: ${topicPreviews[2]}` : `Start with the fundamentals`,
-        ];
+      const actions = topicPreviews.slice(0, 3);
+      while (actions.length < 3) {
+        if (subjectGroup === "math-stem") {
+          actions.push(actions.length === 1 ? `Quiz me on ${inquiry.unitName}` : `Start with the fundamentals`);
+        } else if (subjectGroup === "history") {
+          actions.push(actions.length === 1 ? `Quiz me on the key events` : `Give me the background context`);
+        } else {
+          actions.push(actions.length === 1 ? `Help me develop a thesis` : `Walk me through essay structure`);
+        }
       }
-      if (subjectGroup === "history") {
-        return [
-          `Help me analyze: ${topicPreviews[0]}`,
-          topicPreviews[1] ? `What's the significance of: ${topicPreviews[1]}` : `Quiz me on the key events`,
-          topicPreviews[2] ? `Walk me through: ${topicPreviews[2]}` : `Give me the background context`,
-        ];
-      }
-      return [
-        `Help me with: ${topicPreviews[0]}`,
-        topicPreviews[1] ? `Give me feedback on: ${topicPreviews[1]}` : `Help me develop a thesis`,
-        topicPreviews[2] ? `Help me analyze: ${topicPreviews[2]}` : `Walk me through essay structure`,
-      ];
+      return actions;
     }
 
     // When helpType exists (from session setup form), tailor actions to the user's stated struggle
