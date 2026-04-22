@@ -483,6 +483,7 @@ async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Resp
       temperature: 0.55,
       timeoutMs: LEVEL2_DRAFT_TIMEOUT_MS,
       stageLabel: "drafting",
+      thinking: true,
     });
     rawEssay = sanitizeEssayOutput(essayMsg.text);
   } catch (err) {

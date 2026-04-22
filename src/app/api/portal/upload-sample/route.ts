@@ -33,5 +33,19 @@ export async function POST(req: Request) {
   const text = await extractText(buffer, mimeType);
   const wordCount = text.split(/\s+/).filter(Boolean).length;
 
+  // Reject samples with too little signal. The style-analysis
+  // fingerprint prompt asks the model to extract 10-15 signature
+  // words, a voice pattern, and structural habits — a sub-150-word
+  // sample forces it to hallucinate to fill the schema.
+  const MIN_WORDS = 150;
+  if (wordCount < MIN_WORDS) {
+    return NextResponse.json(
+      {
+        error: `This sample only has ${wordCount} word${wordCount === 1 ? "" : "s"}. Samples need at least ${MIN_WORDS} words for the style analysis to work.`,
+      },
+      { status: 400 },
+    );
+  }
+
   return NextResponse.json({ text, wordCount });
 }

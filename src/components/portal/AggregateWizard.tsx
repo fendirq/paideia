@@ -327,7 +327,12 @@ export function AggregateWizard({ hasLevel2 = false }: { hasLevel2?: boolean }) 
     const classStep = 2;
     const youStep = 3;
 
-    if (step === samplesStep) return samples.length >= 1;
+    // Require 3+ samples. Fewer than 3 gives the style-analysis model
+    // too little signal — the schema asks for 10-15 signatureWords
+    // and a confident voice fingerprint; 1-2 samples force the model
+    // to hallucinate to fill the shape. Matches the UI copy "upload
+    // 3-6 past essays".
+    if (step === samplesStep) return samples.length >= 3;
     if (step === classStep) return !!teacher.gradeLevel;
     if (step === youStep) return !!self.gradeRange;
     // Level 2 Enhanced step requires at least the core fields

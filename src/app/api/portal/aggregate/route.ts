@@ -190,7 +190,15 @@ export async function POST(req: Request) {
           level: profileLevel,
           teacherProfile,
           selfAssessment,
-          writingStyle: Prisma.JsonNull, // clear legacy field
+          // Leave `writingStyle` untouched. This column is the legacy
+          // fallback for profiles created before `styleFingerprint`
+          // existed. Clearing it on every save used to downgrade a
+          // legacy user to an empty-object legacy path whenever the
+          // new fingerprint analysis failed after the transaction
+          // committed — they lost their usable profile in that flake
+          // window. Fingerprint takes precedence in reads when
+          // present; writingStyle only surfaces as the legacy
+          // fallback, so leaving it populated is harmless.
         },
       });
 
