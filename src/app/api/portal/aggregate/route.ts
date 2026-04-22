@@ -125,8 +125,17 @@ export async function POST(req: Request) {
 
   const profileLevel = level === 2 ? 2 : 1;
 
-  if (!samples?.length) {
-    return NextResponse.json({ error: "At least one writing sample is required" }, { status: 400 });
+  // Mirror the frontend gate (AggregateWizard canAdvance). The UI
+  // only lets a user advance with 3+ samples because a 1-2 sample
+  // set forces the style model to hallucinate to fill the fingerprint
+  // schema. Closing the same floor server-side so a direct API caller
+  // can't bypass it.
+  const MIN_SAMPLES = 3;
+  if (!samples?.length || samples.length < MIN_SAMPLES) {
+    return NextResponse.json(
+      { error: `At least ${MIN_SAMPLES} writing samples are required.` },
+      { status: 400 },
+    );
   }
 
   const MAX_SAMPLE_CHARS = 20_000;
@@ -190,7 +199,15 @@ export async function POST(req: Request) {
           level: profileLevel,
           teacherProfile,
           selfAssessment,
-          writingStyle: Prisma.JsonNull, // clear legacy field
+          // Leave `writingStyle` untouched. This column is the legacy
+          // fallback for profiles created before `styleFingerprint`
+          // existed. Clearing it on every save used to downgrade a
+          // legacy user to an empty-object legacy path whenever the
+          // new fingerprint analysis failed after the transaction
+          // committed — they lost their usable profile in that flake
+          // window. Fingerprint takes precedence in reads when
+          // present; writingStyle only surfaces as the legacy
+          // fallback, so leaving it populated is harmless.
         },
       });
 

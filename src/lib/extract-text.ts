@@ -6,8 +6,13 @@ const EXTRACTORS: Record<string, (buffer: Buffer) => Promise<string>> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
     extractDocx,
   "application/msword": extractDocx,
-  "application/octet-stream": extractPdf, // fallback — overridden by extension check
 };
+// `resolveMimeType` upgrades a bare `application/octet-stream` to the
+// right extractor via file extension. Files that arrive as
+// octet-stream AND have no recognizable extension are rejected by
+// `isExtractableType` — previously this fell through to extractPdf
+// and silently produced garbled text for a .doc-without-extension
+// upload.
 
 // Extension-based fallback when MIME type is generic
 const EXT_MAP: Record<string, string> = {
