@@ -226,7 +226,8 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] px-6 py-12">
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-[rgba(40,32,24,0.55)] backdrop-blur-2xl border border-[rgba(168,152,128,0.15)] rounded-[20px] p-8 space-y-8">
         {/* Header */}
         <div>
           <h1 className="font-display text-2xl font-bold text-text-primary mb-1">
@@ -495,8 +496,8 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
             </div>
             <p className="text-xs text-text-muted">
               {hasLevel2
-                ? "Two-pass: analyzes your style fingerprint first, then generates. More accurate but slower."
-                : "Unlock enhanced generation powered by Claude Sonnet 4."}
+                ? "Multi-pass: plan, draft, then refine against your style fingerprint. More accurate but slower."
+                : "Unlock enhanced multi-pass generation."}
             </p>
           </button>
         </div>
@@ -556,6 +557,7 @@ export function GeneratePage({ subject, hasLevel2 = false, classId }: GeneratePa
             {saveError}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

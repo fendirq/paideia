@@ -95,7 +95,7 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
           <div>
             <h1 className="font-display text-xl font-bold text-text-primary mb-2">Level 2 Unlocked</h1>
             <p className="text-text-secondary text-sm">
-              You now have access to enhanced essay generation powered by Claude Sonnet 4.
+              You now have access to enhanced, multi-pass essay generation.
             </p>
           </div>
           <Link
@@ -180,7 +180,7 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
                 <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
-                Single-pass generation (DeepSeek-V3)
+                Single-pass generation
               </li>
               <li className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -208,7 +208,7 @@ export function UpgradePage({ hasPaid }: UpgradePageProps) {
                 <svg className="w-4 h-4 text-accent-light shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
-                Two-pass generation (Claude Sonnet 4)
+                Multi-pass generation (plan, draft, refine)
               </li>
               <li className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-accent-light shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
