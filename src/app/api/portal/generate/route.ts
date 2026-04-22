@@ -12,6 +12,7 @@ import {
   type ResolvedSource,
 } from "@/lib/source-context";
 import { fetchSourceContext } from "@/lib/source-fetch";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   buildLevel1Prompt,
   buildLevel2PlanPrompt,
@@ -154,10 +155,27 @@ function needsSourceFlowPass(text: string): boolean {
   });
 }
 
+// Per-user hourly cap on Level 2 essay generation. The pipeline fires
+// up to 11 sequential Gemini calls and each run costs real money; a
+// tight loop here could drain quota / rack up cost. 10/hr is generous
+// for legitimate essay work — honest users rarely finish a full Level 2
+// draft more than once or twice per hour.
+const L2_LIMIT = 10;
+const L2_WINDOW_MS = 60 * 60 * 1000;
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await checkRateLimit("portal-generate", session.user.id, L2_LIMIT, L2_WINDOW_MS);
+  if (!rl.allowed) {
+    console.warn("portal.generate: rate limit exceeded", { userId: session.user.id });
+    return NextResponse.json(
+      { error: "Hourly generation limit reached. Try again in a bit." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt.getTime() - Date.now()) / 1000)) } },
+    );
   }
 
   const body: GenerateBody = await req.json();
@@ -361,6 +379,11 @@ function streamLevel1(opts: GenerateOptions): Response {
         });
 
         if (!res.ok || !res.body) {
+          console.error("portal.generate.level1: together non-ok", {
+            status: res.status,
+            model: LEVEL1_MODEL,
+            stage: "level1",
+          });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `API error: ${res.status}` })}\n\n`));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
@@ -425,6 +448,13 @@ async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Resp
   let critiqueNotes = "";
   const degradedStages: string[] = [];
 
+  // Tracks which stage was active when the plan-or-draft try/catch
+  // fires, so the degradation log distinguishes a plan failure (prompt
+  // too long, model empty on outline) from a draft failure (timeout on
+  // the bigger write pass). Both kill the whole request — no
+  // degradation path — but ops still needs them separated.
+  let currentStage: "plan" | "draft" = "plan";
+
   try {
     // Step 1: Structural plan
     const planPrompt = buildLevel2PlanPrompt(opts);
@@ -440,6 +470,7 @@ async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Resp
     outline = outlineMsg.text;
 
     // Step 2: Sample-first draft
+    currentStage = "draft";
     const writingPrompt = buildLevel2WritingPrompt(opts, outline);
     const isNarrativeDraft = isNarrativeAssignment(opts.assignment, opts.requirements);
     const draftSystem = isNarrativeDraft
@@ -456,6 +487,7 @@ async function streamLevel2(opts: GenerateOptions, userId: string): Promise<Resp
     rawEssay = sanitizeEssayOutput(essayMsg.text);
   } catch (err) {
     const isTimeout = isTimeoutError(err);
+    logStageDegradation(currentStage === "plan" ? "plan-fatal" : "draft-fatal", userId, err);
     return NextResponse.json(
       { error: isTimeout
           ? "Generation timed out. Please try again or use a shorter assignment."
@@ -798,6 +830,11 @@ function streamLegacy(opts: LegacyGenerateOptions): Response {
         });
 
         if (!res.ok || !res.body) {
+          console.error("portal.generate.legacy: together non-ok", {
+            status: res.status,
+            model: LEVEL1_MODEL,
+            stage: "legacy",
+          });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `API error: ${res.status}` })}\n\n`));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
@@ -837,6 +874,7 @@ async function pipeTogetherStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   const sseState = createSseParserState();
+  let droppedFrames = 0;
 
   try {
     while (true) {
@@ -860,7 +898,13 @@ async function pipeTogetherStream(
             );
           }
         } catch {
-          // skip parse errors
+          droppedFrames++;
+          if (droppedFrames <= 3) {
+            console.warn("portal.generate: dropped malformed SSE frame", {
+              preview: data.slice(0, 120),
+              droppedFrames,
+            });
+          }
         }
       }
     }
@@ -879,8 +923,18 @@ async function pipeTogetherStream(
           );
         }
       } catch {
-        // skip malformed trailing SSE chunks
+        droppedFrames++;
+        if (droppedFrames <= 3) {
+          console.warn("portal.generate: dropped malformed trailing SSE frame", {
+            preview: data.slice(0, 120),
+            droppedFrames,
+          });
+        }
       }
+    }
+
+    if (droppedFrames > 0) {
+      console.warn("portal.generate: total dropped SSE frames", { droppedFrames });
     }
   } catch (err) {
     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));

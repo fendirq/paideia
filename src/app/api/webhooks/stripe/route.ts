@@ -21,54 +21,87 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const userId = session.metadata?.userId;
-
-    if (!userId) {
-      console.error("stripe webhook: checkout.session.completed missing userId", session.id);
-      return NextResponse.json({ error: "Missing userId in metadata" }, { status: 500 });
-    }
-
-    try {
-      await db.user.update({
-        where: { id: userId },
-        data: {
-          level2PaidAt: new Date(),
-          stripePaymentId: session.id,
-          stripeCustomerId: typeof session.customer === "string" ? session.customer : null,
-        },
+  // Idempotency: record event.id + side effects in ONE transaction.
+  // If any side effect fails, the whole tx (including the event-id
+  // row) rolls back, so Stripe's next retry gets a fresh attempt. If
+  // we inserted the event id first outside a tx, a partial failure
+  // would leave the dedup row committed and the retry would be
+  // rejected as a duplicate with the side effect still undone.
+  //
+  // Stripe replays events on timeout/non-2xx. Without this tx pattern
+  // a stale replay of checkout.session.completed after a later
+  // subscription.deleted could reinstate level2PaidAt; with it, the
+  // committed event-id row is our guarantee "this side effect ran."
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.stripeWebhookEvent.create({
+        data: { id: event.id, eventType: event.type },
       });
-    } catch (err) {
-      const prismaErr = err as { code?: string };
-      if (prismaErr.code === "P2002") {
-        // Duplicate webhook delivery — already processed, safe to ignore
-      } else {
-        console.error("stripe webhook: db update failed", err);
-        return NextResponse.json({ error: "DB error" }, { status: 500 });
-      }
-    }
-  }
 
-  if (event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object;
-    const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+        const userId = session.metadata?.userId;
 
-    if (customerId) {
-      try {
-        await db.user.update({
-          where: { stripeCustomerId: customerId },
-          data: { level2PaidAt: null },
+        if (!userId) {
+          console.error("stripe webhook: checkout.session.completed missing userId", session.id);
+          throw new WebhookMissingUserIdError();
+        }
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            level2PaidAt: new Date(),
+            stripePaymentId: session.id,
+            stripeCustomerId: typeof session.customer === "string" ? session.customer : null,
+          },
         });
-      } catch (err) {
-        const prismaErr = err as { code?: string };
-        if (prismaErr.code !== "P2025") {
-          console.error("stripe webhook: subscription.deleted db update failed", err);
-          return NextResponse.json({ error: "DB error" }, { status: 500 });
+      }
+
+      if (event.type === "customer.subscription.deleted") {
+        const subscription = event.data.object;
+        const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+
+        if (customerId) {
+          try {
+            await tx.user.update({
+              where: { stripeCustomerId: customerId },
+              data: { level2PaidAt: null },
+            });
+          } catch (err) {
+            // P2025: no row matched stripeCustomerId. Either the cancel
+            // fires for a user we never saw the checkout for (test mode,
+            // manual Stripe dashboard action) or the row was deleted. Not
+            // a webhook failure — ack and move on so Stripe does not
+            // retry. The tx still commits the event-id dedup row.
+            const prismaErr = err as { code?: string };
+            if (prismaErr.code !== "P2025") throw err;
+          }
         }
       }
+    });
+  } catch (err) {
+    const prismaErr = err as { code?: string };
+    if (prismaErr.code === "P2002") {
+      return NextResponse.json({ received: true, duplicate: true });
     }
+    if (err instanceof WebhookMissingUserIdError) {
+      return NextResponse.json({ error: "Missing userId in metadata" }, { status: 500 });
+    }
+    console.error("stripe webhook: transaction failed", err);
+    return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
+}
+
+// Marker error so the catch block can distinguish a missing-userId
+// bail (should surface as a proper 500) from a generic DB failure. We
+// deliberately throw out of the transaction so the event-id row rolls
+// back — Stripe will retry, and if metadata is still missing the
+// failure repeats until the issue is resolved upstream.
+class WebhookMissingUserIdError extends Error {
+  constructor() {
+    super("Missing userId in metadata");
+    this.name = "WebhookMissingUserIdError";
+  }
 }

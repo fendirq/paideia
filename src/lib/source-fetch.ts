@@ -248,10 +248,16 @@ export async function fetchSourceContext(urls: string[]): Promise<SourceContextR
       if (source.excerpt.length > 0) {
         resolved.push(source);
       } else {
+        console.warn("source-fetch: url produced no extractable text", { url });
         failures.push({ url, reason: "source had no extractable text" });
       }
     } catch (err) {
-      failures.push({ url, reason: describeSourceError(err) });
+      const reason = describeSourceError(err);
+      // Per-URL fetch-layer log. Surge of SSRF rejections or upstream
+      // 5xx should be visible in ops even though the route-level log
+      // only sees the aggregate failure list.
+      console.warn("source-fetch: url failed", { url, reason });
+      failures.push({ url, reason });
     }
   }
 
