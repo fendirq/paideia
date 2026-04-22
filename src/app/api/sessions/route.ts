@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { VALID_HELP_TYPES } from "@/lib/help-types";
+import { VALID_HELP_TYPES, isStructureAwareHelpType } from "@/lib/help-types";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       userId: session.user.id,
       inquiryId,
       classId: classId || null,
-      helpType: typeof helpType === "string" && helpType.trim() && VALID_HELP_TYPES.has(helpType.trim()) ? helpType.trim() : null,
+      helpType: resolveHelpType(helpType),
     },
   });
 
@@ -60,4 +60,18 @@ export async function GET() {
   });
 
   return NextResponse.json(sessions);
+}
+
+// Accept either a static help-type value (from the VALID_HELP_TYPES
+// set) or a dynamic structure-aware one (e.g. "work-through-problem-3").
+// Without the prefix check the structure-aware menu silently drops to
+// null and the tutor never sees the student's file-specific selection.
+function resolveHelpType(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (VALID_HELP_TYPES.has(trimmed) || isStructureAwareHelpType(trimmed)) {
+    return trimmed;
+  }
+  return null;
 }

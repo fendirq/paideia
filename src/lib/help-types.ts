@@ -9,12 +9,33 @@ export interface HelpTypeOption {
 }
 
 /**
+ * Prefixes that identify a structure-aware help-type value produced
+ * by `structureAwareHelpTypes`. The values encode dynamic per-file
+ * specifics (e.g. `work-through-problem-3`) so they can't live in
+ * the static `VALID_HELP_TYPES` set; `isStructureAwareHelpType`
+ * below whitelists them at validation time instead.
+ */
+const STRUCTURE_AWARE_PREFIXES = [
+  "work-through-problem-",
+  "discuss-question-",
+  "walk-through-worksheet",
+  "unpack-essay-prompt",
+  "fill-template-guided",
+  "analyze-passage",
+] as const;
+
+export function isStructureAwareHelpType(value: string): boolean {
+  return STRUCTURE_AWARE_PREFIXES.some((p) => value === p || value.startsWith(p));
+}
+
+/**
  * Structure-aware help-type options prepended to the static per-subject
- * list when a file's MaterialStructure is known. These are free-form
- * values — not checked against VALID_HELP_TYPES — so the server logs
- * the user's actual selection without rejecting. The tutor's system
- * prompt already knows how to handle structure-aware goals via the
- * helpTypeContext block in src/lib/system-prompt.ts.
+ * list when a file's MaterialStructure is known. Values carry dynamic
+ * suffixes (problem number, question index) so they're NOT members of
+ * `VALID_HELP_TYPES` — validators must also accept
+ * `isStructureAwareHelpType(value)` or these selections silently drop
+ * to null. The tutor's system prompt handles structure-aware goals via
+ * the `helpTypeContext` block in src/lib/system-prompt.ts.
  */
 export function structureAwareHelpTypes(
   structure: MaterialStructure | null | undefined,
