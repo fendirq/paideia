@@ -125,8 +125,17 @@ export async function POST(req: Request) {
 
   const profileLevel = level === 2 ? 2 : 1;
 
-  if (!samples?.length) {
-    return NextResponse.json({ error: "At least one writing sample is required" }, { status: 400 });
+  // Mirror the frontend gate (AggregateWizard canAdvance). The UI
+  // only lets a user advance with 3+ samples because a 1-2 sample
+  // set forces the style model to hallucinate to fill the fingerprint
+  // schema. Closing the same floor server-side so a direct API caller
+  // can't bypass it.
+  const MIN_SAMPLES = 3;
+  if (!samples?.length || samples.length < MIN_SAMPLES) {
+    return NextResponse.json(
+      { error: `At least ${MIN_SAMPLES} writing samples are required.` },
+      { status: 400 },
+    );
   }
 
   const MAX_SAMPLE_CHARS = 20_000;
