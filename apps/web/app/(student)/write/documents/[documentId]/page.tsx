@@ -5,7 +5,7 @@ export default async function DocumentPage({
 }: {
   params: Promise<{ documentId: string }>;
 }) {
-  const { documentId: _ } = await params;
+  await params;
   return (
     <div className="flex flex-col gap-6 p-6">
       <header className="flex items-baseline justify-between">

@@ -8,8 +8,12 @@
  * @module
  */
 
+import type * as documents from "../documents.js";
+import type * as drive from "../drive.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_capabilities from "../lib/capabilities.js";
+import type * as profile from "../profile.js";
+import type * as snapshots from "../snapshots.js";
 import type * as users from "../users.js";
 
 import type {
@@ -19,8 +23,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  documents: typeof documents;
+  drive: typeof drive;
   "lib/auth": typeof lib_auth;
   "lib/capabilities": typeof lib_capabilities;
+  profile: typeof profile;
+  snapshots: typeof snapshots;
   users: typeof users;
 }>;
 

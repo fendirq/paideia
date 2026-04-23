@@ -1,5 +1,5 @@
 import { DriveView } from "@/components/write/drive-view";
-import type { Id } from "../../../../../../convex/_generated/dataModel";
+import type { Id } from "../../../../../../../convex/_generated/dataModel";
 
 export default async function FolderPage({
   params,
