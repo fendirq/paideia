@@ -1,3 +1,8 @@
+export function normalizeCapabilities(capabilities: string[]) {
+  return [...new Set(capabilities)].sort();
+}
+
 export function canAccessWritingPortal(capabilities: string[]) {
-  return capabilities.includes("student") || capabilities.includes("writing_portal");
+  const normalized = normalizeCapabilities(capabilities);
+  return normalized.includes("student") || normalized.includes("writing_portal");
 }
