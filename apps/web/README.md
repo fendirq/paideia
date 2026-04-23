@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# Paideia Web App
 
-## Getting Started
+Next.js 16 App Router app for the Paideia platform — sign-in/sign-out flow, dashboard placeholder, and the student writing portal under `/write`.
 
-First, run the development server:
+## Surfaces
+
+- `/` — landing page (legacy CSS modules)
+- `/auth` — Clerk unified sign-in/sign-up
+- `/dashboard` — auth wiring proof-of-life
+- `/write` — student writing portal (drive)
+- `/write/profile` — voice training flow
+- `/write/folders/[folderId]` — folder contents
+- `/write/documents/[documentId]` — lightweight rich-text editor + generation sidebar
+
+The writing portal uses the locked shadcn preset `b7C9wSxrU` (Lyra style, Mist colors, Figtree font, HugeIcons, radius None, dark premium creative-studio). See [`docs/design-system.md`](../../docs/design-system.md) for the locked tokens and application rules.
+
+## Local commands
+
+From the repo root, all package tasks go through Turborepo:
+
+- `bun run dev` — start every dev server
+- `bun run check-types` — typecheck every package
+- `bun run lint` — lint every package
+- `bunx --bun turbo run build --filter=web` — production build of just this app
+
+From `apps/web`:
+
+- `bun run dev` — Next dev on http://127.0.0.1:3000
+- `bun run test` — Vitest unit tests
+- `bun run test:e2e` — Playwright (uses `webServer.reuseExistingServer`, so run `bun run dev` separately if you want a hot-reload session)
+
+After changing Convex schema or auth config, sync from the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx convex dev --once
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, and `CLERK_SECRET_KEY`. The Convex/Clerk JWT issuer config lives in the repo root `.env.local` (`CLERK_JWT_ISSUER_DOMAIN`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+## Stack snapshot
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16.2.4 (App Router) on React 19.2.5
+- Clerk 7 for identity (`@clerk/nextjs`)
+- Convex 1.36 for the realtime backend (`convex/react` + `ConvexProviderWithClerk`)
+- Tailwind v4 + shadcn primitives in `components/ui/*`
+- TipTap 3 for the editor
+- Vitest 4 + Testing Library for unit tests; Playwright for e2e
