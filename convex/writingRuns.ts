@@ -5,9 +5,12 @@ import {
   internalMutation,
 } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { requireIdentity } from "./lib/auth";
+
+const WRITING_RUN_LIST_LIMIT = 25;
 
 async function requireViewerRecord(ctx: QueryCtx | MutationCtx) {
   const identity = await requireIdentity(ctx);
@@ -30,7 +33,8 @@ export const listRunsForDocument = query({
     return await ctx.db
       .query("writingRuns")
       .withIndex("by_documentId", (q) => q.eq("documentId", args.documentId))
-      .collect();
+      .order("desc")
+      .take(WRITING_RUN_LIST_LIMIT);
   },
 });
 
@@ -107,6 +111,15 @@ export const executeRun = action({
     mockOutput: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireIdentity(ctx);
+    const run: Doc<"writingRuns"> | null = await ctx.runQuery(
+      api.writingRuns.getRun,
+      { runId: args.runId },
+    );
+    if (!run) {
+      throw new Error("Run not found");
+    }
+
     try {
       await ctx.runMutation(internal.writingRuns.markRunning, {
         runId: args.runId,
