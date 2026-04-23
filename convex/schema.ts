@@ -29,12 +29,20 @@ export default defineSchema({
     documentId: v.id("documents"),
     ownerId: v.id("users"),
     editorJson: v.string(),
-    source: v.union(v.literal("autosave"), v.literal("manual"), v.literal("ai-run")),
+    source: v.union(
+      v.literal("autosave"),
+      v.literal("manual"),
+      v.literal("ai-run"),
+    ),
   }).index("by_documentId", ["documentId"]),
 
   writingProfiles: defineTable({
     ownerId: v.id("users"),
-    status: v.union(v.literal("empty"), v.literal("training"), v.literal("ready")),
+    status: v.union(
+      v.literal("empty"),
+      v.literal("training"),
+      v.literal("ready"),
+    ),
     sampleCount: v.number(),
     summary: v.union(v.string(), v.null()),
   }).index("by_ownerId", ["ownerId"]),
@@ -45,12 +53,18 @@ export default defineSchema({
     fileId: v.union(v.id("_storage"), v.null()),
     title: v.string(),
     excerpt: v.union(v.string(), v.null()),
-  }).index("by_profileId", ["profileId"]),
+  })
+    .index("by_ownerId", ["ownerId"])
+    .index("by_profileId", ["profileId"]),
 
   writingRuns: defineTable({
     ownerId: v.id("users"),
     documentId: v.id("documents"),
-    kind: v.union(v.literal("outline"), v.literal("draft"), v.literal("rewrite")),
+    kind: v.union(
+      v.literal("outline"),
+      v.literal("draft"),
+      v.literal("rewrite"),
+    ),
     status: v.union(
       v.literal("queued"),
       v.literal("running"),
@@ -59,5 +73,7 @@ export default defineSchema({
     ),
     instruction: v.string(),
     outputText: v.union(v.string(), v.null()),
-  }).index("by_documentId", ["documentId"]),
+  })
+    .index("by_documentId", ["documentId"])
+    .index("by_ownerId", ["ownerId"]),
 });
