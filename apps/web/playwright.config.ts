@@ -1,4 +1,9 @@
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+
 import { defineConfig } from "@playwright/test";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   testDir: "./tests/e2e",
