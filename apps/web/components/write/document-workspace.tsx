@@ -28,6 +28,15 @@ import type { SerializedDoc } from "@/lib/editor/schema";
 
 type RunKind = Doc<"writingRuns">["kind"];
 type RunStatus = Doc<"writingRuns">["status"];
+type RunInstruction = {
+  prompt?: string;
+  sources?: string;
+  rubric?: string;
+  snapshotId?: string;
+  from?: number;
+  to?: number;
+  selectedText?: string;
+};
 
 function formatDateTime(ms: number) {
   return new Date(ms).toLocaleString(undefined, {
@@ -55,24 +64,41 @@ function mockOutputForKind(
 ) {
   if (kind === "outline") {
     const topic = inputs.prompt.trim() || "your piece";
+    const sourceLine = inputs.sources.trim()
+      ? "- Evidence lane: pull the strongest source details forward before analysis."
+      : "- Evidence lane: note the facts, scenes, or quotes you still need to gather.";
+    const rubricLine = inputs.rubric.trim()
+      ? "- Rubric check: echo the assignment criteria in the transitions and closing move."
+      : "- Rubric check: keep the thesis, evidence, and conclusion easy to evaluate.";
     return [
       `Outline for ${topic}`,
       "",
-      "1. Opening hook — frame the stakes and why this matters.",
-      "2. Context — the facts, sources, and reference material.",
-      "3. Core argument — the beat-by-beat path of your thinking.",
-      "4. Counterpoint — the strongest objection and your reply.",
-      "5. Close — the takeaway the reader should carry out.",
+      "- Opening move: frame the stakes and why this topic matters now.",
+      "- Context: establish the source material or lived example the piece builds from.",
+      "- Core argument: walk the reader through the main claim one beat at a time.",
+      sourceLine,
+      "- Counterpoint: name the strongest objection and answer it directly.",
+      rubricLine,
+      "- Close: leave the reader with the takeaway they should carry forward.",
     ].join("\n");
   }
   if (kind === "draft") {
     const topic = inputs.prompt.trim() || "the assigned piece";
+    const evidenceLine = inputs.sources.trim()
+      ? "It pulls in the source material you pasted so the evidence shows up earlier in the piece."
+      : "It leaves obvious openings where you can add evidence once you know the shape of the argument.";
+    const rubricLine = inputs.rubric.trim()
+      ? "It also keeps the rubric language in view so the draft aims toward the assignment target."
+      : "It keeps the structure readable so revision stays easy.";
     return [
-      `Draft of ${topic}`,
+      `Working draft for ${topic}`,
       "",
-      "This is a first-pass draft generated from your inputs. It follows the shape your outline suggested while staying close to the voice your profile captures.",
+      "This first pass opens with a clear claim, gives the reader context quickly, and leaves enough room for your own voice to sharpen the turns of phrase.",
       "",
-      "Use it as scaffolding, not a finish line. Rewrite what rings false, keep what sings, and let the editor be where you actually write.",
+      evidenceLine,
+      rubricLine,
+      "",
+      "Use it as scaffolding, not a finish line. Keep the sentences that feel true, rewrite the ones that flatten your voice, and let the editor be where the real writing happens.",
     ].join("\n");
   }
   return "Rewritten passage.";
@@ -95,6 +121,37 @@ function appendTextToDocument(
     type: "doc",
     content: [...(base.content ?? []), ...paragraphs],
   };
+}
+
+function parseRunInstruction(instruction: string): RunInstruction | null {
+  try {
+    return JSON.parse(instruction) as RunInstruction;
+  } catch {
+    return null;
+  }
+}
+
+function instructionSummary(instruction: string) {
+  const parsed = parseRunInstruction(instruction);
+  if (!parsed) {
+    return "Structured inputs recorded for this run.";
+  }
+
+  const selectedText = parsed.selectedText?.trim();
+  if (selectedText) {
+    return `Selection: "${selectedText.slice(0, 96)}"`;
+  }
+
+  const prompt = parsed.prompt?.trim();
+  if (prompt) {
+    return `Prompt: ${prompt.slice(0, 96)}`;
+  }
+
+  if (parsed.snapshotId && typeof parsed.from === "number" && typeof parsed.to === "number") {
+    return `Snapshot range: ${parsed.from}-${parsed.to}`;
+  }
+
+  return "Structured inputs recorded for this run.";
 }
 
 function StatusBadge({ status }: { status: RunStatus }) {
@@ -133,7 +190,7 @@ function StatusBadge({ status }: { status: RunStatus }) {
   return (
     <Badge
       variant={item.variant}
-      className="h-6 gap-1.5 px-2.5 text-[11px] uppercase tracking-[0.16em]"
+      className="h-6 gap-1.5 rounded-none px-2.5 text-[11px] uppercase tracking-[0.16em]"
     >
       <HugeiconsIcon
         icon={item.icon}
@@ -185,7 +242,10 @@ export function DocumentWorkspace({
   const [sources, setSources] = useState("");
   const [rubric, setRubric] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [pendingRunId, setPendingRunId] =
+    useState<Id<"writingRuns"> | null>(null);
+  const [insertingRunId, setInsertingRunId] =
     useState<Id<"writingRuns"> | null>(null);
 
   // We feed the editor with the latest known JSON. When the user clicks
@@ -203,10 +263,14 @@ export function DocumentWorkspace({
     return runs.find((r) => r._id === pendingRunId) ?? null;
   }, [pendingRunId, runs]);
 
-  const sortedRuns = useMemo(() => {
-    if (!runs) return [];
-    return [...runs].sort((a, b) => b._creationTime - a._creationTime);
-  }, [runs]);
+  const latestRun = runs?.[0] ?? null;
+  const activeRun = pendingRun ?? latestRun;
+
+  useEffect(() => {
+    if (editorOverride && snapshot?.editorJson === editorOverride) {
+      setEditorOverride(undefined);
+    }
+  }, [editorOverride, snapshot?.editorJson]);
 
   async function handleTitleBlur() {
     if (!doc) return;
@@ -220,6 +284,7 @@ export function DocumentWorkspace({
 
   async function handleGenerate(kind: RunKind) {
     if (generating) return;
+    setWorkspaceError(null);
     setGenerating(true);
     try {
       const instruction = JSON.stringify({ prompt, sources, rubric });
@@ -227,22 +292,36 @@ export function DocumentWorkspace({
       setPendingRunId(runId);
       const mockOutput = mockOutputForKind(kind, { prompt, sources, rubric });
       await executeRun({ runId, mockOutput });
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Unable to start this run.",
+      );
     } finally {
       setGenerating(false);
     }
   }
 
   async function handleInsertRun(run: Doc<"writingRuns">) {
-    if (!run.outputText) return;
-    const base = editorOverride ?? snapshot?.editorJson ?? undefined;
-    const nextDoc = appendTextToDocument(base, run.outputText);
-    const nextJson = JSON.stringify(nextDoc);
-    setEditorOverride(nextJson);
-    await saveSnapshot({
-      documentId,
-      editorJson: nextJson,
-      source: "ai-run",
-    });
+    if (!run.outputText || insertingRunId) return;
+    setWorkspaceError(null);
+    setInsertingRunId(run._id);
+    try {
+      const base = editorOverride ?? snapshot?.editorJson ?? undefined;
+      const nextDoc = appendTextToDocument(base, run.outputText);
+      const nextJson = JSON.stringify(nextDoc);
+      setEditorOverride(nextJson);
+      await saveSnapshot({
+        documentId,
+        editorJson: nextJson,
+        source: "ai-run",
+      });
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Unable to insert this run.",
+      );
+    } finally {
+      setInsertingRunId(null);
+    }
   }
 
   if (doc === undefined || snapshot === undefined) {
@@ -273,41 +352,49 @@ export function DocumentWorkspace({
   const editorJson = editorOverride ?? snapshot?.editorJson ?? undefined;
 
   return (
-    <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="mx-auto grid w-full max-w-6xl gap-6 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_380px]">
       <section className="flex min-w-0 flex-col gap-5">
-        <header className="flex flex-col gap-3">
+        <header className="flex flex-col gap-3 border-b border-border pb-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Document
+            Writing portal
           </p>
-          <Input
-            aria-label="Document title"
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={handleTitleBlur}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                (e.target as HTMLInputElement).blur();
-              }
-            }}
-            placeholder="Untitled"
-            className="h-auto border-0 bg-transparent p-0 text-3xl font-semibold tracking-tight shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-3xl"
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge
-              variant={doc.status === "archived" ? "outline" : "secondary"}
-              className="h-6 gap-1.5 px-2.5 text-[11px] uppercase tracking-[0.16em]"
-            >
-              <HugeiconsIcon
-                icon={FileEditIcon}
-                strokeWidth={1.8}
-                className="size-3"
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <Input
+                aria-label="Document title"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                placeholder="Untitled"
+                className="h-auto border-0 bg-transparent p-0 text-3xl font-semibold tracking-tight shadow-none focus-visible:border-0 focus-visible:ring-0 md:text-3xl"
               />
-              {doc.status}
-            </Badge>
-            <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
-              {lastSnapshotLabel}
-            </span>
+              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                Draft manually, generate from structured inputs, and keep each
+                outline or draft run anchored to this document&apos;s history.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant={doc.status === "archived" ? "outline" : "secondary"}
+                className="h-6 gap-1.5 rounded-none px-2.5 text-[11px] uppercase tracking-[0.16em]"
+              >
+                <HugeiconsIcon
+                  icon={FileEditIcon}
+                  strokeWidth={1.8}
+                  className="size-3"
+                />
+                {doc.status}
+              </Badge>
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
+                {lastSnapshotLabel}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -325,10 +412,15 @@ export function DocumentWorkspace({
         />
         <GenerationCard
           generating={generating}
-          pendingRun={pendingRun}
+          activeRun={activeRun}
+          errorMessage={workspaceError}
           onGenerate={handleGenerate}
         />
-        <HistoryCard runs={sortedRuns} onInsert={handleInsertRun} />
+        <HistoryCard
+          runs={runs ?? []}
+          insertingRunId={insertingRunId}
+          onInsert={handleInsertRun}
+        />
       </aside>
     </div>
   );
@@ -421,17 +513,19 @@ function InputField({
 
 function GenerationCard({
   generating,
-  pendingRun,
+  activeRun,
+  errorMessage,
   onGenerate,
 }: {
   generating: boolean;
-  pendingRun: Doc<"writingRuns"> | null;
+  activeRun: Doc<"writingRuns"> | null;
+  errorMessage: string | null;
   onGenerate: (kind: RunKind) => void;
 }) {
   const inFlight =
     generating ||
-    pendingRun?.status === "queued" ||
-    pendingRun?.status === "running";
+    activeRun?.status === "queued" ||
+    activeRun?.status === "running";
 
   return (
     <section className="flex flex-col gap-4 border border-border bg-card p-4">
@@ -457,26 +551,45 @@ function GenerationCard({
         <Button
           variant="ghost"
           className="w-full justify-start gap-2 rounded-none text-muted-foreground"
-          disabled={inFlight || !pendingRun}
+          disabled={inFlight || !activeRun}
           onClick={() => {
-            if (pendingRun) onGenerate(pendingRun.kind);
+            if (activeRun) onGenerate(activeRun.kind);
           }}
         >
           <HugeiconsIcon icon={ArrowReloadHorizontalIcon} strokeWidth={1.8} />
           Regenerate last
         </Button>
       </div>
-      {pendingRun ? (
+      {errorMessage ? (
+        <div className="flex flex-col gap-1 border border-destructive/40 bg-destructive/5 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">
+            Run error
+          </p>
+          <p className="text-sm leading-relaxed text-destructive">
+            {errorMessage}
+          </p>
+        </div>
+      ) : null}
+      {activeRun ? (
         <div className="flex flex-col gap-2 border border-border bg-background p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              Current run · {kindLabel(pendingRun.kind)}
+              Current run · {kindLabel(activeRun.kind)}
             </span>
-            <StatusBadge status={pendingRun.status} />
+            <StatusBadge status={activeRun.status} />
           </div>
-          {pendingRun.outputText ? (
-            <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-              {pendingRun.outputText}
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {instructionSummary(activeRun.instruction)}
+          </p>
+          {activeRun.outputText ? (
+            <p
+              className={
+                activeRun.status === "failed"
+                  ? "text-sm leading-relaxed text-destructive"
+                  : "line-clamp-4 text-sm leading-relaxed text-muted-foreground"
+              }
+            >
+              {activeRun.outputText}
             </p>
           ) : (
             <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -505,14 +618,19 @@ function GenerationCard({
 
 function HistoryCard({
   runs,
+  insertingRunId,
   onInsert,
 }: {
   runs: Doc<"writingRuns">[];
+  insertingRunId: Id<"writingRuns"> | null;
   onInsert: (run: Doc<"writingRuns">) => void;
 }) {
   return (
     <section className="flex flex-col gap-4 border border-border bg-card p-4">
-      <SectionHeader eyebrow="History" meta={runs.length ? runs.length : "0"} />
+      <SectionHeader
+        eyebrow="History"
+        meta={runs.length ? `${runs.length} latest` : "0"}
+      />
       {runs.length === 0 ? (
         <p className="text-xs leading-relaxed text-muted-foreground">
           Every run — outline, draft, rewrite — is stored as a structured record
@@ -534,8 +652,17 @@ function HistoryCard({
               <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
                 {formatDateTime(run._creationTime)}
               </p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {instructionSummary(run.instruction)}
+              </p>
               {run.outputText ? (
-                <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                <p
+                  className={
+                    run.status === "failed"
+                      ? "text-sm leading-relaxed text-destructive"
+                      : "line-clamp-4 text-sm leading-relaxed text-muted-foreground"
+                  }
+                >
                   {run.outputText}
                 </p>
               ) : null}
@@ -544,11 +671,15 @@ function HistoryCard({
                   variant="outline"
                   size="sm"
                   className="gap-1.5 rounded-none"
-                  disabled={run.status !== "succeeded" || !run.outputText}
+                  disabled={
+                    run.status !== "succeeded" ||
+                    !run.outputText ||
+                    insertingRunId !== null
+                  }
                   onClick={() => onInsert(run)}
                 >
                   <HugeiconsIcon icon={AiMagicIcon} strokeWidth={1.8} />
-                  Insert at end
+                  {insertingRunId === run._id ? "Inserting..." : "Insert at end"}
                 </Button>
               </div>
             </li>

@@ -3,8 +3,7 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AiMagicIcon,
-  MagicWand01Icon,
-  AiContentGenerator01Icon,
+  Alert01Icon,
 } from "@hugeicons/core-free-icons";
 
 import { SelectionPayload } from "@/lib/editor/selection";
@@ -13,68 +12,47 @@ import { Button } from "@/components/ui/button";
 export function AiSelectionMenu({
   selection,
   onRewrite,
-  onTighten,
-  onExpand,
 }: {
   selection: SelectionPayload | null;
   onRewrite?: () => void;
-  onTighten?: () => void;
-  onExpand?: () => void;
 }) {
   if (!selection || !selection.text) return null;
 
-  const canRewrite = typeof onRewrite === "function";
-  const canTighten = typeof onTighten === "function";
-  const canExpand = typeof onExpand === "function";
+  const isRewriteWired = typeof onRewrite === "function";
 
   return (
-    <div className="border border-border bg-card p-3">
+    <div className="border border-border bg-card p-4">
       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-        AI selection tools
+        Selection rewrite
       </p>
       <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
         &ldquo;{selection.text.slice(0, 120)}&rdquo;
       </p>
-      <div className="mt-3 flex flex-col gap-2">
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          className="gap-1.5 rounded-none"
-          onClick={onRewrite}
-          disabled={!canRewrite}
-        >
-          <HugeiconsIcon icon={AiMagicIcon} strokeWidth={1.8} />
-          Rewrite selection
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="gap-1.5 rounded-none"
-          onClick={onTighten}
-          disabled={!canTighten}
-        >
-          <HugeiconsIcon icon={MagicWand01Icon} strokeWidth={1.8} />
-          Tighten tone
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 rounded-none"
-          onClick={onExpand}
-          disabled={!canExpand}
-        >
-          <HugeiconsIcon icon={AiContentGenerator01Icon} strokeWidth={1.8} />
-          Expand
-        </Button>
-      </div>
-      {!(canRewrite && canTighten && canExpand) ? (
-        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-          Selection actions are surfaced here, but the actual AI rewrite flow is
-          still reserved for Task 7.
-        </p>
+      <Button
+        type="button"
+        variant="default"
+        size="sm"
+        className="mt-3 gap-1.5 rounded-none"
+        onClick={onRewrite}
+        disabled={!isRewriteWired}
+      >
+        <HugeiconsIcon icon={AiMagicIcon} strokeWidth={1.8} />
+        Rewrite selection
+      </Button>
+      {!isRewriteWired ? (
+        <div className="mt-3 flex gap-2 border border-dashed border-border p-3">
+          <HugeiconsIcon
+            icon={Alert01Icon}
+            strokeWidth={1.8}
+            className="mt-0.5 size-3 shrink-0 text-muted-foreground"
+          />
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            TODO(Task 8): thread documentId, snapshotId, and{" "}
+            {"{ from, to, selectedText, prompt }"} into createRun(...) so
+            rewrite runs target a known snapshot range instead of a generic
+            workspace action.
+          </p>
+        </div>
       ) : null}
     </div>
   );
