@@ -15,6 +15,7 @@ import type * as lib_capabilities from "../lib/capabilities.js";
 import type * as profile from "../profile.js";
 import type * as snapshots from "../snapshots.js";
 import type * as users from "../users.js";
+import type * as writingRuns from "../writingRuns.js";
 
 import type {
   ApiFromModules,
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   profile: typeof profile;
   snapshots: typeof snapshots;
   users: typeof users;
+  writingRuns: typeof writingRuns;
 }>;
 
 /**

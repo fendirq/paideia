@@ -1,20 +1,11 @@
-import { WritingEditor } from "@/components/editor/editor";
+import { DocumentWorkspace } from "@/components/write/document-workspace";
+import type { Id } from "../../../../../../../convex/_generated/dataModel";
 
 export default async function DocumentPage({
   params,
 }: {
   params: Promise<{ documentId: string }>;
 }) {
-  await params;
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      <header className="flex items-baseline justify-between">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Document</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Untitled</h1>
-        </div>
-      </header>
-      <WritingEditor />
-    </div>
-  );
+  const { documentId } = await params;
+  return <DocumentWorkspace documentId={documentId as Id<"documents">} />;
 }
