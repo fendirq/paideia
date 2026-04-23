@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -44,7 +45,12 @@ function formatDate(ms: number) {
 }
 
 export function DriveView({ folderId = null }: DriveViewProps) {
+  const router = useRouter();
   const parentFolderId = folderId ?? null;
+  const folder = useQuery(
+    api.drive.getFolder,
+    folderId ? { folderId } : "skip",
+  );
 
   const folders = useQuery(api.drive.listFolders, {
     parentFolderId,
@@ -64,12 +70,15 @@ export function DriveView({ folderId = null }: DriveViewProps) {
   const [docTitle, setDocTitle] = useState("");
   const [creatingDoc, setCreatingDoc] = useState(false);
 
-  const isLoading = folders === undefined || documents === undefined;
+  const isLoading =
+    folders === undefined ||
+    documents === undefined ||
+    (folderId !== null && folder === undefined);
 
   const title = useMemo(() => {
     if (!folderId) return "My Drive";
-    return "Folder";
-  }, [folderId]);
+    return folder?.name ?? "Folder";
+  }, [folder?.name, folderId]);
 
   const counts = useMemo(() => {
     return {
@@ -158,17 +167,48 @@ export function DriveView({ folderId = null }: DriveViewProps) {
         </div>
       </header>
 
-      <FoldersSection
-        folders={folders}
-        isLoading={isLoading}
-        onCreateClick={() => setFolderOpen(true)}
-      />
+      {!isLoading && folderId && folder === null ? (
+        <Card className="border-dashed bg-card/60">
+          <CardContent className="flex flex-col items-start gap-3 py-12">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Folder unavailable
+            </p>
+            <div className="flex max-w-md flex-col gap-1.5">
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                We couldn&apos;t find that folder in your drive.
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                It may have been moved, deleted, or belong to a different
+                student workspace.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              onClick={() => router.push("/write")}
+            >
+              Back to drive
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
-      <DocumentsSection
-        documents={documents}
-        isLoading={isLoading}
-        onCreateClick={() => setDocOpen(true)}
-      />
+      {!folderId || folder !== null ? (
+        <>
+          <FoldersSection
+            folders={folders}
+            isLoading={isLoading}
+            onCreateClick={() => setFolderOpen(true)}
+          />
+
+          <DocumentsSection
+            documents={documents}
+            isLoading={isLoading}
+            onCreateClick={() => setDocOpen(true)}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -293,7 +333,9 @@ function DocumentsSection({
   isLoading,
   onCreateClick,
 }: {
-  documents: Doc<"documents">[] | undefined;
+  documents:
+    | Array<Doc<"documents"> & { lastUpdatedAt: number }>
+    | undefined;
   isLoading: boolean;
   onCreateClick: () => void;
 }) {
@@ -339,7 +381,11 @@ function DocumentsSection({
   );
 }
 
-function DocumentCard({ doc }: { doc: Doc<"documents"> }) {
+function DocumentCard({
+  doc,
+}: {
+  doc: Doc<"documents"> & { lastUpdatedAt: number };
+}) {
   return (
     <Link
       href={`/write/documents/${doc._id}`}
@@ -363,7 +409,7 @@ function DocumentCard({ doc }: { doc: Doc<"documents"> }) {
               {doc.title || "Untitled document"}
             </h3>
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
-              Updated {formatDate(doc._creationTime)}
+              Updated {formatDate(doc.lastUpdatedAt)}
             </p>
           </div>
         </CardContent>
@@ -416,7 +462,10 @@ function NewFolderDialog({
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-folder-name" className="uppercase tracking-[0.14em] text-muted-foreground">
+            <Label
+              htmlFor="new-folder-name"
+              className="uppercase tracking-[0.14em] text-muted-foreground"
+            >
               Name
             </Label>
             <Input
@@ -485,7 +534,10 @@ function NewDocumentDialog({
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-doc-title" className="uppercase tracking-[0.14em] text-muted-foreground">
+            <Label
+              htmlFor="new-doc-title"
+              className="uppercase tracking-[0.14em] text-muted-foreground"
+            >
               Title
             </Label>
             <Input

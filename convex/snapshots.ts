@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { requireIdentity } from "./lib/auth";
 
+const SNAPSHOT_LIST_LIMIT = 25;
+
 async function requireViewerRecord(ctx: QueryCtx | MutationCtx) {
   const identity = await requireIdentity(ctx);
   const user = await ctx.db
@@ -24,7 +26,8 @@ export const listSnapshots = query({
     return await ctx.db
       .query("documentSnapshots")
       .withIndex("by_documentId", (q) => q.eq("documentId", args.documentId))
-      .collect();
+      .order("desc")
+      .take(SNAPSHOT_LIST_LIMIT);
   },
 });
 
@@ -38,6 +41,18 @@ export const saveSnapshot = mutation({
     const user = await requireViewerRecord(ctx);
     const doc = await ctx.db.get(args.documentId);
     if (!doc || doc.ownerId !== user._id) throw new Error("Document not found");
+
+    if (doc.latestSnapshotId) {
+      const latestSnapshot = await ctx.db.get(doc.latestSnapshotId);
+      if (
+        latestSnapshot &&
+        latestSnapshot.ownerId === user._id &&
+        latestSnapshot.editorJson === args.editorJson
+      ) {
+        return latestSnapshot._id;
+      }
+    }
+
     const snapshotId = await ctx.db.insert("documentSnapshots", {
       documentId: args.documentId,
       ownerId: user._id,

@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { requireIdentity } from "./lib/auth";
 
+const DRIVE_DOCUMENT_LIMIT = 50;
+
 async function requireViewerRecord(ctx: QueryCtx | MutationCtx) {
   const identity = await requireIdentity(ctx);
   const user = await ctx.db
@@ -21,12 +23,30 @@ export const listDocuments = query({
   },
   handler: async (ctx, args) => {
     const user = await requireViewerRecord(ctx);
-    return await ctx.db
+    const docs = await ctx.db
       .query("documents")
       .withIndex("by_ownerId_and_folderId", (q) =>
         q.eq("ownerId", user._id).eq("folderId", args.folderId),
       )
-      .collect();
+      .order("desc")
+      .take(DRIVE_DOCUMENT_LIMIT);
+
+    return await Promise.all(
+      docs.map(async (doc) => {
+        if (!doc.latestSnapshotId) {
+          return {
+            ...doc,
+            lastUpdatedAt: doc._creationTime,
+          };
+        }
+
+        const snapshot = await ctx.db.get(doc.latestSnapshotId);
+        return {
+          ...doc,
+          lastUpdatedAt: snapshot?._creationTime ?? doc._creationTime,
+        };
+      }),
+    );
   },
 });
 
@@ -47,10 +67,20 @@ export const createDocument = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireViewerRecord(ctx);
+    const title = args.title.trim();
+    if (!title) throw new Error("Document title is required");
+
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.ownerId !== user._id) {
+        throw new Error("Folder not found");
+      }
+    }
+
     return await ctx.db.insert("documents", {
       ownerId: user._id,
       folderId: args.folderId,
-      title: args.title,
+      title,
       status: "draft",
       latestSnapshotId: null,
     });
@@ -63,7 +93,9 @@ export const renameDocument = mutation({
     const user = await requireViewerRecord(ctx);
     const doc = await ctx.db.get(args.documentId);
     if (!doc || doc.ownerId !== user._id) throw new Error("Document not found");
-    await ctx.db.patch(args.documentId, { title: args.title });
+    const title = args.title.trim();
+    if (!title) throw new Error("Document title is required");
+    await ctx.db.patch(args.documentId, { title });
   },
 });
 
@@ -76,6 +108,14 @@ export const moveDocument = mutation({
     const user = await requireViewerRecord(ctx);
     const doc = await ctx.db.get(args.documentId);
     if (!doc || doc.ownerId !== user._id) throw new Error("Document not found");
+
+    if (args.folderId) {
+      const folder = await ctx.db.get(args.folderId);
+      if (!folder || folder.ownerId !== user._id) {
+        throw new Error("Folder not found");
+      }
+    }
+
     await ctx.db.patch(args.documentId, { folderId: args.folderId });
   },
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -43,18 +43,29 @@ export function ProfileTrainingFlow() {
   );
   const createProfile = useMutation(api.profile.createProfile);
   const addSampleMetadata = useMutation(api.profile.addSampleMetadata);
+  const updateProfileSummary = useMutation(api.profile.updateProfileSummary);
+  const markProfileReady = useMutation(api.profile.markProfileReady);
 
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
+  const [notes, setNotes] = useState("");
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [readyingProfile, setReadyingProfile] = useState(false);
 
   const sampleCount = profile?.sampleCount ?? 0;
   const isReady = profile?.status === "ready";
+  const hasNotes = Boolean(profile?.summary?.trim());
+  const canMarkReady = sampleCount >= SAMPLE_TARGET && hasNotes;
   const progress = Math.min(
     100,
     Math.round((sampleCount / SAMPLE_TARGET) * 100),
   );
+
+  useEffect(() => {
+    setNotes(profile?.summary ?? "");
+  }, [profile?._id, profile?.summary]);
 
   const checklist = useMemo<ChecklistStep[]>(
     () => [
@@ -68,7 +79,7 @@ export function ProfileTrainingFlow() {
         id: "02",
         title: "Add preferences",
         description: "Teach Paideia the tone, rhythm, and habits to keep.",
-        done: sampleCount >= SAMPLE_TARGET,
+        done: hasNotes,
       },
       {
         id: "03",
@@ -77,7 +88,7 @@ export function ProfileTrainingFlow() {
         done: isReady,
       },
     ],
-    [sampleCount, isReady],
+    [hasNotes, isReady, sampleCount],
   );
 
   async function handleStartTraining() {
@@ -107,6 +118,30 @@ export function ProfileTrainingFlow() {
       setExcerpt("");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSaveNotes(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile || savingNotes) return;
+    setSavingNotes(true);
+    try {
+      await updateProfileSummary({
+        profileId: profile._id,
+        summary: notes.trim(),
+      });
+    } finally {
+      setSavingNotes(false);
+    }
+  }
+
+  async function handleMarkReady() {
+    if (!profile || readyingProfile || !canMarkReady) return;
+    setReadyingProfile(true);
+    try {
+      await markProfileReady({ profileId: profile._id });
+    } finally {
+      setReadyingProfile(false);
     }
   }
 
@@ -218,7 +253,52 @@ export function ProfileTrainingFlow() {
                 style={{ width: `${progress}%` }}
               />
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Ready unlocks once you&apos;ve added {SAMPLE_TARGET} samples and
+              captured the voice notes Paideia should preserve.
+            </p>
           </div>
+
+          <Card className="bg-card">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+                Voice notes
+              </CardTitle>
+              <CardDescription>
+                Capture the tone, pacing, habits, and context Paideia should
+                hold onto when it drafts in your voice.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="flex flex-col gap-4" onSubmit={handleSaveNotes}>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="profile-summary">Preferences and context</Label>
+                  <Textarea
+                    id="profile-summary"
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    placeholder="Examples: keep my intros direct, avoid over-formal transitions, and preserve my habit of grounding claims in lived examples."
+                    rows={5}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    {hasNotes
+                      ? "Voice notes saved. Update them any time as your writing goals shift."
+                      : "Add a few lines about your voice before marking this profile ready."}
+                  </p>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    className="gap-2 rounded-none"
+                    disabled={savingNotes}
+                  >
+                    {savingNotes ? "Saving…" : "Save notes"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
 
           {samples === undefined ? (
             <Card className="bg-card/60">
@@ -321,7 +401,7 @@ export function ProfileTrainingFlow() {
                   <p className="text-[11px] text-muted-foreground">
                     {sampleCount >= SAMPLE_TARGET
                       ? "You can keep adding — more samples sharpen the voice."
-                      : `${SAMPLE_TARGET - sampleCount} more to unlock a ready profile.`}
+                      : `${SAMPLE_TARGET - sampleCount} more to unlock ready review.`}
                   </p>
                   <Button
                     type="submit"
@@ -333,6 +413,40 @@ export function ProfileTrainingFlow() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+                Readiness
+              </CardTitle>
+              <CardDescription>
+                Confirm the profile only after the samples and notes feel like a
+                real baseline for your writing voice.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3">
+              <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+                {isReady
+                  ? "This profile is ready for document drafting and revision flows."
+                  : canMarkReady
+                    ? "Everything is in place. Mark the profile ready when you want future drafts to rely on this training set."
+                    : "To mark ready, add at least three samples and save your voice notes first."}
+              </p>
+              <Button
+                type="button"
+                className="gap-2 rounded-none"
+                onClick={handleMarkReady}
+                disabled={isReady || readyingProfile || !canMarkReady}
+              >
+                <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} />
+                {isReady
+                  ? "Profile ready"
+                  : readyingProfile
+                    ? "Marking ready…"
+                    : "Mark ready"}
+              </Button>
             </CardContent>
           </Card>
         </section>

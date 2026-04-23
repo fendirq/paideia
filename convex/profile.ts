@@ -3,6 +3,9 @@ import { v } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { requireIdentity } from "./lib/auth";
 
+const PROFILE_READY_SAMPLE_TARGET = 3;
+const PROFILE_SAMPLE_LIMIT = 12;
+
 async function requireViewerRecord(ctx: QueryCtx | MutationCtx) {
   const identity = await requireIdentity(ctx);
   const user = await ctx.db
@@ -36,7 +39,8 @@ export const listSamples = query({
     return await ctx.db
       .query("writingSamples")
       .withIndex("by_profileId", (q) => q.eq("profileId", args.profileId))
-      .collect();
+      .order("desc")
+      .take(PROFILE_SAMPLE_LIMIT);
   },
 });
 
@@ -74,13 +78,58 @@ export const addSampleMetadata = mutation({
       ownerId: user._id,
       profileId: args.profileId,
       fileId: null,
-      title: args.title,
+      title: args.title.trim(),
       excerpt: args.excerpt,
     });
     const nextCount = profile.sampleCount + 1;
     await ctx.db.patch(args.profileId, {
       sampleCount: nextCount,
-      status: nextCount >= 3 ? "ready" : "training",
+      status: profile.status === "ready" ? "ready" : "training",
+    });
+  },
+});
+
+export const updateProfileSummary = mutation({
+  args: {
+    profileId: v.id("writingProfiles"),
+    summary: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireViewerRecord(ctx);
+    const profile = await ctx.db.get(args.profileId);
+    if (!profile || profile.ownerId !== user._id) {
+      throw new Error("Profile not found");
+    }
+
+    const summary = args.summary.trim();
+    await ctx.db.patch(args.profileId, {
+      summary: summary.length > 0 ? summary : null,
+      status: profile.status === "empty" ? "training" : profile.status,
+    });
+  },
+});
+
+export const markProfileReady = mutation({
+  args: {
+    profileId: v.id("writingProfiles"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireViewerRecord(ctx);
+    const profile = await ctx.db.get(args.profileId);
+    if (!profile || profile.ownerId !== user._id) {
+      throw new Error("Profile not found");
+    }
+
+    if (profile.sampleCount < PROFILE_READY_SAMPLE_TARGET) {
+      throw new Error("Add at least three samples before marking ready");
+    }
+
+    if (!profile.summary?.trim()) {
+      throw new Error("Add voice notes before marking ready");
+    }
+
+    await ctx.db.patch(args.profileId, {
+      status: "ready",
     });
   },
 });
