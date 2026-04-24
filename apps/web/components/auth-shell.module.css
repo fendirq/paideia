@@ -1,0 +1,78 @@
+.shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.card {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 420px);
+  background: rgba(255, 252, 247, 0.86);
+  border: 1px solid rgba(23, 18, 13, 0.1);
+  border-radius: 30px;
+  overflow: hidden;
+  box-shadow: 0 28px 90px rgba(78, 45, 27, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.intro {
+  padding: clamp(28px, 4vw, 48px);
+  display: grid;
+  gap: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(188, 95, 44, 0.18), transparent 32%),
+    linear-gradient(180deg, rgba(255, 248, 240, 0.95), rgba(247, 236, 223, 0.92));
+}
+
+.label {
+  font-family:
+    var(--font-geist-mono),
+    "Geist Mono",
+    ui-monospace,
+    monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--accent-strong);
+}
+
+.title {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.body {
+  color: var(--muted);
+  line-height: 1.75;
+  font-size: 1rem;
+  max-width: 42ch;
+}
+
+.points {
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.content {
+  padding: clamp(20px, 4vw, 36px);
+  display: grid;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.content :global(.cl-rootBox),
+.content :global(.cl-cardBox) {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+}

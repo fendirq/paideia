@@ -1,0 +1,57 @@
+.panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(23, 18, 13, 0.1);
+  background: rgba(255, 252, 247, 0.82);
+  box-shadow: 0 24px 70px rgba(78, 45, 27, 0.1);
+}
+
+.label {
+  font-family:
+    var(--font-geist-mono),
+    "Geist Mono",
+    ui-monospace,
+    monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--accent-strong);
+}
+
+.title {
+  font-size: clamp(1.6rem, 3vw, 2.35rem);
+  letter-spacing: -0.04em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(23, 18, 13, 0.08);
+}
+
+.metric span,
+.copy {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.metric strong {
+  font-size: 1rem;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
